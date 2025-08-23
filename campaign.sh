@@ -2,7 +2,7 @@
 
 # ---------------------------------------------- START ONE-TIME PARAMETERS ----------------------------------------------
 # needed by gpgpu-sim for real register usage on PTXPlus mode
-export PTXAS_CUDA_INSTALL_PATH=/usr/local/cuda-11.2
+export PTXAS_CUDA_INSTALL_PATH=/usr
 
 CONFIG_FILE=./gpgpusim.config
 TMP_DIR=./logs

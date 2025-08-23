@@ -42,9 +42,9 @@ include ../../version_detection.mk
 
 OUTPUT_DIR=$(SIM_OBJ_FILES_DIR)/cuda-sim
 
-OPT	:=  -O3 -g3 -Wall -Wno-unused-function -Wno-sign-compare
+OPT	:=  -O3 -g3 -Wall -Wno-unused-function -Wno-sign-compare -Wno-stringop-truncation -Wno-format-truncation -Wno-literal-suffix
 ifeq ($(DEBUG),1)
-	OPT := -g3 -Wall  -Wno-unused-function -Wno-sign-compare
+	OPT := -g3 -Wall  -Wno-unused-function -Wno-sign-compare -Wno-stringop-truncation -Wno-format-truncation -Wno-literal-suffix
 endif
 OPT += -I$(CUDA_INSTALL_PATH)/include  -I$(OUTPUT_DIR)/ -I. -I$(SIM_OBJ_FILES_DIR)
 OPT += -fPIC 
@@ -129,9 +129,9 @@ $(OUTPUT_DIR)/instructions.h: instructions.cc
 
 $(OUTPUT_DIR)/ptx_parser_decode.def: $(OUTPUT_DIR)/ptx.tab.c
 ifeq ($(shell uname),Linux)
-	cat $(OUTPUT_DIR)/ptx.tab.h | grep "=" | sed 's/^[ ]\+//' | sed 's/[=,]//g' | sed 's/\([_A-Z1-9]\+\)[ ]\+\([0-9]\+\)/\1 \1/' | sed 's/^/DEF(/' | sed 's/ /,"/' | sed 's/$$/")/' > $(OUTPUT_DIR)/ptx_parser_decode.def
+	cat $(OUTPUT_DIR)/ptx.tab.h | grep "=" | sed 's/^[ ]\+//' | sed 's/[=,]//g' | sed 's/\([_A-Z1-9]\+\)[ ]\+\([0-9]\+\)/\1 \1/' | sed 's/^/DEF(/' | sed 's/ /,"/' | sed 's/ \/.*//' | sed 's/$$/")/' > $(OUTPUT_DIR)/ptx_parser_decode.def
 else
-	cat $(OUTPUT_DIR)/ptx.tab.h | grep "=" | sed -E 's/^ +//' | sed 's/[=,]//g' | sed -E 's/([_A-Z1-9]+).*/\1 \1/' | sed 's/^/DEF(/' | sed 's/ /,"/' | sed 's/$$/")/' > $(OUTPUT_DIR)/ptx_parser_decode.def
+	cat $(OUTPUT_DIR)/ptx.tab.h | grep "=" | sed -E 's/^ +//' | sed 's/[=,]//g' | sed -E 's/([_A-Z1-9]+).*/\1 \1/' | sed 's/^/DEF(/' | sed 's/ /,"/' | sed 's/ \/.*//' | sed 's/$$/")/' > $(OUTPUT_DIR)/ptx_parser_decode.def
 endif
 
 $(OUTPUT_DIR)/instructions.o: $(OUTPUT_DIR)/instructions.h $(OUTPUT_DIR)/ptx.tab.c
