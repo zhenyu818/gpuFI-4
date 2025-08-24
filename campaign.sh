@@ -3,46 +3,45 @@
 # ---------------------------------------------- START ONE-TIME PARAMETERS ----------------------------------------------
 # needed by gpgpu-sim for real register usage on PTXPlus mode
 export PTXAS_CUDA_INSTALL_PATH=/usr
-
 CONFIG_FILE=./gpgpusim.config
 TMP_DIR=./logs
 CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
-RUNS=7
+RUNS=100
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
 DELETE_LOGS=0 # if 1 then all logs will be deleted at the end of the script
 # ---------------------------------------------- END ONE-TIME PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER GPGPU CARD PARAMETERS ----------------------------------------------
-# L1 cache size per SIMT core (30 SIMT cores on RTX 2060, 30 clusters with 1 core each) - 80 for Volta QV100
-L1D_SIZE_BITS=276736  # nsets=1, line_size=128 bytes + 57 bits, assoc=256
-L1C_SIZE_BITS=582656 # nsets=128, line_size=64 bytes + 57 bits, assoc=8
-L1T_SIZE_BITS=1106944 # nsets=4, line_size=128 bytes + 57 bits, assoc=256
-# L2 cache total size from all sub partitions
-L2_SIZE_BITS=53133312 # (nsets=32, line_size=128 bytes + 57 bits, assoc=24) x 24 sub partitions (64 sub partitions in Volta QV100)
+# L1 cache size per SIMT core (30 SIMT cores on RTX 2060, 30 clusters with 1 core each)
+L1D_SIZE_BITS=524345  # nsets=1, line_size=128 bytes + 57 bits, assoc=512 (64 KB per core)
+L1C_SIZE_BITS=524345 # nsets=128, line_size=64 bytes + 57 bits, assoc=8 (64 KB per core)
+L1T_SIZE_BITS=1048633 # nsets=4, line_size=128 bytes + 57 bits, assoc=256 (128 KB per core)
+# L2 cache total size from all sub partitions (RTX 2060: 12 memory controllers × 2 sub partitions = 24 total)
+L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24 sub partitions = 3 MB total
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./srad 2 0.5 128 128"
+CUDA_UUT="./pathfinder 100 100 10"
 # total cycles for all kernels
-CYCLES=49799
+CYCLES=67532
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
 # fix cycles.txt with kernel execution cycles
 # (e.g. seq 1 10 >> cycles.txt, or multiple seq commands if a kernel has multiple executions)
 # use the following command from profiling execution for easier creation of cycles.txt file
 # e.g. grep "_Z12lud_diagonalPfii" cycles.in | awk  '{ system("seq " $12 " " $18 ">> cycles.txt")}'
 CYCLES_FILE=./cycles.txt
-MAX_REGISTERS_USED=24
-SHADER_USED="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 66 67 68 69 70 71 72 73 74 75 76 77 78 79"
-SUCCESS_MSG='Test PASSED'
-FAILED_MSG='Test FAILED'
+MAX_REGISTERS_USED=15
+SHADER_USED="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29"
+SUCCESS_MSG='Success'
+FAILED_MSG='Failed'
 TIMEOUT_VAL=400s
 DATATYPE_SIZE=32
 # lmem and smem values are taken from gpgpu-sim ptx output per kernel
 # e.g. GPGPU-Sim PTX: Kernel '_Z9vectorAddPKdS0_Pdi' : regs=8, lmem=0, smem=0, cmem=380
 # if 0 put a random value > 0
-LMEM_SIZE_BITS=10
-SMEM_SIZE_BITS=1024
+LMEM_SIZE_BITS=1
+SMEM_SIZE_BITS=2048
 # ---------------------------------------------- END PER KERNEL/APPLICATION PARAMETERS (+profile=1) ------------------------------------------------
 
 FAULT_INJECTION_OCCURRED="Fault injection"

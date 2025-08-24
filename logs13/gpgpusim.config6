@@ -3,32 +3,32 @@
 # 1- https://www.nvidia.com/content/dam/en-zz/Solutions/design-visualization/technologies/turing-architecture/NVIDIA-Turing-Architecture-Whitepaper.pdf
 # 2- "RTX on—The NVIDIA Turing GPU", IEEE MICRO 2020
 
--run_uid r15b2
+-run_uid r13b6
 
 -profile 0
 -last_cycle 67532
 -components_to_flip 0
 
--thread_rand 3110
--warp_rand 361
--total_cycle_rand 16088
+-thread_rand 2510
+-warp_rand 5693
+-total_cycle_rand 20482
 -register_rand_n 12
--reg_bitflip_rand_n 11
+-reg_bitflip_rand_n 8
 -per_warp 0
 -kernel_n 0
 
 -local_mem_bitflip_rand_n 1
 
--block_rand 5408
+-block_rand 106
 -block_n 1
--shared_mem_bitflip_rand_n 1694
--l1d_shader_rand_n 28
--l1d_cache_bitflip_rand_n 17658
--l1c_shader_rand_n 3
--l1c_cache_bitflip_rand_n 471354
--l1t_shader_rand_n 26
--l1t_cache_bitflip_rand_n 805091
--l2_cache_bitflip_rand_n 10833674
+-shared_mem_bitflip_rand_n 1427
+-l1d_shader_rand_n 11
+-l1d_cache_bitflip_rand_n 424542
+-l1c_shader_rand_n 0
+-l1c_cache_bitflip_rand_n 519513
+-l1t_shader_rand_n 18
+-l1t_cache_bitflip_rand_n 198194
+-l2_cache_bitflip_rand_n 11921488
 
 #-gpgpu_max_concurrent_kernel 20
 
