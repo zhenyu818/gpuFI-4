@@ -204,6 +204,8 @@ void check_and_apply_l2_bf(ptx_thread_info *thread, addr_t addr, ptx_reg_t &data
 //            printf("bit_start=%u, bit_end=%u, bf_line_sz_bits_idx=%u, bf_size_bits_idx=%u\n", bit_start, bit_end, gpu_sim->l2_line_bitflip_bits_idx[j]+1, bf_size_bits_idx+1);
 //            printf("Before bit flip of thread=%u, value = %llu, reg_bf=%u\n", thread->get_uid(), data.u64, bf_size_bits_idx+1);
           *reg_bf ^= 1UL << bf_size_bits_idx;
+          thread->fi_set_next_dst_from_mem("L1T_cache", bf_size_bits_idx+1);
+          thread->fi_set_next_dst_from_mem("L2_cache", bf_size_bits_idx+1);
 //            printf("After bit flip value = %llu\n", data.u64);
 //            printf("DATA INSIDE= %llu\n", data.u64);
         }
@@ -269,6 +271,7 @@ void l1t_bit_flip(ptx_thread_info *thread, unsigned data_tex_array_index, unsign
 //          printf("bit_start=%u, bit_end=%u, bf_line_sz_bits_idx=%u, bf_size_bits_idx=%u\n", bit_start, bit_end, l1t_line_bitflip_bits_idx_vector[j]+1, bf_size_bits_idx+1);
 //          printf("Before bit flip value = %llu, reg_bf=%u\n", data_bf.u64, bf_size_bits_idx+1);
           *reg_bf ^= 1UL << bf_size_bits_idx;
+          thread->fi_set_next_dst_from_mem("L2_cache", bf_size_bits_idx+1);
 //          printf("After bit flip value = %llu\n", data_bf.u64);
         }
       } else if (l1t_tag_vector[j] == tag && probe_status == MISS) { // miss
@@ -368,6 +371,10 @@ void local_global_read_l1D_bf(ptx_thread_info *thread, ptx_reg_t &data, size_t s
 //                printf("Thread on chunk %u, bit_start=%u, bit_end=%u, bf_line_sz_bits_idx=%u, bf_size_bits_idx=%u\n", chunk_idx, bit_start, bit_end, l1d_line_bitflip_bits_idx_vector[j]+1, bf_size_bits_idx+1);
 //                printf("Before bit flip of thread=%u, value = %llu, reg_bf=%u\n", thread->get_uid(), data.u64, bf_size_bits_idx+1);
               *reg_bf ^= 1UL << bf_size_bits_idx;
+              // 标记：来自本地内存位翻转
+              thread->fi_set_next_dst_from_mem("local_mem", bf_size_bits_idx+1);
+              // 标记下一次目的寄存器写回为直接受影响（来自L1D缓存注入）
+              thread->fi_set_next_dst_from_mem("L1D_cache", bf_size_bits_idx+1);
 //                printf("After bit flip value = %llu\n", data.u64);
 //                printf("DATA INSIDE= %f\n", data.f32);
             }
@@ -691,7 +698,31 @@ void ptx_thread_info::set_reg(const symbol *reg, const ptx_reg_t &value) {
   if (reg->name() == "_") return;
   assert(!m_regs.empty());
   assert(reg->uid() > 0);
-  m_regs.back()[reg] = value;
+  ptx_reg_t newValue = value;
+  // 如果该寄存器被标记为“下一次写入时翻转”，则在写回前翻转并打印FI_DIRECT（目的寄存器）
+  unsigned bit1based = 0;
+  if (fi_take_pending_dst_flip(reg, newValue, bit1based)) {
+    unsigned pc_now = get_pc();
+    unsigned icount_now = get_icount();
+    printf("FI_DIRECT: component=RF thread_uid=%u hw(sid=%u,wid=%u,tid=%u) icount=%u pc=%u inst= ",
+           get_uid(), get_hw_sid(), get_hw_wid(), get_hw_tid(), icount_now, pc_now);
+    print_insn(pc_now, stdout);
+    printf(" | dst_reg=%s bit=%u\n", reg->name().c_str(), bit1based);
+    // 同时标记该寄存器为已故障，以便后续源操作数读取时也能触发（若该值被再次作为源使用）
+    fi_mark_faulted_reg(reg);
+  }
+  // 如果上一条LOAD路径来自local/global/L1/L2等注入位标记，直接打印FI_DIRECT（目的寄存器），不再改值
+  std::string mem_comp;
+  unsigned mem_bit1 = 0;
+  if (fi_consume_next_dst_from_mem(mem_comp, mem_bit1)) {
+    unsigned pc_now = get_pc();
+    unsigned icount_now = get_icount();
+    printf("FI_DIRECT: component=%s thread_uid=%u hw(sid=%u,wid=%u,tid=%u) icount=%u pc=%u inst= ",
+           mem_comp.c_str(), get_uid(), get_hw_sid(), get_hw_wid(), get_hw_tid(), icount_now, pc_now);
+    print_insn(pc_now, stdout);
+    printf(" | dst_reg=%s bit=%u\n", reg->name().c_str(), mem_bit1);
+  }
+  m_regs.back()[reg] = newValue;
   if (m_enable_debug_trace) m_debug_trace_regs_modified.back()[reg] = value;
   m_last_set_operand_value = value;
 }
@@ -781,7 +812,19 @@ ptx_reg_t ptx_thread_info::get_operand_value(const operand_info &op,
          (opType != FF64_TYPE)) ||
         (op.get_addr_space() != undefined_space)) {
       if (op.is_reg()) {
-        result = get_reg(op.get_symbol());
+        const symbol* src_sym = op.get_symbol();
+        result = get_reg(src_sym);
+        // 打印“直接受影响”的指令：当读取到被翻转过的寄存器时，仅打印一次
+        if (fi_consume_if_faulted_reg(src_sym)) {
+          unsigned pc_now = get_pc();
+          unsigned icount_now = get_icount();
+          printf("FI_DIRECT: component=RF thread_uid=%u hw(sid=%u,wid=%u,tid=%u) icount=%u pc=%u inst= ",
+                 get_uid(), get_hw_sid(), get_hw_wid(), get_hw_tid(), icount_now, pc_now);
+          print_insn(pc_now, stdout);
+          printf(" | src_reg=");
+          fprintf(stdout, "%s", src_sym->name().c_str());
+          printf("\n");
+        }
       } else if (op.is_builtin()) {
         result.u32 = get_builtin(op.get_int(), op.get_addr_offset());
       } else if (op.is_immediate_address()) {

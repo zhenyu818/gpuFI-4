@@ -2,12 +2,12 @@
 
 # ---------------------------------------------- START ONE-TIME PARAMETERS ----------------------------------------------
 # needed by gpgpu-sim for real register usage on PTXPlus mode
-export PTXAS_CUDA_INSTALL_PATH=/usr
+export PTXAS_CUDA_INSTALL_PATH=/usr/local/cuda
 CONFIG_FILE=./gpgpusim.config
 TMP_DIR=./logs
 CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
-RUNS=100
+RUNS=10
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
 DELETE_LOGS=0 # if 1 then all logs will be deleted at the end of the script
 # ---------------------------------------------- END ONE-TIME PARAMETERS ------------------------------------------------
@@ -130,6 +130,11 @@ gather_results() {
         grep -iq "${SUCCESS_MSG}" $file; success_msg_grep=$(echo $?)
 	grep -i "${CYCLES_MSG}" $file | tail -1 | grep -q "${CYCLES}"; cycles_grep=$(echo $?)
         grep -iq "${FAILED_MSG}" $file; failed_msg_grep=$(echo $?)
+        # 打印每次故障注入影响的线程与PTX指令
+        if grep -q "FI_DIRECT:" "$file"; then
+            echo "[Run ${1}] Effects from ${file}:"
+            grep -h "FI_DIRECT:" "$file"
+        fi
         result=${success_msg_grep}${cycles_grep}${failed_msg_grep}
         case $result in
         "001")
@@ -178,6 +183,9 @@ parallel_execution() {
 }
 
 main() {
+    # 删除所有以logs开头的文件夹
+    find . -type d -name "logs*" -exec rm -rf {} + 2>/dev/null || true
+    
     if [[ "$profile" -eq 1 ]] || [[ "$profile" -eq 2 ]] || [[ "$profile" -eq 3 ]]; then
         RUNS=1
     fi

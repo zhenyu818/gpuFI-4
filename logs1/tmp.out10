@@ -175,29 +175,29 @@ GPGPU-Sim: Configuration options:
 -power_trace_zlevel                     6 # Compression level of the power trace output log (0=no comp, 9=highest)
 -steady_power_levels_enabled                    0 # produce a file for the steady power levels (1=On, 0=Off)
 -steady_state_definition                  8:4 # allowed deviation:number of samples
--run_uid                             r1b4 # TODO
+-run_uid                            r1b10 # TODO
 -profile                                0 # TODO
 -last_cycle                         67532 # TODO
 -component_to_flip                      0 # TODO
--thread_rand                         3426 # TODO
--warp_rand                           1355 # TODO
--total_cycle_rand                   20009 # TODO
--register_rand_n                        5 # TODO
--reg_bitflip_rand_n                    17 # TODO
+-thread_rand                          414 # TODO
+-warp_rand                           1142 # TODO
+-total_cycle_rand                    5272 # TODO
+-register_rand_n                        4 # TODO
+-reg_bitflip_rand_n                     8 # TODO
 -per_warp                               0 # TODO
 -kernel_n                               0 # TODO
 -local_mem_bitflip_rand_n                    1 # TODO
 -components_to_flip                     0 # TODO
 -block_n                                1 # TODO
--shared_mem_bitflip_rand_n                  593 # TODO
--block_rand                          2178 # TODO
--l1d_shader_rand_n                     10 # TODO
--l1d_cache_bitflip_rand_n               419426 # TODO
--l1c_shader_rand_n                      3 # TODO
--l1c_cache_bitflip_rand_n               253493 # TODO
--l1t_shader_rand_n                      3 # TODO
--l1t_cache_bitflip_rand_n               575270 # TODO
--l2_cache_bitflip_rand_n             15966366 # TODO
+-shared_mem_bitflip_rand_n                  118 # TODO
+-block_rand                          1888 # TODO
+-l1d_shader_rand_n                      8 # TODO
+-l1d_cache_bitflip_rand_n               259031 # TODO
+-l1c_shader_rand_n                     26 # TODO
+-l1c_cache_bitflip_rand_n               309387 # TODO
+-l1t_shader_rand_n                     18 # TODO
+-l1t_cache_bitflip_rand_n               446119 # TODO
+-l2_cache_bitflip_rand_n              4479921 # TODO
 -gpgpu_max_cycle                        0 # terminates gpu simulation early (0 = no limit)
 -gpgpu_max_insn                         0 # terminates gpu simulation early (0 = no limit)
 -gpgpu_max_cta                          0 # terminates gpu simulation early (0 = no limit)
@@ -266,7 +266,7 @@ self exe links to: /root/gpuFI-4/pathfinder
 Running md5sum using "md5sum /root/gpuFI-4/pathfinder "
 self exe links to: /root/gpuFI-4/pathfinder
 Extracting specific PTX file named pathfinder.1.sm_75.ptx 
-GPGPU-Sim PTX: __cudaRegisterFunction _Z14dynproc_kerneliPiS_S_iiii : hostFun 0x0x60d428401c3c, fat_cubin_handle = 1
+GPGPU-Sim PTX: __cudaRegisterFunction _Z14dynproc_kerneliPiS_S_iiii : hostFun 0x0x652464a01c3c, fat_cubin_handle = 1
 GPGPU-Sim PTX: Parsing pathfinder.1.sm_75.ptx
 GPGPU-Sim PTX: allocating shared region for "_ZZ14dynproc_kerneliPiS_S_iiiiE4prev" from 0x0 to 0x400 (shared memory space)
 GPGPU-Sim PTX: allocating shared region for "_ZZ14dynproc_kerneliPiS_S_iiiiE6result" from 0x400 to 0x800 (shared memory space)
@@ -277,16 +277,16 @@ GPGPU-Sim PTX: finished loading globals (0 bytes total).
 GPGPU-Sim PTX: loading constants with explicit initializers...  done.
 GPGPU-Sim PTX: Loading PTXInfo from pathfinder.1.sm_75.ptx
 GPGPU-Sim PTX: Kernel '_Z14dynproc_kerneliPiS_S_iiii' : regs=15, lmem=0, smem=2048, cmem=400
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc50c..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc500..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f8..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc508..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc4ec..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4ec..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4e0..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d8..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d0..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4e8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4cc..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d580..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d588..
 
-GPGPU-Sim PTX: cudaLaunch for 0x0x60d428401c3c (mode=performance simulation) on stream 0
+GPGPU-Sim PTX: cudaLaunch for 0x0x652464a01c3c (mode=performance simulation) on stream 0
 GPGPU-Sim PTX: finding reconvergence points for '_Z14dynproc_kerneliPiS_S_iiii'...
 GPGPU-Sim PTX: Finding dominators for '_Z14dynproc_kerneliPiS_S_iiii'...
 GPGPU-Sim PTX: Finding immediate dominators for '_Z14dynproc_kerneliPiS_S_iiii'...
@@ -317,18 +317,24 @@ GPGPU-Sim PTX: ... done pre-decoding instructions for '_Z14dynproc_kerneliPiS_S_
 GPGPU-Sim PTX: pushing kernel '_Z14dynproc_kerneliPiS_S_iiii' to stream 0, gridDim= (1,1,1) blockDim = (256,1,1) 
 GPGPU-Sim uArch: Shader 0 bind to kernel 1 '_Z14dynproc_kerneliPiS_S_iiii'
 GPGPU-Sim uArch: CTA/core = 4, limited by: threads
+#### gpu_sim_cycle=5272 and gpu_tot_sim_cycle=0
+FI_EFFECT: component=RF reg_idx=4 reg_name=%rs8 bit=8 thread_uid=159 hw(sid=0,wid=4,tid=158) icount=208 pc=792 inst= dynproc_kernel PC=0x318 (pathfinder.1.sm_75.ptx:151) add.s32 %r120, %r120, 1;
+Fault injection time taken=  0.002202 seconds
+Fault injection on total_cycle = 5272
+FI_DIRECT: component=RF thread_uid=159 hw(sid=0,wid=4,tid=158) icount=230 pc=512 inst= dynproc_kernel PC=0x200 (pathfinder.1.sm_75.ptx:108) mov.u16 %rs8, 0; | dst_reg=%rs8 bit=8
+FI_DIRECT: component=RF thread_uid=159 hw(sid=0,wid=4,tid=158) icount=235 pc=720 inst= dynproc_kernel PC=0x2d0 (pathfinder.1.sm_75.ptx:139) setp.eq.s16%p16, %rs8, 0; | src_reg=%rs8
 Destroy streams for kernel 1: size 0
 kernel_name = _Z14dynproc_kerneliPiS_S_iiii 
 kernel_launch_uid = 1 
 gpu_sim_cycle = 7734
-gpu_sim_insn = 106640
-gpu_ipc =      13.7885
+gpu_sim_insn = 106645
+gpu_ipc =      13.7891
 gpu_tot_sim_cycle = 7734
-gpu_tot_sim_insn = 106640
-gpu_tot_ipc =      13.7885
+gpu_tot_sim_insn = 106645
+gpu_tot_ipc =      13.7891
 gpu_tot_issued_cta = 1
-gpu_occupancy = 24.6649% 
-gpu_tot_occupancy = 24.6649% 
+gpu_occupancy = 24.6658% 
+gpu_tot_occupancy = 24.6658% 
 max_total_param_size = 0
 gpu_stall_dramfull = 0
 gpu_stall_icnt2sh    = 0
@@ -338,13 +344,13 @@ partiton_level_parallism_util =       1.0000
 partiton_level_parallism_util_total  =       1.0000
 L2_BW  =       1.0618 GB/Sec
 L2_BW_total  =       1.0618 GB/Sec
-gpu_total_sim_rate=106640
+gpu_total_sim_rate=106645
 
 ========= Core cache stats =========
 L1I_cache:
-	L1I_total_cache_accesses = 1964
+	L1I_total_cache_accesses = 1967
 	L1I_total_cache_misses = 64
-	L1I_total_cache_miss_rate = 0.0326
+	L1I_total_cache_miss_rate = 0.0325
 	L1I_total_cache_pending_hits = 0
 	L1I_total_cache_reservation_fails = 0
 L1D_cache:
@@ -400,9 +406,9 @@ L1T_cache:
 Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT] = 5
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT_RESERVED] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 82
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 79
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][RESERVATION_FAIL] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 89
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 92
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][MISS] = 0
@@ -438,7 +444,7 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][MISS] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][RESERVATION_FAIL] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][SECTOR_MISS] = 0
-	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 1900
+	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 1903
 	Total_core_cache_stats_breakdown[INST_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[INST_ACC_R][MISS] = 64
 	Total_core_cache_stats_breakdown[INST_ACC_R][RESERVATION_FAIL] = 0
@@ -456,16 +462,16 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][TOTAL_ACCESS] = 176
 	Total_core_cache_stats_breakdown[CONST_ACC_R][TOTAL_ACCESS] = 56
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_W][TOTAL_ACCESS] = 16
-	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 1964
+	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 1967
 
 Total_core_cache_fail_stats:
 ctas_completed 1, Shader 0 warp_id issue ditsribution:
 warp_id:
 0, 1, 2, 3, 4, 5, 6, 7, 
 distro:
-606, 606, 606, 606, 325, 325, 325, 325, 
-gpgpu_n_tot_thrd_icount = 119168
-gpgpu_n_tot_w_icount = 3724
+606, 606, 606, 606, 331, 325, 325, 325, 
+gpgpu_n_tot_thrd_icount = 119360
+gpgpu_n_tot_w_icount = 3730
 gpgpu_n_stall_shd_mem = 144
 gpgpu_n_mem_read_local = 0
 gpgpu_n_mem_write_local = 0
@@ -475,7 +481,7 @@ gpgpu_n_mem_texture = 0
 gpgpu_n_mem_const = 1
 gpgpu_n_load_insn  = 1100
 gpgpu_n_store_insn = 100
-gpgpu_n_shmem_insn = 6000
+gpgpu_n_shmem_insn = 6002
 gpgpu_n_sstarr_insn = 0
 gpgpu_n_tex_insn = 0
 gpgpu_n_const_mem_insn = 0
@@ -491,8 +497,8 @@ gpgpu_stall_shd_mem[gl_mem][coal_stall] = 0
 gpgpu_stall_shd_mem[gl_mem][data_port_stall] = 0
 gpu_reg_bank_conflict_stalls = 0
 Warp Occupancy Distribution:
-Stall:132	W0_Idle:9628	W0_Scoreboard:17448	W1:0	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:281	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:281	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:3162
-single_issue_nums: WS0:931	WS1:931	WS2:931	WS3:931	
+Stall:133	W0_Idle:9620	W0_Scoreboard:17449	W1:6	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:281	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:281	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:3162
+single_issue_nums: WS0:937	WS1:931	WS2:931	WS3:931	
 dual_issue_nums: WS0:0	WS1:0	WS2:0	WS3:0	
 traffic_breakdown_coretomem[CONST_ACC_R] = 8 {8:1,}
 traffic_breakdown_coretomem[GLOBAL_ACC_R] = 1104 {8:138,}
@@ -1595,22 +1601,22 @@ Reply_Network_out_buffer_avg_util =       0.0008
 
 
 gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 1 sec (1 sec)
-gpgpu_simulation_rate = 106640 (inst/sec)
+gpgpu_simulation_rate = 106645 (inst/sec)
 gpgpu_simulation_rate = 7734 (cycle/sec)
 gpgpu_silicon_slowdown = 176493x
 GPGPU-Sim: synchronize waiting for inactive GPU simulation
 GPGPU-Sim API: Stream Manager State
 GPGPU-Sim: detected inactive GPU simulation thread
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc50c..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc500..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f8..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc508..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc4ec..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4ec..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4e0..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d8..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d0..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4e8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4cc..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d580..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d588..
 
-GPGPU-Sim PTX: cudaLaunch for 0x0x60d428401c3c (mode=performance simulation) on stream 0
+GPGPU-Sim PTX: cudaLaunch for 0x0x652464a01c3c (mode=performance simulation) on stream 0
 GPGPU-Sim PTX: PDOM analysis already done for _Z14dynproc_kerneliPiS_S_iiii 
 GPGPU-Sim PTX: pushing kernel '_Z14dynproc_kerneliPiS_S_iiii' to stream 0, gridDim= (1,1,1) blockDim = (256,1,1) 
 GPGPU-Sim uArch: Shader 1 bind to kernel 2 '_Z14dynproc_kerneliPiS_S_iiii'
@@ -1621,11 +1627,11 @@ gpu_sim_cycle = 6805
 gpu_sim_insn = 106640
 gpu_ipc =      15.6708
 gpu_tot_sim_cycle = 14539
-gpu_tot_sim_insn = 213280
-gpu_tot_ipc =      14.6695
+gpu_tot_sim_insn = 213285
+gpu_tot_ipc =      14.6699
 gpu_tot_issued_cta = 2
 gpu_occupancy = 24.6192% 
-gpu_tot_occupancy = 24.6435% 
+gpu_tot_occupancy = 24.6440% 
 max_total_param_size = 0
 gpu_stall_dramfull = 0
 gpu_stall_icnt2sh    = 0
@@ -1635,11 +1641,11 @@ partiton_level_parallism_util =       1.0000
 partiton_level_parallism_util_total  =       1.0000
 L2_BW  =       1.2067 GB/Sec
 L2_BW_total  =       1.1296 GB/Sec
-gpu_total_sim_rate=213280
+gpu_total_sim_rate=106642
 
 ========= Core cache stats =========
 L1I_cache:
-	L1I_total_cache_accesses = 3928
+	L1I_total_cache_accesses = 3931
 	L1I_total_cache_misses = 128
 	L1I_total_cache_miss_rate = 0.0326
 	L1I_total_cache_pending_hits = 0
@@ -1697,9 +1703,9 @@ L1T_cache:
 Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT] = 10
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT_RESERVED] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 163
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 160
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][RESERVATION_FAIL] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 179
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 182
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][MISS] = 0
@@ -1735,7 +1741,7 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][MISS] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][RESERVATION_FAIL] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][SECTOR_MISS] = 0
-	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 3800
+	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 3803
 	Total_core_cache_stats_breakdown[INST_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[INST_ACC_R][MISS] = 128
 	Total_core_cache_stats_breakdown[INST_ACC_R][RESERVATION_FAIL] = 0
@@ -1753,16 +1759,16 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][TOTAL_ACCESS] = 352
 	Total_core_cache_stats_breakdown[CONST_ACC_R][TOTAL_ACCESS] = 112
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_W][TOTAL_ACCESS] = 32
-	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 3928
+	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 3931
 
 Total_core_cache_fail_stats:
 ctas_completed 2, Shader 0 warp_id issue ditsribution:
 warp_id:
 0, 1, 2, 3, 4, 5, 6, 7, 
 distro:
-606, 606, 606, 606, 325, 325, 325, 325, 
-gpgpu_n_tot_thrd_icount = 238336
-gpgpu_n_tot_w_icount = 7448
+606, 606, 606, 606, 331, 325, 325, 325, 
+gpgpu_n_tot_thrd_icount = 238528
+gpgpu_n_tot_w_icount = 7454
 gpgpu_n_stall_shd_mem = 288
 gpgpu_n_mem_read_local = 0
 gpgpu_n_mem_write_local = 0
@@ -1772,7 +1778,7 @@ gpgpu_n_mem_texture = 0
 gpgpu_n_mem_const = 2
 gpgpu_n_load_insn  = 2200
 gpgpu_n_store_insn = 200
-gpgpu_n_shmem_insn = 12000
+gpgpu_n_shmem_insn = 12002
 gpgpu_n_sstarr_insn = 0
 gpgpu_n_tex_insn = 0
 gpgpu_n_const_mem_insn = 0
@@ -1788,8 +1794,8 @@ gpgpu_stall_shd_mem[gl_mem][coal_stall] = 0
 gpgpu_stall_shd_mem[gl_mem][data_port_stall] = 0
 gpu_reg_bank_conflict_stalls = 0
 Warp Occupancy Distribution:
-Stall:264	W0_Idle:15374	W0_Scoreboard:35062	W1:0	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:562	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:562	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:6324
-single_issue_nums: WS0:1862	WS1:1862	WS2:1862	WS3:1862	
+Stall:265	W0_Idle:15366	W0_Scoreboard:35063	W1:6	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:562	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:562	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:6324
+single_issue_nums: WS0:1868	WS1:1862	WS2:1862	WS3:1862	
 dual_issue_nums: WS0:0	WS1:0	WS2:0	WS3:0	
 traffic_breakdown_coretomem[CONST_ACC_R] = 16 {8:2,}
 traffic_breakdown_coretomem[GLOBAL_ACC_R] = 2208 {8:276,}
@@ -2891,32 +2897,26 @@ Reply_Network_out_buffer_avg_util =       0.0009
 ----------------------------END-of-Interconnect-DETAILS-------------------------
 
 
-gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 1 sec (1 sec)
-gpgpu_simulation_rate = 213280 (inst/sec)
-gpgpu_simulation_rate = 14539 (cycle/sec)
-gpgpu_silicon_slowdown = 93885x
+gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 2 sec (2 sec)
+gpgpu_simulation_rate = 106642 (inst/sec)
+gpgpu_simulation_rate = 7269 (cycle/sec)
+gpgpu_silicon_slowdown = 187783x
 GPGPU-Sim: synchronize waiting for inactive GPU simulation
 GPGPU-Sim API: Stream Manager State
 GPGPU-Sim: detected inactive GPU simulation thread
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc50c..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc500..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f8..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc508..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc4ec..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4ec..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4e0..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d8..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d0..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4e8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4cc..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d580..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d588..
 
-GPGPU-Sim PTX: cudaLaunch for 0x0x60d428401c3c (mode=performance simulation) on stream 0
+GPGPU-Sim PTX: cudaLaunch for 0x0x652464a01c3c (mode=performance simulation) on stream 0
 GPGPU-Sim PTX: PDOM analysis already done for _Z14dynproc_kerneliPiS_S_iiii 
 GPGPU-Sim PTX: pushing kernel '_Z14dynproc_kerneliPiS_S_iiii' to stream 0, gridDim= (1,1,1) blockDim = (256,1,1) 
 GPGPU-Sim uArch: Shader 2 bind to kernel 3 '_Z14dynproc_kerneliPiS_S_iiii'
-#### gpu_sim_cycle=5470 and gpu_tot_sim_cycle=14539
-FI_EFFECT: component=RF reg_idx=5 reg_name=%r101 bit=17 thread_uid=611 hw(sid=2,wid=3,tid=98) icount=517 pc=552 inst= dynproc_kernel PC=0x228 (pathfinder.1.sm_75.ptx:115) add.s32 %r74, %r42, %r72;
-Fault injection time taken=  0.002673 seconds
-Fault injection on total_cycle = 20009
-FI_DIRECT: component=RF thread_uid=611 hw(sid=2,wid=3,tid=98) icount=541 pc=736 inst= dynproc_kernel PC=0x2e0 (pathfinder.1.sm_75.ptx:142) shl.b32 %r101, %r22, 2; | dst_reg=%r101 bit=17
-FI_DIRECT: component=RF thread_uid=611 hw(sid=2,wid=3,tid=98) icount=543 pc=752 inst= dynproc_kernel PC=0x2f0 (pathfinder.1.sm_75.ptx:144) add.s32 %r103, %r102, %r101; | src_reg=%r101
 Destroy streams for kernel 3: size 0
 kernel_name = _Z14dynproc_kerneliPiS_S_iiii 
 kernel_launch_uid = 3 
@@ -2924,11 +2924,11 @@ gpu_sim_cycle = 6686
 gpu_sim_insn = 106640
 gpu_ipc =      15.9497
 gpu_tot_sim_cycle = 21225
-gpu_tot_sim_insn = 319920
-gpu_tot_ipc =      15.0728
+gpu_tot_sim_insn = 319925
+gpu_tot_ipc =      15.0730
 gpu_tot_issued_cta = 3
 gpu_occupancy = 24.6133% 
-gpu_tot_occupancy = 24.6340% 
+gpu_tot_occupancy = 24.6343% 
 max_total_param_size = 0
 gpu_stall_dramfull = 0
 gpu_stall_icnt2sh    = 0
@@ -2938,11 +2938,11 @@ partiton_level_parallism_util =       1.0000
 partiton_level_parallism_util_total  =       1.0000
 L2_BW  =       1.2282 GB/Sec
 L2_BW_total  =       1.1607 GB/Sec
-gpu_total_sim_rate=159960
+gpu_total_sim_rate=159962
 
 ========= Core cache stats =========
 L1I_cache:
-	L1I_total_cache_accesses = 5892
+	L1I_total_cache_accesses = 5895
 	L1I_total_cache_misses = 192
 	L1I_total_cache_miss_rate = 0.0326
 	L1I_total_cache_pending_hits = 0
@@ -3000,9 +3000,9 @@ L1T_cache:
 Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT] = 15
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT_RESERVED] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 239
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 236
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][RESERVATION_FAIL] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 274
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 277
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][MISS] = 0
@@ -3038,7 +3038,7 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][MISS] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][RESERVATION_FAIL] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][SECTOR_MISS] = 0
-	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 5700
+	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 5703
 	Total_core_cache_stats_breakdown[INST_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[INST_ACC_R][MISS] = 192
 	Total_core_cache_stats_breakdown[INST_ACC_R][RESERVATION_FAIL] = 0
@@ -3056,16 +3056,16 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][TOTAL_ACCESS] = 528
 	Total_core_cache_stats_breakdown[CONST_ACC_R][TOTAL_ACCESS] = 168
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_W][TOTAL_ACCESS] = 48
-	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 5892
+	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 5895
 
 Total_core_cache_fail_stats:
 ctas_completed 3, Shader 0 warp_id issue ditsribution:
 warp_id:
 0, 1, 2, 3, 4, 5, 6, 7, 
 distro:
-606, 606, 606, 606, 325, 325, 325, 325, 
-gpgpu_n_tot_thrd_icount = 357504
-gpgpu_n_tot_w_icount = 11172
+606, 606, 606, 606, 331, 325, 325, 325, 
+gpgpu_n_tot_thrd_icount = 357696
+gpgpu_n_tot_w_icount = 11178
 gpgpu_n_stall_shd_mem = 432
 gpgpu_n_mem_read_local = 0
 gpgpu_n_mem_write_local = 0
@@ -3075,7 +3075,7 @@ gpgpu_n_mem_texture = 0
 gpgpu_n_mem_const = 3
 gpgpu_n_load_insn  = 3300
 gpgpu_n_store_insn = 300
-gpgpu_n_shmem_insn = 18000
+gpgpu_n_shmem_insn = 18002
 gpgpu_n_sstarr_insn = 0
 gpgpu_n_tex_insn = 0
 gpgpu_n_const_mem_insn = 0
@@ -3091,8 +3091,8 @@ gpgpu_stall_shd_mem[gl_mem][coal_stall] = 0
 gpgpu_stall_shd_mem[gl_mem][data_port_stall] = 0
 gpu_reg_bank_conflict_stalls = 0
 Warp Occupancy Distribution:
-Stall:396	W0_Idle:21133	W0_Scoreboard:52187	W1:0	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:843	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:843	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:9486
-single_issue_nums: WS0:2793	WS1:2793	WS2:2793	WS3:2793	
+Stall:397	W0_Idle:21125	W0_Scoreboard:52188	W1:6	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:843	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:843	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:9486
+single_issue_nums: WS0:2799	WS1:2793	WS2:2793	WS3:2793	
 dual_issue_nums: WS0:0	WS1:0	WS2:0	WS3:0	
 traffic_breakdown_coretomem[CONST_ACC_R] = 24 {8:3,}
 traffic_breakdown_coretomem[GLOBAL_ACC_R] = 3312 {8:414,}
@@ -4195,22 +4195,22 @@ Reply_Network_out_buffer_avg_util =       0.0009
 
 
 gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 2 sec (2 sec)
-gpgpu_simulation_rate = 159960 (inst/sec)
+gpgpu_simulation_rate = 159962 (inst/sec)
 gpgpu_simulation_rate = 10612 (cycle/sec)
 gpgpu_silicon_slowdown = 128627x
 GPGPU-Sim: synchronize waiting for inactive GPU simulation
 GPGPU-Sim API: Stream Manager State
 GPGPU-Sim: detected inactive GPU simulation thread
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc50c..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc500..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f8..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc508..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc4ec..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4ec..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4e0..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d8..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d0..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4e8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4cc..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d580..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d588..
 
-GPGPU-Sim PTX: cudaLaunch for 0x0x60d428401c3c (mode=performance simulation) on stream 0
+GPGPU-Sim PTX: cudaLaunch for 0x0x652464a01c3c (mode=performance simulation) on stream 0
 GPGPU-Sim PTX: PDOM analysis already done for _Z14dynproc_kerneliPiS_S_iiii 
 GPGPU-Sim PTX: pushing kernel '_Z14dynproc_kerneliPiS_S_iiii' to stream 0, gridDim= (1,1,1) blockDim = (256,1,1) 
 GPGPU-Sim uArch: Shader 3 bind to kernel 4 '_Z14dynproc_kerneliPiS_S_iiii'
@@ -4221,11 +4221,11 @@ gpu_sim_cycle = 6686
 gpu_sim_insn = 106640
 gpu_ipc =      15.9497
 gpu_tot_sim_cycle = 27911
-gpu_tot_sim_insn = 426560
-gpu_tot_ipc =      15.2829
+gpu_tot_sim_insn = 426565
+gpu_tot_ipc =      15.2830
 gpu_tot_issued_cta = 4
 gpu_occupancy = 24.6133% 
-gpu_tot_occupancy = 24.6291% 
+gpu_tot_occupancy = 24.6293% 
 max_total_param_size = 0
 gpu_stall_dramfull = 0
 gpu_stall_icnt2sh    = 0
@@ -4235,11 +4235,11 @@ partiton_level_parallism_util =       1.0000
 partiton_level_parallism_util_total  =       1.0000
 L2_BW  =       1.2282 GB/Sec
 L2_BW_total  =       1.1769 GB/Sec
-gpu_total_sim_rate=213280
+gpu_total_sim_rate=142188
 
 ========= Core cache stats =========
 L1I_cache:
-	L1I_total_cache_accesses = 7856
+	L1I_total_cache_accesses = 7859
 	L1I_total_cache_misses = 256
 	L1I_total_cache_miss_rate = 0.0326
 	L1I_total_cache_pending_hits = 0
@@ -4297,9 +4297,9 @@ L1T_cache:
 Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT] = 20
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT_RESERVED] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 319
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 316
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][RESERVATION_FAIL] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 365
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 368
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][MISS] = 0
@@ -4335,7 +4335,7 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][MISS] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][RESERVATION_FAIL] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][SECTOR_MISS] = 0
-	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 7600
+	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 7603
 	Total_core_cache_stats_breakdown[INST_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[INST_ACC_R][MISS] = 256
 	Total_core_cache_stats_breakdown[INST_ACC_R][RESERVATION_FAIL] = 0
@@ -4353,16 +4353,16 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][TOTAL_ACCESS] = 704
 	Total_core_cache_stats_breakdown[CONST_ACC_R][TOTAL_ACCESS] = 224
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_W][TOTAL_ACCESS] = 64
-	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 7856
+	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 7859
 
 Total_core_cache_fail_stats:
 ctas_completed 4, Shader 0 warp_id issue ditsribution:
 warp_id:
 0, 1, 2, 3, 4, 5, 6, 7, 
 distro:
-606, 606, 606, 606, 325, 325, 325, 325, 
-gpgpu_n_tot_thrd_icount = 476672
-gpgpu_n_tot_w_icount = 14896
+606, 606, 606, 606, 331, 325, 325, 325, 
+gpgpu_n_tot_thrd_icount = 476864
+gpgpu_n_tot_w_icount = 14902
 gpgpu_n_stall_shd_mem = 576
 gpgpu_n_mem_read_local = 0
 gpgpu_n_mem_write_local = 0
@@ -4372,7 +4372,7 @@ gpgpu_n_mem_texture = 0
 gpgpu_n_mem_const = 4
 gpgpu_n_load_insn  = 4400
 gpgpu_n_store_insn = 400
-gpgpu_n_shmem_insn = 24000
+gpgpu_n_shmem_insn = 24002
 gpgpu_n_sstarr_insn = 0
 gpgpu_n_tex_insn = 0
 gpgpu_n_const_mem_insn = 0
@@ -4388,8 +4388,8 @@ gpgpu_stall_shd_mem[gl_mem][coal_stall] = 0
 gpgpu_stall_shd_mem[gl_mem][data_port_stall] = 0
 gpu_reg_bank_conflict_stalls = 0
 Warp Occupancy Distribution:
-Stall:528	W0_Idle:26892	W0_Scoreboard:69312	W1:0	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:1124	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:1124	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:12648
-single_issue_nums: WS0:3724	WS1:3724	WS2:3724	WS3:3724	
+Stall:529	W0_Idle:26884	W0_Scoreboard:69313	W1:6	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:1124	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:1124	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:12648
+single_issue_nums: WS0:3730	WS1:3724	WS2:3724	WS3:3724	
 dual_issue_nums: WS0:0	WS1:0	WS2:0	WS3:0	
 traffic_breakdown_coretomem[CONST_ACC_R] = 32 {8:4,}
 traffic_breakdown_coretomem[GLOBAL_ACC_R] = 4416 {8:552,}
@@ -5491,23 +5491,23 @@ Reply_Network_out_buffer_avg_util =       0.0009
 ----------------------------END-of-Interconnect-DETAILS-------------------------
 
 
-gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 2 sec (2 sec)
-gpgpu_simulation_rate = 213280 (inst/sec)
-gpgpu_simulation_rate = 13955 (cycle/sec)
-gpgpu_silicon_slowdown = 97814x
+gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 3 sec (3 sec)
+gpgpu_simulation_rate = 142188 (inst/sec)
+gpgpu_simulation_rate = 9303 (cycle/sec)
+gpgpu_silicon_slowdown = 146726x
 GPGPU-Sim: synchronize waiting for inactive GPU simulation
 GPGPU-Sim API: Stream Manager State
 GPGPU-Sim: detected inactive GPU simulation thread
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc50c..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc500..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f8..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc508..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc4ec..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4ec..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4e0..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d8..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d0..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4e8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4cc..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d580..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d588..
 
-GPGPU-Sim PTX: cudaLaunch for 0x0x60d428401c3c (mode=performance simulation) on stream 0
+GPGPU-Sim PTX: cudaLaunch for 0x0x652464a01c3c (mode=performance simulation) on stream 0
 GPGPU-Sim PTX: PDOM analysis already done for _Z14dynproc_kerneliPiS_S_iiii 
 GPGPU-Sim PTX: pushing kernel '_Z14dynproc_kerneliPiS_S_iiii' to stream 0, gridDim= (1,1,1) blockDim = (256,1,1) 
 GPGPU-Sim uArch: Shader 4 bind to kernel 5 '_Z14dynproc_kerneliPiS_S_iiii'
@@ -5518,11 +5518,11 @@ gpu_sim_cycle = 6686
 gpu_sim_insn = 106640
 gpu_ipc =      15.9497
 gpu_tot_sim_cycle = 34597
-gpu_tot_sim_insn = 533200
-gpu_tot_ipc =      15.4117
+gpu_tot_sim_insn = 533205
+gpu_tot_ipc =      15.4119
 gpu_tot_issued_cta = 5
 gpu_occupancy = 24.6133% 
-gpu_tot_occupancy = 24.6260% 
+gpu_tot_occupancy = 24.6262% 
 max_total_param_size = 0
 gpu_stall_dramfull = 0
 gpu_stall_icnt2sh    = 0
@@ -5532,11 +5532,11 @@ partiton_level_parallism_util =       1.0000
 partiton_level_parallism_util_total  =       1.0000
 L2_BW  =       1.2282 GB/Sec
 L2_BW_total  =       1.1868 GB/Sec
-gpu_total_sim_rate=177733
+gpu_total_sim_rate=177735
 
 ========= Core cache stats =========
 L1I_cache:
-	L1I_total_cache_accesses = 9820
+	L1I_total_cache_accesses = 9823
 	L1I_total_cache_misses = 320
 	L1I_total_cache_miss_rate = 0.0326
 	L1I_total_cache_pending_hits = 0
@@ -5594,9 +5594,9 @@ L1T_cache:
 Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT] = 25
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT_RESERVED] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 398
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 395
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][RESERVATION_FAIL] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 457
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 460
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][MISS] = 0
@@ -5632,7 +5632,7 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][MISS] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][RESERVATION_FAIL] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][SECTOR_MISS] = 0
-	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 9500
+	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 9503
 	Total_core_cache_stats_breakdown[INST_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[INST_ACC_R][MISS] = 320
 	Total_core_cache_stats_breakdown[INST_ACC_R][RESERVATION_FAIL] = 0
@@ -5650,16 +5650,16 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][TOTAL_ACCESS] = 880
 	Total_core_cache_stats_breakdown[CONST_ACC_R][TOTAL_ACCESS] = 280
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_W][TOTAL_ACCESS] = 80
-	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 9820
+	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 9823
 
 Total_core_cache_fail_stats:
 ctas_completed 5, Shader 0 warp_id issue ditsribution:
 warp_id:
 0, 1, 2, 3, 4, 5, 6, 7, 
 distro:
-606, 606, 606, 606, 325, 325, 325, 325, 
-gpgpu_n_tot_thrd_icount = 595840
-gpgpu_n_tot_w_icount = 18620
+606, 606, 606, 606, 331, 325, 325, 325, 
+gpgpu_n_tot_thrd_icount = 596032
+gpgpu_n_tot_w_icount = 18626
 gpgpu_n_stall_shd_mem = 720
 gpgpu_n_mem_read_local = 0
 gpgpu_n_mem_write_local = 0
@@ -5669,7 +5669,7 @@ gpgpu_n_mem_texture = 0
 gpgpu_n_mem_const = 5
 gpgpu_n_load_insn  = 5500
 gpgpu_n_store_insn = 500
-gpgpu_n_shmem_insn = 30000
+gpgpu_n_shmem_insn = 30002
 gpgpu_n_sstarr_insn = 0
 gpgpu_n_tex_insn = 0
 gpgpu_n_const_mem_insn = 0
@@ -5685,8 +5685,8 @@ gpgpu_stall_shd_mem[gl_mem][coal_stall] = 0
 gpgpu_stall_shd_mem[gl_mem][data_port_stall] = 0
 gpu_reg_bank_conflict_stalls = 0
 Warp Occupancy Distribution:
-Stall:660	W0_Idle:32651	W0_Scoreboard:86437	W1:0	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:1405	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:1405	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:15810
-single_issue_nums: WS0:4655	WS1:4655	WS2:4655	WS3:4655	
+Stall:661	W0_Idle:32643	W0_Scoreboard:86438	W1:6	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:1405	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:1405	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:15810
+single_issue_nums: WS0:4661	WS1:4655	WS2:4655	WS3:4655	
 dual_issue_nums: WS0:0	WS1:0	WS2:0	WS3:0	
 traffic_breakdown_coretomem[CONST_ACC_R] = 40 {8:5,}
 traffic_breakdown_coretomem[GLOBAL_ACC_R] = 5520 {8:690,}
@@ -6789,22 +6789,22 @@ Reply_Network_out_buffer_avg_util =       0.0009
 
 
 gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 3 sec (3 sec)
-gpgpu_simulation_rate = 177733 (inst/sec)
+gpgpu_simulation_rate = 177735 (inst/sec)
 gpgpu_simulation_rate = 11532 (cycle/sec)
 gpgpu_silicon_slowdown = 118366x
 GPGPU-Sim: synchronize waiting for inactive GPU simulation
 GPGPU-Sim API: Stream Manager State
 GPGPU-Sim: detected inactive GPU simulation thread
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc50c..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc500..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f8..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc508..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc4ec..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4ec..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4e0..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d8..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d0..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4e8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4cc..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d580..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d588..
 
-GPGPU-Sim PTX: cudaLaunch for 0x0x60d428401c3c (mode=performance simulation) on stream 0
+GPGPU-Sim PTX: cudaLaunch for 0x0x652464a01c3c (mode=performance simulation) on stream 0
 GPGPU-Sim PTX: PDOM analysis already done for _Z14dynproc_kerneliPiS_S_iiii 
 GPGPU-Sim PTX: pushing kernel '_Z14dynproc_kerneliPiS_S_iiii' to stream 0, gridDim= (1,1,1) blockDim = (256,1,1) 
 GPGPU-Sim uArch: Shader 5 bind to kernel 6 '_Z14dynproc_kerneliPiS_S_iiii'
@@ -6815,11 +6815,11 @@ gpu_sim_cycle = 6686
 gpu_sim_insn = 106640
 gpu_ipc =      15.9497
 gpu_tot_sim_cycle = 41283
-gpu_tot_sim_insn = 639840
-gpu_tot_ipc =      15.4989
+gpu_tot_sim_insn = 639845
+gpu_tot_ipc =      15.4990
 gpu_tot_issued_cta = 6
 gpu_occupancy = 24.6133% 
-gpu_tot_occupancy = 24.6240% 
+gpu_tot_occupancy = 24.6241% 
 max_total_param_size = 0
 gpu_stall_dramfull = 0
 gpu_stall_icnt2sh    = 0
@@ -6829,11 +6829,11 @@ partiton_level_parallism_util =       1.0000
 partiton_level_parallism_util_total  =       1.0000
 L2_BW  =       1.2282 GB/Sec
 L2_BW_total  =       1.1935 GB/Sec
-gpu_total_sim_rate=159960
+gpu_total_sim_rate=159961
 
 ========= Core cache stats =========
 L1I_cache:
-	L1I_total_cache_accesses = 11784
+	L1I_total_cache_accesses = 11787
 	L1I_total_cache_misses = 384
 	L1I_total_cache_miss_rate = 0.0326
 	L1I_total_cache_pending_hits = 0
@@ -6891,9 +6891,9 @@ L1T_cache:
 Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT] = 30
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT_RESERVED] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 479
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 476
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][RESERVATION_FAIL] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 547
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 550
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][MISS] = 0
@@ -6929,7 +6929,7 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][MISS] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][RESERVATION_FAIL] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][SECTOR_MISS] = 0
-	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 11400
+	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 11403
 	Total_core_cache_stats_breakdown[INST_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[INST_ACC_R][MISS] = 384
 	Total_core_cache_stats_breakdown[INST_ACC_R][RESERVATION_FAIL] = 0
@@ -6947,16 +6947,16 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][TOTAL_ACCESS] = 1056
 	Total_core_cache_stats_breakdown[CONST_ACC_R][TOTAL_ACCESS] = 336
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_W][TOTAL_ACCESS] = 96
-	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 11784
+	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 11787
 
 Total_core_cache_fail_stats:
 ctas_completed 6, Shader 0 warp_id issue ditsribution:
 warp_id:
 0, 1, 2, 3, 4, 5, 6, 7, 
 distro:
-606, 606, 606, 606, 325, 325, 325, 325, 
-gpgpu_n_tot_thrd_icount = 715008
-gpgpu_n_tot_w_icount = 22344
+606, 606, 606, 606, 331, 325, 325, 325, 
+gpgpu_n_tot_thrd_icount = 715200
+gpgpu_n_tot_w_icount = 22350
 gpgpu_n_stall_shd_mem = 864
 gpgpu_n_mem_read_local = 0
 gpgpu_n_mem_write_local = 0
@@ -6966,7 +6966,7 @@ gpgpu_n_mem_texture = 0
 gpgpu_n_mem_const = 6
 gpgpu_n_load_insn  = 6600
 gpgpu_n_store_insn = 600
-gpgpu_n_shmem_insn = 36000
+gpgpu_n_shmem_insn = 36002
 gpgpu_n_sstarr_insn = 0
 gpgpu_n_tex_insn = 0
 gpgpu_n_const_mem_insn = 0
@@ -6982,8 +6982,8 @@ gpgpu_stall_shd_mem[gl_mem][coal_stall] = 0
 gpgpu_stall_shd_mem[gl_mem][data_port_stall] = 0
 gpu_reg_bank_conflict_stalls = 0
 Warp Occupancy Distribution:
-Stall:792	W0_Idle:38410	W0_Scoreboard:103562	W1:0	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:1686	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:1686	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:18972
-single_issue_nums: WS0:5586	WS1:5586	WS2:5586	WS3:5586	
+Stall:793	W0_Idle:38402	W0_Scoreboard:103563	W1:6	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:1686	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:1686	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:18972
+single_issue_nums: WS0:5592	WS1:5586	WS2:5586	WS3:5586	
 dual_issue_nums: WS0:0	WS1:0	WS2:0	WS3:0	
 traffic_breakdown_coretomem[CONST_ACC_R] = 48 {8:6,}
 traffic_breakdown_coretomem[GLOBAL_ACC_R] = 6624 {8:828,}
@@ -8086,22 +8086,22 @@ Reply_Network_out_buffer_avg_util =       0.0009
 
 
 gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 4 sec (4 sec)
-gpgpu_simulation_rate = 159960 (inst/sec)
+gpgpu_simulation_rate = 159961 (inst/sec)
 gpgpu_simulation_rate = 10320 (cycle/sec)
 gpgpu_silicon_slowdown = 132267x
 GPGPU-Sim: synchronize waiting for inactive GPU simulation
 GPGPU-Sim API: Stream Manager State
 GPGPU-Sim: detected inactive GPU simulation thread
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc50c..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc500..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f8..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc508..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc4ec..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4ec..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4e0..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d8..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d0..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4e8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4cc..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d580..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d588..
 
-GPGPU-Sim PTX: cudaLaunch for 0x0x60d428401c3c (mode=performance simulation) on stream 0
+GPGPU-Sim PTX: cudaLaunch for 0x0x652464a01c3c (mode=performance simulation) on stream 0
 GPGPU-Sim PTX: PDOM analysis already done for _Z14dynproc_kerneliPiS_S_iiii 
 GPGPU-Sim PTX: pushing kernel '_Z14dynproc_kerneliPiS_S_iiii' to stream 0, gridDim= (1,1,1) blockDim = (256,1,1) 
 GPGPU-Sim uArch: Shader 6 bind to kernel 7 '_Z14dynproc_kerneliPiS_S_iiii'
@@ -8112,11 +8112,11 @@ gpu_sim_cycle = 6686
 gpu_sim_insn = 106640
 gpu_ipc =      15.9497
 gpu_tot_sim_cycle = 47969
-gpu_tot_sim_insn = 746480
-gpu_tot_ipc =      15.5617
+gpu_tot_sim_insn = 746485
+gpu_tot_ipc =      15.5618
 gpu_tot_issued_cta = 7
 gpu_occupancy = 24.6133% 
-gpu_tot_occupancy = 24.6225% 
+gpu_tot_occupancy = 24.6226% 
 max_total_param_size = 0
 gpu_stall_dramfull = 0
 gpu_stall_icnt2sh    = 0
@@ -8126,11 +8126,11 @@ partiton_level_parallism_util =       1.0000
 partiton_level_parallism_util_total  =       1.0000
 L2_BW  =       1.2282 GB/Sec
 L2_BW_total  =       1.1983 GB/Sec
-gpu_total_sim_rate=186620
+gpu_total_sim_rate=149297
 
 ========= Core cache stats =========
 L1I_cache:
-	L1I_total_cache_accesses = 13748
+	L1I_total_cache_accesses = 13751
 	L1I_total_cache_misses = 448
 	L1I_total_cache_miss_rate = 0.0326
 	L1I_total_cache_pending_hits = 0
@@ -8188,9 +8188,9 @@ L1T_cache:
 Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT] = 35
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT_RESERVED] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 555
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 552
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][RESERVATION_FAIL] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 642
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 645
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][MISS] = 0
@@ -8226,7 +8226,7 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][MISS] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][RESERVATION_FAIL] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][SECTOR_MISS] = 0
-	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 13300
+	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 13303
 	Total_core_cache_stats_breakdown[INST_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[INST_ACC_R][MISS] = 448
 	Total_core_cache_stats_breakdown[INST_ACC_R][RESERVATION_FAIL] = 0
@@ -8244,16 +8244,16 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][TOTAL_ACCESS] = 1232
 	Total_core_cache_stats_breakdown[CONST_ACC_R][TOTAL_ACCESS] = 392
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_W][TOTAL_ACCESS] = 112
-	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 13748
+	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 13751
 
 Total_core_cache_fail_stats:
 ctas_completed 7, Shader 0 warp_id issue ditsribution:
 warp_id:
 0, 1, 2, 3, 4, 5, 6, 7, 
 distro:
-606, 606, 606, 606, 325, 325, 325, 325, 
-gpgpu_n_tot_thrd_icount = 834176
-gpgpu_n_tot_w_icount = 26068
+606, 606, 606, 606, 331, 325, 325, 325, 
+gpgpu_n_tot_thrd_icount = 834368
+gpgpu_n_tot_w_icount = 26074
 gpgpu_n_stall_shd_mem = 1008
 gpgpu_n_mem_read_local = 0
 gpgpu_n_mem_write_local = 0
@@ -8263,7 +8263,7 @@ gpgpu_n_mem_texture = 0
 gpgpu_n_mem_const = 7
 gpgpu_n_load_insn  = 7700
 gpgpu_n_store_insn = 700
-gpgpu_n_shmem_insn = 42000
+gpgpu_n_shmem_insn = 42002
 gpgpu_n_sstarr_insn = 0
 gpgpu_n_tex_insn = 0
 gpgpu_n_const_mem_insn = 0
@@ -8279,8 +8279,8 @@ gpgpu_stall_shd_mem[gl_mem][coal_stall] = 0
 gpgpu_stall_shd_mem[gl_mem][data_port_stall] = 0
 gpu_reg_bank_conflict_stalls = 0
 Warp Occupancy Distribution:
-Stall:924	W0_Idle:44169	W0_Scoreboard:120687	W1:0	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:1967	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:1967	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:22134
-single_issue_nums: WS0:6517	WS1:6517	WS2:6517	WS3:6517	
+Stall:925	W0_Idle:44161	W0_Scoreboard:120688	W1:6	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:1967	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:1967	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:22134
+single_issue_nums: WS0:6523	WS1:6517	WS2:6517	WS3:6517	
 dual_issue_nums: WS0:0	WS1:0	WS2:0	WS3:0	
 traffic_breakdown_coretomem[CONST_ACC_R] = 56 {8:7,}
 traffic_breakdown_coretomem[GLOBAL_ACC_R] = 7728 {8:966,}
@@ -9382,23 +9382,23 @@ Reply_Network_out_buffer_avg_util =       0.0009
 ----------------------------END-of-Interconnect-DETAILS-------------------------
 
 
-gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 4 sec (4 sec)
-gpgpu_simulation_rate = 186620 (inst/sec)
-gpgpu_simulation_rate = 11992 (cycle/sec)
-gpgpu_silicon_slowdown = 113825x
+gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 5 sec (5 sec)
+gpgpu_simulation_rate = 149297 (inst/sec)
+gpgpu_simulation_rate = 9593 (cycle/sec)
+gpgpu_silicon_slowdown = 142291x
 GPGPU-Sim: synchronize waiting for inactive GPU simulation
 GPGPU-Sim API: Stream Manager State
 GPGPU-Sim: detected inactive GPU simulation thread
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc50c..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc500..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f8..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc508..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc4ec..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4ec..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4e0..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d8..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d0..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4e8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4cc..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d580..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d588..
 
-GPGPU-Sim PTX: cudaLaunch for 0x0x60d428401c3c (mode=performance simulation) on stream 0
+GPGPU-Sim PTX: cudaLaunch for 0x0x652464a01c3c (mode=performance simulation) on stream 0
 GPGPU-Sim PTX: PDOM analysis already done for _Z14dynproc_kerneliPiS_S_iiii 
 GPGPU-Sim PTX: pushing kernel '_Z14dynproc_kerneliPiS_S_iiii' to stream 0, gridDim= (1,1,1) blockDim = (256,1,1) 
 GPGPU-Sim uArch: Shader 7 bind to kernel 8 '_Z14dynproc_kerneliPiS_S_iiii'
@@ -9409,11 +9409,11 @@ gpu_sim_cycle = 6686
 gpu_sim_insn = 106640
 gpu_ipc =      15.9497
 gpu_tot_sim_cycle = 54655
-gpu_tot_sim_insn = 853120
-gpu_tot_ipc =      15.6092
+gpu_tot_sim_insn = 853125
+gpu_tot_ipc =      15.6093
 gpu_tot_issued_cta = 8
 gpu_occupancy = 24.6133% 
-gpu_tot_occupancy = 24.6214% 
+gpu_tot_occupancy = 24.6215% 
 max_total_param_size = 0
 gpu_stall_dramfull = 0
 gpu_stall_icnt2sh    = 0
@@ -9423,11 +9423,11 @@ partiton_level_parallism_util =       1.0000
 partiton_level_parallism_util_total  =       1.0000
 L2_BW  =       1.2282 GB/Sec
 L2_BW_total  =       1.2020 GB/Sec
-gpu_total_sim_rate=170624
+gpu_total_sim_rate=170625
 
 ========= Core cache stats =========
 L1I_cache:
-	L1I_total_cache_accesses = 15712
+	L1I_total_cache_accesses = 15715
 	L1I_total_cache_misses = 512
 	L1I_total_cache_miss_rate = 0.0326
 	L1I_total_cache_pending_hits = 0
@@ -9485,9 +9485,9 @@ L1T_cache:
 Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT] = 40
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT_RESERVED] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 635
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 632
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][RESERVATION_FAIL] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 733
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 736
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][MISS] = 0
@@ -9523,7 +9523,7 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][MISS] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][RESERVATION_FAIL] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][SECTOR_MISS] = 0
-	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 15200
+	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 15203
 	Total_core_cache_stats_breakdown[INST_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[INST_ACC_R][MISS] = 512
 	Total_core_cache_stats_breakdown[INST_ACC_R][RESERVATION_FAIL] = 0
@@ -9541,16 +9541,16 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][TOTAL_ACCESS] = 1408
 	Total_core_cache_stats_breakdown[CONST_ACC_R][TOTAL_ACCESS] = 448
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_W][TOTAL_ACCESS] = 128
-	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 15712
+	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 15715
 
 Total_core_cache_fail_stats:
 ctas_completed 8, Shader 0 warp_id issue ditsribution:
 warp_id:
 0, 1, 2, 3, 4, 5, 6, 7, 
 distro:
-606, 606, 606, 606, 325, 325, 325, 325, 
-gpgpu_n_tot_thrd_icount = 953344
-gpgpu_n_tot_w_icount = 29792
+606, 606, 606, 606, 331, 325, 325, 325, 
+gpgpu_n_tot_thrd_icount = 953536
+gpgpu_n_tot_w_icount = 29798
 gpgpu_n_stall_shd_mem = 1152
 gpgpu_n_mem_read_local = 0
 gpgpu_n_mem_write_local = 0
@@ -9560,7 +9560,7 @@ gpgpu_n_mem_texture = 0
 gpgpu_n_mem_const = 8
 gpgpu_n_load_insn  = 8800
 gpgpu_n_store_insn = 800
-gpgpu_n_shmem_insn = 48000
+gpgpu_n_shmem_insn = 48002
 gpgpu_n_sstarr_insn = 0
 gpgpu_n_tex_insn = 0
 gpgpu_n_const_mem_insn = 0
@@ -9576,8 +9576,8 @@ gpgpu_stall_shd_mem[gl_mem][coal_stall] = 0
 gpgpu_stall_shd_mem[gl_mem][data_port_stall] = 0
 gpu_reg_bank_conflict_stalls = 0
 Warp Occupancy Distribution:
-Stall:1056	W0_Idle:49928	W0_Scoreboard:137812	W1:0	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:2248	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:2248	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:25296
-single_issue_nums: WS0:7448	WS1:7448	WS2:7448	WS3:7448	
+Stall:1057	W0_Idle:49920	W0_Scoreboard:137813	W1:6	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:2248	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:2248	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:25296
+single_issue_nums: WS0:7454	WS1:7448	WS2:7448	WS3:7448	
 dual_issue_nums: WS0:0	WS1:0	WS2:0	WS3:0	
 traffic_breakdown_coretomem[CONST_ACC_R] = 64 {8:8,}
 traffic_breakdown_coretomem[GLOBAL_ACC_R] = 8832 {8:1104,}
@@ -10680,22 +10680,22 @@ Reply_Network_out_buffer_avg_util =       0.0009
 
 
 gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 5 sec (5 sec)
-gpgpu_simulation_rate = 170624 (inst/sec)
+gpgpu_simulation_rate = 170625 (inst/sec)
 gpgpu_simulation_rate = 10931 (cycle/sec)
 gpgpu_silicon_slowdown = 124874x
 GPGPU-Sim: synchronize waiting for inactive GPU simulation
 GPGPU-Sim API: Stream Manager State
 GPGPU-Sim: detected inactive GPU simulation thread
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc50c..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc500..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f8..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc508..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc4ec..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4ec..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4e0..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d8..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d0..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4e8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4cc..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d580..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d588..
 
-GPGPU-Sim PTX: cudaLaunch for 0x0x60d428401c3c (mode=performance simulation) on stream 0
+GPGPU-Sim PTX: cudaLaunch for 0x0x652464a01c3c (mode=performance simulation) on stream 0
 GPGPU-Sim PTX: PDOM analysis already done for _Z14dynproc_kerneliPiS_S_iiii 
 GPGPU-Sim PTX: pushing kernel '_Z14dynproc_kerneliPiS_S_iiii' to stream 0, gridDim= (1,1,1) blockDim = (256,1,1) 
 GPGPU-Sim uArch: Shader 8 bind to kernel 9 '_Z14dynproc_kerneliPiS_S_iiii'
@@ -10706,11 +10706,11 @@ gpu_sim_cycle = 6686
 gpu_sim_insn = 106640
 gpu_ipc =      15.9497
 gpu_tot_sim_cycle = 61341
-gpu_tot_sim_insn = 959760
-gpu_tot_ipc =      15.6463
+gpu_tot_sim_insn = 959765
+gpu_tot_ipc =      15.6464
 gpu_tot_issued_cta = 9
 gpu_occupancy = 24.6133% 
-gpu_tot_occupancy = 24.6205% 
+gpu_tot_occupancy = 24.6206% 
 max_total_param_size = 0
 gpu_stall_dramfull = 0
 gpu_stall_icnt2sh    = 0
@@ -10720,11 +10720,11 @@ partiton_level_parallism_util =       1.0000
 partiton_level_parallism_util_total  =       1.0000
 L2_BW  =       1.2282 GB/Sec
 L2_BW_total  =       1.2048 GB/Sec
-gpu_total_sim_rate=191952
+gpu_total_sim_rate=159960
 
 ========= Core cache stats =========
 L1I_cache:
-	L1I_total_cache_accesses = 17676
+	L1I_total_cache_accesses = 17679
 	L1I_total_cache_misses = 576
 	L1I_total_cache_miss_rate = 0.0326
 	L1I_total_cache_pending_hits = 0
@@ -10782,9 +10782,9 @@ L1T_cache:
 Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT] = 45
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT_RESERVED] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 714
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 711
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][RESERVATION_FAIL] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 825
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 828
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][MISS] = 0
@@ -10820,7 +10820,7 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][MISS] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][RESERVATION_FAIL] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][SECTOR_MISS] = 0
-	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 17100
+	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 17103
 	Total_core_cache_stats_breakdown[INST_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[INST_ACC_R][MISS] = 576
 	Total_core_cache_stats_breakdown[INST_ACC_R][RESERVATION_FAIL] = 0
@@ -10838,16 +10838,16 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][TOTAL_ACCESS] = 1584
 	Total_core_cache_stats_breakdown[CONST_ACC_R][TOTAL_ACCESS] = 504
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_W][TOTAL_ACCESS] = 144
-	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 17676
+	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 17679
 
 Total_core_cache_fail_stats:
 ctas_completed 9, Shader 0 warp_id issue ditsribution:
 warp_id:
 0, 1, 2, 3, 4, 5, 6, 7, 
 distro:
-606, 606, 606, 606, 325, 325, 325, 325, 
-gpgpu_n_tot_thrd_icount = 1072512
-gpgpu_n_tot_w_icount = 33516
+606, 606, 606, 606, 331, 325, 325, 325, 
+gpgpu_n_tot_thrd_icount = 1072704
+gpgpu_n_tot_w_icount = 33522
 gpgpu_n_stall_shd_mem = 1296
 gpgpu_n_mem_read_local = 0
 gpgpu_n_mem_write_local = 0
@@ -10857,7 +10857,7 @@ gpgpu_n_mem_texture = 0
 gpgpu_n_mem_const = 9
 gpgpu_n_load_insn  = 9900
 gpgpu_n_store_insn = 900
-gpgpu_n_shmem_insn = 54000
+gpgpu_n_shmem_insn = 54002
 gpgpu_n_sstarr_insn = 0
 gpgpu_n_tex_insn = 0
 gpgpu_n_const_mem_insn = 0
@@ -10873,8 +10873,8 @@ gpgpu_stall_shd_mem[gl_mem][coal_stall] = 0
 gpgpu_stall_shd_mem[gl_mem][data_port_stall] = 0
 gpu_reg_bank_conflict_stalls = 0
 Warp Occupancy Distribution:
-Stall:1188	W0_Idle:55687	W0_Scoreboard:154937	W1:0	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:2529	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:2529	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:28458
-single_issue_nums: WS0:8379	WS1:8379	WS2:8379	WS3:8379	
+Stall:1189	W0_Idle:55679	W0_Scoreboard:154938	W1:6	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:2529	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:2529	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:28458
+single_issue_nums: WS0:8385	WS1:8379	WS2:8379	WS3:8379	
 dual_issue_nums: WS0:0	WS1:0	WS2:0	WS3:0	
 traffic_breakdown_coretomem[CONST_ACC_R] = 72 {8:9,}
 traffic_breakdown_coretomem[GLOBAL_ACC_R] = 9936 {8:1242,}
@@ -11976,23 +11976,23 @@ Reply_Network_out_buffer_avg_util =       0.0009
 ----------------------------END-of-Interconnect-DETAILS-------------------------
 
 
-gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 5 sec (5 sec)
-gpgpu_simulation_rate = 191952 (inst/sec)
-gpgpu_simulation_rate = 12268 (cycle/sec)
-gpgpu_silicon_slowdown = 111265x
+gpgpu_simulation_time = 0 days, 0 hrs, 0 min, 6 sec (6 sec)
+gpgpu_simulation_rate = 159960 (inst/sec)
+gpgpu_simulation_rate = 10223 (cycle/sec)
+gpgpu_silicon_slowdown = 133522x
 GPGPU-Sim: synchronize waiting for inactive GPU simulation
 GPGPU-Sim API: Stream Manager State
 GPGPU-Sim: detected inactive GPU simulation thread
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc50c..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc500..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f8..
-GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffcdfdfc4f0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc508..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc4ec..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a0..
-GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffcdfdfc5a8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4ec..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4e0..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d8..
+GPGPU-Sim PTX: Setting up arguments for 8 bytes starting at 0x7ffe6f05d4d0..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4e8..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d4cc..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d580..
+GPGPU-Sim PTX: Setting up arguments for 4 bytes starting at 0x7ffe6f05d588..
 
-GPGPU-Sim PTX: cudaLaunch for 0x0x60d428401c3c (mode=performance simulation) on stream 0
+GPGPU-Sim PTX: cudaLaunch for 0x0x652464a01c3c (mode=performance simulation) on stream 0
 GPGPU-Sim PTX: PDOM analysis already done for _Z14dynproc_kerneliPiS_S_iiii 
 GPGPU-Sim PTX: pushing kernel '_Z14dynproc_kerneliPiS_S_iiii' to stream 0, gridDim= (1,1,1) blockDim = (256,1,1) 
 GPGPU-Sim uArch: Shader 9 bind to kernel 10 '_Z14dynproc_kerneliPiS_S_iiii'
@@ -12003,11 +12003,11 @@ gpu_sim_cycle = 6191
 gpu_sim_insn = 96972
 gpu_ipc =      15.6634
 gpu_tot_sim_cycle = 67532
-gpu_tot_sim_insn = 1056732
+gpu_tot_sim_insn = 1056737
 gpu_tot_ipc =      15.6479
 gpu_tot_issued_cta = 10
 gpu_occupancy = 24.5855% 
-gpu_tot_occupancy = 24.6173% 
+gpu_tot_occupancy = 24.6174% 
 max_total_param_size = 0
 gpu_stall_dramfull = 0
 gpu_stall_icnt2sh    = 0
@@ -12021,7 +12021,7 @@ gpu_total_sim_rate=176122
 
 ========= Core cache stats =========
 L1I_cache:
-	L1I_total_cache_accesses = 19460
+	L1I_total_cache_accesses = 19463
 	L1I_total_cache_misses = 640
 	L1I_total_cache_miss_rate = 0.0329
 	L1I_total_cache_pending_hits = 0
@@ -12079,9 +12079,9 @@ L1T_cache:
 Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT] = 49
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][HIT_RESERVED] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 791
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][MISS] = 788
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][RESERVATION_FAIL] = 0
-	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 904
+	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][SECTOR_MISS] = 907
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[LOCAL_ACC_R][MISS] = 0
@@ -12117,7 +12117,7 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][MISS] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][RESERVATION_FAIL] = 0
 	Total_core_cache_stats_breakdown[L2_WRBK_ACC][SECTOR_MISS] = 0
-	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 18820
+	Total_core_cache_stats_breakdown[INST_ACC_R][HIT] = 18823
 	Total_core_cache_stats_breakdown[INST_ACC_R][HIT_RESERVED] = 0
 	Total_core_cache_stats_breakdown[INST_ACC_R][MISS] = 640
 	Total_core_cache_stats_breakdown[INST_ACC_R][RESERVATION_FAIL] = 0
@@ -12135,16 +12135,16 @@ Total_core_cache_stats:
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_R][TOTAL_ACCESS] = 1744
 	Total_core_cache_stats_breakdown[CONST_ACC_R][TOTAL_ACCESS] = 560
 	Total_core_cache_stats_breakdown[GLOBAL_ACC_W][TOTAL_ACCESS] = 160
-	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 19460
+	Total_core_cache_stats_breakdown[INST_ACC_R][TOTAL_ACCESS] = 19463
 
 Total_core_cache_fail_stats:
 ctas_completed 10, Shader 0 warp_id issue ditsribution:
 warp_id:
 0, 1, 2, 3, 4, 5, 6, 7, 
 distro:
-606, 606, 606, 606, 325, 325, 325, 325, 
-gpgpu_n_tot_thrd_icount = 1180800
-gpgpu_n_tot_w_icount = 36900
+606, 606, 606, 606, 331, 325, 325, 325, 
+gpgpu_n_tot_thrd_icount = 1180992
+gpgpu_n_tot_w_icount = 36906
 gpgpu_n_stall_shd_mem = 1428
 gpgpu_n_mem_read_local = 0
 gpgpu_n_mem_write_local = 0
@@ -12154,7 +12154,7 @@ gpgpu_n_mem_texture = 0
 gpgpu_n_mem_const = 10
 gpgpu_n_load_insn  = 10900
 gpgpu_n_store_insn = 1000
-gpgpu_n_shmem_insn = 59400
+gpgpu_n_shmem_insn = 59402
 gpgpu_n_sstarr_insn = 0
 gpgpu_n_tex_insn = 0
 gpgpu_n_const_mem_insn = 0
@@ -12170,8 +12170,8 @@ gpgpu_stall_shd_mem[gl_mem][coal_stall] = 0
 gpgpu_stall_shd_mem[gl_mem][data_port_stall] = 0
 gpu_reg_bank_conflict_stalls = 0
 Warp Occupancy Distribution:
-Stall:1319	W0_Idle:61415	W0_Scoreboard:170454	W1:0	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:2783	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:2783	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:31334
-single_issue_nums: WS0:9225	WS1:9225	WS2:9225	WS3:9225	
+Stall:1320	W0_Idle:61407	W0_Scoreboard:170455	W1:6	W2:0	W3:0	W4:0	W5:0	W6:0	W7:0	W8:0	W9:0	W10:0	W11:0	W12:0	W13:0	W14:2783	W15:0	W16:0	W17:0	W18:0	W19:0	W20:0	W21:0	W22:2783	W23:0	W24:0	W25:0	W26:0	W27:0	W28:0	W29:0	W30:0	W31:0	W32:31334
+single_issue_nums: WS0:9231	WS1:9225	WS2:9225	WS3:9225	
 dual_issue_nums: WS0:0	WS1:0	WS2:0	WS3:0	
 traffic_breakdown_coretomem[CONST_ACC_R] = 80 {8:10,}
 traffic_breakdown_coretomem[GLOBAL_ACC_R] = 10944 {8:1368,}
@@ -13280,5 +13280,5 @@ gpgpu_silicon_slowdown = 121279x
 GPGPU-Sim: synchronize waiting for inactive GPU simulation
 GPGPU-Sim API: Stream Manager State
 GPGPU-Sim: detected inactive GPU simulation thread
-Failed
+Success
 GPGPU-Sim: *** exit detected ***

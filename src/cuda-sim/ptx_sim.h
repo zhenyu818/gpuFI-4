@@ -39,7 +39,9 @@
 #include <list>
 #include <map>
 #include <set>
+#include <map>
 #include <string>
+#include <set>
 
 #include "memory.h"
 
@@ -463,6 +465,42 @@ class ptx_thread_info {
     return m_regs;
   }
 
+  // Fault-injection tracking helpers (RF): mark and consume on first use
+  void fi_mark_faulted_reg(const symbol* sym) { m_fi_faulted_regs.insert(sym); }
+  bool fi_consume_if_faulted_reg(const symbol* sym) {
+    std::set<const symbol*>::iterator it = m_fi_faulted_regs.find(sym);
+    if (it != m_fi_faulted_regs.end()) { m_fi_faulted_regs.erase(it); return true; }
+    return false;
+  }
+
+  // Mark a destination register to flip on next write and bit index (1-based)
+  void fi_mark_pending_dst_flip(const symbol* sym, unsigned bit1based) { m_fi_pending_dst_bit[sym] = bit1based; }
+  bool fi_take_pending_dst_flip(const symbol* sym, ptx_reg_t &value, unsigned &bit1based) {
+    std::map<const symbol*, unsigned>::iterator it = m_fi_pending_dst_bit.find(sym);
+    if (it == m_fi_pending_dst_bit.end()) return false;
+    bit1based = it->second;
+    m_fi_pending_dst_bit.erase(it);
+    unsigned b = bit1based - 1;
+    unsigned long long *p = &value.u64;
+    *p ^= 1ULL << b;
+    return true;
+  }
+
+  // Mark next destination write as directly affected by a memory/cache flip
+  void fi_set_next_dst_from_mem(const char* component, unsigned bit1based) {
+    m_fi_next_dst_from_mem = true;
+    m_fi_next_dst_bit1 = bit1based;
+    strncpy(m_fi_next_dst_component, component, sizeof(m_fi_next_dst_component)-1);
+    m_fi_next_dst_component[sizeof(m_fi_next_dst_component)-1] = '\0';
+  }
+  bool fi_consume_next_dst_from_mem(std::string &component, unsigned &bit1based) {
+    if (!m_fi_next_dst_from_mem) return false;
+    m_fi_next_dst_from_mem = false;
+    bit1based = m_fi_next_dst_bit1;
+    component = std::string(m_fi_next_dst_component);
+    return true;
+  }
+
  public:
   addr_t m_last_effective_address;
   bool m_branch_taken;
@@ -517,6 +555,16 @@ class ptx_thread_info {
   bool m_enable_debug_trace;
 
   std::stack<class operand_info, std::vector<operand_info> > m_breakaddrs;
+
+  // Set of registers that have been fault-injected (flip applied) and
+  // should trigger a one-time FI_DIRECT print when first read as a source.
+  std::set<const symbol*> m_fi_faulted_regs;
+  // Map of destination registers scheduled to be flipped on next write
+  std::map<const symbol*, unsigned> m_fi_pending_dst_bit;
+
+  bool m_fi_next_dst_from_mem = false;
+  unsigned m_fi_next_dst_bit1 = 0;
+  char m_fi_next_dst_component[16];
 };
 
 addr_t generic_to_local(unsigned smid, unsigned hwtid, addr_t addr);

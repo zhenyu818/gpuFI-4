@@ -9,26 +9,26 @@
 -last_cycle 67532
 -components_to_flip 0
 
--thread_rand 48
--warp_rand 4112
--total_cycle_rand 1419
--register_rand_n 8
--reg_bitflip_rand_n 29
+-thread_rand 1511
+-warp_rand 4360
+-total_cycle_rand 45021
+-register_rand_n 12
+-reg_bitflip_rand_n 23
 -per_warp 0
 -kernel_n 0
 
 -local_mem_bitflip_rand_n 1
 
--block_rand 5436
+-block_rand 3362
 -block_n 1
--shared_mem_bitflip_rand_n 939
--l1d_shader_rand_n 26
--l1d_cache_bitflip_rand_n 110451
--l1c_shader_rand_n 7
--l1c_cache_bitflip_rand_n 244709
--l1t_shader_rand_n 4
--l1t_cache_bitflip_rand_n 106470
--l2_cache_bitflip_rand_n 4597730
+-shared_mem_bitflip_rand_n 1019
+-l1d_shader_rand_n 24
+-l1d_cache_bitflip_rand_n 196903
+-l1c_shader_rand_n 20
+-l1c_cache_bitflip_rand_n 57951
+-l1t_shader_rand_n 17
+-l1t_cache_bitflip_rand_n 743720
+-l2_cache_bitflip_rand_n 22102828
 
 #-gpgpu_max_concurrent_kernel 20
 
