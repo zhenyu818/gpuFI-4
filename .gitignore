@@ -61,3 +61,7 @@ debug_tools/WatchYourStep/ptxjitplus/*.ptx
 accel-sim-framework/
 gpu-app-collection/
 
+# Ignore any directories starting with 'log' and everything inside them
+log*/
+**/log*/
+

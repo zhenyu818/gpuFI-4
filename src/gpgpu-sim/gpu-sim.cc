@@ -1928,11 +1928,15 @@ void bitflip_n_nregs(std::vector<ptx_thread_info*> &threads_vector, char *regist
         ptx_reg_t *reg_to_bitflip = regs[reg_idx];
         unsigned long* reg_64b = (unsigned long*) reg_to_bitflip; // 8 bytes
         for(std::vector<unsigned>::iterator bf_it = reg_bitflip_vector.begin(); bf_it != reg_bitflip_vector.end(); ++bf_it) {
-//          printf("Before bit flip of reg=%s, value = %lu\n", reg_symbols[reg_idx]->name().c_str(), *reg_to_bitflip);
+          printf("FI_EFFECT: Before bit flip of reg=%s, value = %lu; ", reg_symbols[reg_idx]->name().c_str(), *reg_to_bitflip);
           *reg_64b ^= 1UL << (*bf_it-1);
-//          printf("After bit %u flip of reg=%s, value = %lu\n", *bf_it, reg_symbols[reg_idx]->name().c_str(), *reg_to_bitflip);
+          printf("After bit %u flip of reg=%s, value = %lu;", *bf_it, reg_symbols[reg_idx]->name().c_str(), *reg_to_bitflip);
           unsigned pc = (*threads_it)->get_pc();
           unsigned icount = (*threads_it)->get_icount();
+          printf("pc=%u, icount=%u; ", pc, icount);
+          (*threads_it)->print_insn(pc, stdout);
+          printf("\n");
+
           printf("FI_EFFECT: component=RF reg_idx=%d reg_name=%s bit=%u thread_uid=%u hw(sid=%u,wid=%u,tid=%u) icount=%u pc=%u inst= ",
                  reg_idx+1, reg_symbols[reg_idx]->name().c_str(), *bf_it, (*threads_it)->get_uid(), (*threads_it)->get_hw_sid(), (*threads_it)->get_hw_wid(), (*threads_it)->get_hw_tid(), icount, pc);
           (*threads_it)->print_insn(pc, stdout);
@@ -1940,6 +1944,10 @@ void bitflip_n_nregs(std::vector<ptx_thread_info*> &threads_vector, char *regist
           // 如果翻转的是谓词/源寄存器，不保证下一条指令使用；为确保“被该指令计算的结果”受影响，
           // 将该寄存器标记为目的寄存器的下一次写回时翻转（覆盖到结果），从而保证影响的是该指令的输出。
           (*threads_it)->fi_mark_pending_dst_flip(reg_symbols[reg_idx], *bf_it);
+          // 同时标记源寄存器，用于源操作数追踪
+          (*threads_it)->fi_mark_faulted_src_reg(reg_symbols[reg_idx], *bf_it);
+          // 启动一次性有效性检查窗口：当前注入，仅在其后的第一次访问时判定有效性
+          (*threads_it)->fi_start_effect_check(reg_symbols[reg_idx]);
         }
       }
     }

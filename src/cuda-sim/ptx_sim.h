@@ -501,6 +501,38 @@ class ptx_thread_info {
     return true;
   }
 
+  // Mark a source register as faulted with specific bit flip information
+  void fi_mark_faulted_src_reg(const symbol* sym, unsigned bit1based) { 
+    m_fi_faulted_src_regs[sym] = bit1based; 
+  }
+  bool fi_consume_if_faulted_src_reg(const symbol* sym, unsigned &bit1based) {
+    std::map<const symbol*, unsigned>::iterator it = m_fi_faulted_src_regs.find(sym);
+    if (it == m_fi_faulted_src_regs.end()) return false;
+    bit1based = it->second;
+    m_fi_faulted_src_regs.erase(it);
+    return true;
+  }
+
+  // =============== FI effectiveness tracking (A: dst write, B: src read) ===============
+  void fi_update_last_write_pc(const symbol* sym) {
+    m_fi_last_write_pc[sym] = get_pc();
+    m_fi_last_write_icount[sym] = get_icount();
+  }
+  void fi_start_effect_check(const symbol* sym) {
+    // Record a pending effectiveness check at injection time
+    fi_effect_record rec;
+    rec.inject_pc = get_pc();
+    rec.inject_icount = get_icount();
+    std::map<const symbol*, unsigned>::iterator itw = m_fi_last_write_pc.find(sym);
+    rec.hasA = (itw != m_fi_last_write_pc.end());
+    rec.A_pc = rec.hasA ? itw->second : (unsigned)-1;
+    std::map<const symbol*, unsigned>::iterator itwi = m_fi_last_write_icount.find(sym);
+    rec.A_icount = (itwi != m_fi_last_write_icount.end()) ? itwi->second : (unsigned)-1;
+    m_fi_effect_pending[sym] = rec;
+  }
+  void fi_on_read_access(const symbol* sym);
+  void fi_on_write_access(const symbol* sym);
+
  public:
   addr_t m_last_effective_address;
   bool m_branch_taken;
@@ -565,6 +597,24 @@ class ptx_thread_info {
   bool m_fi_next_dst_from_mem = false;
   unsigned m_fi_next_dst_bit1 = 0;
   char m_fi_next_dst_component[16];
+
+  // Map of source registers that have been fault-injected (flip applied)
+  // with specific bit flip information for source operand tracking
+  std::map<const symbol*, unsigned> m_fi_faulted_src_regs;
+
+  // Record last write PC per register symbol (for A)
+  std::map<const symbol*, unsigned> m_fi_last_write_pc;
+  struct fi_effect_record {
+    unsigned inject_pc;
+    unsigned inject_icount;
+    unsigned A_pc;
+    unsigned A_icount;
+    bool hasA;
+  };
+  // Pending effectiveness checks keyed by symbol
+  std::map<const symbol*, fi_effect_record> m_fi_effect_pending;
+  // Record last write icount per register symbol (for A)
+  std::map<const symbol*, unsigned> m_fi_last_write_icount;
 };
 
 addr_t generic_to_local(unsigned smid, unsigned hwtid, addr_t addr);
