@@ -19,6 +19,9 @@ float init_time = 0, mem_alloc_time = 0, h2d_time = 0, kernel_time = 0,
 #define DEVICE 0
 #define HALO 1 // halo width along one direction when advancing to the next iteration
 
+#define M_SEED 3415
+#define EXP_NAME "1-1"
+
 //#define BENCH_PRINT
 
 void run(int argc, char** argv);
@@ -27,7 +30,6 @@ int rows, cols;
 int* data;
 int** wall;
 int* result;
-#define M_SEED 3415
 int pyramid_height;
 
 void
@@ -46,17 +48,23 @@ init(int argc, char** argv)
 	for(int n=0; n<rows; n++)
 		wall[n]=data+cols*n;
 	result = new int[cols];
-	
-	int seed = M_SEED;
-	srand(seed);
 
-	for (int i = 0; i < rows; i++)
-    {
-        for (int j = 0; j < cols; j++)
-        {
-            wall[i][j] = rand() % 10;
-        }
-    }
+	// 从 input/EXP_NAME.txt 读取 wall 输入
+	FILE *f = fopen("input/" EXP_NAME ".txt", "r");
+	if (!f) {
+		perror("fopen input/EXP_NAME.txt");
+		exit(1);
+	}
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			if (fscanf(f, "%d", &wall[i][j]) != 1) {
+				fprintf(stderr, "Invalid input at %d,%d\n", i, j);
+				fclose(f);
+				exit(1);
+			}
+		}
+	}
+	fclose(f);
 }
 
 void 
@@ -220,54 +228,19 @@ void run(int argc, char** argv)
 #endif
 
     cudaMemcpy(result, gpuResult[final_ret], sizeof(int)*cols, cudaMemcpyDeviceToHost);
+    
+    // write result array to a txt file named by EXP_NAME in current path
+    {
+    	FILE *f = fopen(EXP_NAME ".txt", "w");
+    	if (f) {
+    		for (int i = 0; i < cols; ++i) {
+    			fprintf(f, "%d%c", result[i], (i == cols - 1) ? '\n' : ' ');
+    		}
+    		fclose(f);
+    	}
+    }
 
-    // 读取result.txt文件进行比对
-    FILE *file = fopen("result.txt", "r");
-    if (file == NULL) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
-    }
-    
-    int expected_result[cols];
-    int i = 0;
-    while (fscanf(file, "%d", &expected_result[i]) == 1 && i < cols) {
-        i++;
-    }
-    fclose(file);
-    
-    // 检查是否读取了足够的元素
-    if (i != cols) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
-    }
-    
-    // 比对结果
-    bool match = true;
-    for (i = 0; i < cols; i++) {
-        if (result[i] != expected_result[i]) {
-            match = false;
-            break;
-        }
-    }
-    
-    
-    // if (match) {
-    //     printf("Success\n");
-    // } else {
-    //     printf("Failed\n");
-    // }
+
 
     cudaFree(gpuWall);
     cudaFree(gpuResult[0]);

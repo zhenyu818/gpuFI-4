@@ -130,15 +130,6 @@ gather_results() {
         grep -iq "${SUCCESS_MSG}" $file; success_msg_grep=$(echo $?)
 	grep -i "${CYCLES_MSG}" $file | tail -1 | grep -q "${CYCLES}"; cycles_grep=$(echo $?)
         grep -iq "${FAILED_MSG}" $file; failed_msg_grep=$(echo $?)
-        # 打印每次故障注入影响的线程与PTX指令
-        # if grep -q "FI_DIRECT:" "$file"; then
-        #     echo "[Run ${1}] Effects from ${file}:"
-        #     grep -h "FI_DIRECT:" "$file"
-        # fi
-        # if grep -q "FI_EFFECT:" "$file"; then
-        #     echo "[Run ${1}] Effects from ${file}:"
-        #     grep -h "FI_EFFECT:" "$file"
-        # fi
         if grep -q "FI_VALIDATION:" "$file"; then
             echo "[Run ${1}] Effects from ${file}:"
             grep -h "FI_VALIDATION:" "$file"
