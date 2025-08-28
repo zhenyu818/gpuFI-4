@@ -31,6 +31,8 @@ int* data;
 int** wall;
 int* result;
 int pyramid_height;
+// 对抗性输入扰动函数前置声明
+static void apply_adversarial_patterns(int **grid, int rows, int cols);
 
 // 从pathfinder_gen_input_1.cu集成的输入生成函数
 static void generate_input_1(int argc, char **argv)
@@ -50,74 +52,19 @@ static void generate_input_1(int argc, char **argv)
 		wall[n]=data+cols*n;
 	result = new int[cols];
 
-	// 生成包含对抗性模式的输入数据
+	// 直接生成输入数据，而不是从文件读取
 	srand(M_SEED);
-	
-	// 对抗性模式1: 极值模式 - 在关键位置放置极大值和极小值
 	for (int i = 0; i < rows; i++) {
 		for (int j = 0; j < cols; j++) {
-			// 在边界和关键路径上放置极值
-			if (i == 0 || i == rows-1 || j == 0 || j == cols-1) {
-				// 边界放置极大值，增加边界处理复杂度
-				wall[i][j] = (i + j) % 2 == 0 ? 999 : 1;
-			} else if (i % 3 == 0 && j % 3 == 0) {
-				// 在3的倍数位置放置极小值，创建"陷阱"
-				wall[i][j] = 0;
-			} else if (i == rows/2 && j == cols/2) {
-				// 中心位置放置极大值，增加中心路径计算复杂度
-				wall[i][j] = 999;
-			} else if ((i + j) % 7 == 0) {
-				// 在特定模式位置放置交替的极值
-				wall[i][j] = (i + j) % 14 == 0 ? 999 : 1;
-			} else {
-				// 其他位置生成中等范围的随机值，但偏向于创建复杂路径
-				int base_val = rand() % 20;
-				// 增加一些"噪声"，使路径规划更复杂
-				if (base_val < 5) {
-					wall[i][j] = rand() % 100 + 50;  // 50-149的高值
-				} else if (base_val < 10) {
-					wall[i][j] = rand() % 10;        // 0-9的低值
-				} else {
-					wall[i][j] = rand() % 30 + 10;   // 10-39的中等值
-				}
-			}
+			wall[i][j] = rand() % 10;
 		}
 	}
-	
-	// 对抗性模式2: 创建"迷宫"模式 - 在特定行创建高成本路径
-	for (int i = 1; i < rows-1; i += 4) {
-		for (int j = 0; j < cols; j++) {
-			if (j % 2 == 0) {
-				wall[i][j] = 888;  // 创建高成本行
-			}
-		}
-	}
-	
-	// 对抗性模式3: 在关键计算路径上放置交替的高低值
-	for (int i = 0; i < rows; i++) {
-		for (int j = 0; j < cols; j++) {
-			if ((i + j) % 5 == 0 && i > 0 && i < rows-1 && j > 0 && j < cols-1) {
-				// 在内部位置创建交替模式，增加动态规划的计算复杂度
-				wall[i][j] = (i + j) % 10 == 0 ? 777 : 3;
-			}
-		}
-	}
-	
-	// 对抗性模式4: 在算法可能优化的路径上放置挑战性值
-	for (int i = 0; i < rows; i++) {
-		for (int j = 0; j < cols; j++) {
-			if (i == j || i == cols-1-j) {
-				// 对角线位置放置特殊值，挑战算法的优化策略
-				wall[i][j] = (i + j) % 3 == 0 ? 666 : 5;
-			}
-		}
-	}
-	
-    printf("Adversarial input generated with seed %d\n", M_SEED);
-    printf("Input matrix (%dx%d):\n", rows, cols);
+	// 在随机基础上施加对抗性模式（整数扰动，保持0..9范围）
+	apply_adversarial_patterns(wall, rows, cols);
+    printf("input generated\n");
     for(int i=0; i<rows; i++) {
         for(int j=0; j<cols; j++) {
-            printf("%3d ", wall[i][j]);
+            printf("%d ", wall[i][j]);
         }
         printf("\n");
     }
@@ -140,6 +87,92 @@ fatal(char *s)
 #define IN_RANGE(x, min, max)   ((x)>=(min) && (x)<=(max))
 #define CLAMP_RANGE(x, min, max) x = (x<(min)) ? min : ((x>(max)) ? max : x )
 #define MIN(a, b) ((a)<=(b) ? (a) : (b))
+
+// 生成对抗性整数扰动：在看似平滑/随机的数据上，构造“诱饵走廊”与“陷阱带”
+// 目标：在不显著改变整体分布（只做±1/±2小幅调整，且保持0..9区间）的情况下，
+// 让局部最优路径在中段被提高成本，迫使全局最优发生偏移，从而具有对抗性特征。
+static void apply_adversarial_patterns(int **grid, int rows, int cols)
+{
+	int corridor1_col = cols/2;
+	int corridor2_col = (corridor1_col + 5 < cols) ? corridor1_col + 5 : (cols - 1);
+	int width_c1 = (cols > 16) ? 2 : 1;
+	int width_c2 = (cols > 16) ? 2 : 1;
+
+	int r1_end = (int)(rows * 0.4f);
+	int trap_start = (int)(rows * 0.45f);
+	int trap_end = (int)(rows * 0.7f);
+	int r2_start = (int)(rows * 0.55f);
+
+	if (r1_end < 1) r1_end = 1;
+	if (trap_start < r1_end) trap_start = r1_end;
+	if (trap_end < trap_start + 1) trap_end = trap_start + 1;
+	if (r2_start < trap_start) r2_start = trap_start;
+
+	// 稀疏±1随机微扰（~1% 概率）
+	for (int i = 0; i < rows; ++i) {
+		for (int j = 0; j < cols; ++j) {
+			int r = rand() % 100;
+			if (r == 0) {
+				int delta = (rand() & 1) ? 1 : -1;
+				int v = grid[i][j] + delta;
+				CLAMP_RANGE(v, 0, 9);
+				grid[i][j] = v;
+			}
+		}
+	}
+
+	// 段1：c1 附近小幅降低
+	for (int i = 0; i < r1_end; ++i) {
+		for (int w = -width_c1; w <= width_c1; ++w) {
+			int j = corridor1_col + w;
+			if (j >= 0 && j < cols) {
+				int v = grid[i][j] - 2;
+				CLAMP_RANGE(v, 0, 9);
+				grid[i][j] = v;
+			}
+		}
+	}
+
+	// 段2（陷阱）：c1 附近抬高
+	for (int i = trap_start; i < trap_end; ++i) {
+		for (int w = -width_c1; w <= width_c1; ++w) {
+			int j = corridor1_col + w;
+			if (j >= 0 && j < cols) {
+				int v = grid[i][j] + 3;
+				CLAMP_RANGE(v, 0, 9);
+				grid[i][j] = v;
+			}
+		}
+	}
+
+	// 段3：c2 附近小幅降低
+	for (int i = r2_start; i < rows; ++i) {
+		for (int w = -width_c2; w <= width_c2; ++w) {
+			int j = corridor2_col + w;
+			if (j >= 0 && j < cols) {
+				int v = grid[i][j] - 2;
+				CLAMP_RANGE(v, 0, 9);
+				grid[i][j] = v;
+			}
+		}
+	}
+
+	// 细微“扰动栅栏”
+	for (int i = r1_end; i < rows; ++i) {
+		int fence_left = corridor1_col - (width_c1 + 3);
+		int fence_right = corridor2_col + (width_c2 + 3);
+		if (fence_left >= 0 && fence_left < cols) {
+			int v = grid[i][fence_left] + 1;
+			CLAMP_RANGE(v, 0, 9);
+			grid[i][fence_left] = v;
+		}
+		if (fence_right >= 0 && fence_right < cols) {
+			int v = grid[i][fence_right] + 1;
+			CLAMP_RANGE(v, 0, 9);
+			grid[i][fence_right] = v;
+		}
+	}
+}
 
 __global__ void dynproc_kernel(
                 int iteration, 

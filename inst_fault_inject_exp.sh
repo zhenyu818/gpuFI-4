@@ -53,3 +53,4 @@ else
 fi
 
 done < test_apps/${TEST_APP_NAME}/size_list.txt
+
