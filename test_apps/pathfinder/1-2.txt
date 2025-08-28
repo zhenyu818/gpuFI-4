@@ -1,0 +1,7 @@
+input generated
+0 0 0 0 
+0 0 0 0 
+0 0 0 0 
+0 0 0 0 
+result generated
+0 0 0 0

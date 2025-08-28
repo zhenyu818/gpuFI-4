@@ -1,0 +1,7 @@
+input generated
+8 0 3 8 
+9 0 2 4 
+6 7 4 0 
+7 0 4 6 
+result generated
+13 4 6 8
