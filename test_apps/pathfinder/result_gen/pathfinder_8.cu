@@ -49,11 +49,57 @@ static void generate_input_1(int argc, char **argv)
 		wall[n]=data+cols*n;
 	result = new int[cols];
 
-	// 直接生成输入数据，而不是从文件读取
+	// 构造包含Adversarial patterns的输入数据
 	srand(M_SEED);
+	
+	// 生成Adversarial patterns
 	for (int i = 0; i < rows; i++) {
 		for (int j = 0; j < cols; j++) {
-			wall[i][j] = rand() % 10;
+			// 基础值设为0
+			wall[i][j] = 0;
+			
+			// Pattern 1: 棋盘模式 - 交替极值 (0和9)
+			if ((i + j) % 2 == 0) {
+				wall[i][j] = 0;  // 最小值
+			} else {
+				wall[i][j] = 9;  // 最大值
+			}
+			
+			// Pattern 2: 边界特殊情况 - 创建边界障碍
+			if (i == 0 || i == rows-1 || j == 0 || j == cols-1) {
+				wall[i][j] = 7;  // 边界高值，增加路径寻找难度
+			}
+			
+			// Pattern 3: 对角线路径 - 创建最优路径
+			if (i == j) {
+				wall[i][j] = 0;  // 对角线最优路径
+			}
+			
+			// Pattern 4: 中心区域陷阱 - 高成本区域
+			if (i >= rows/4 && i < 3*rows/4 && j >= cols/4 && j < 3*cols/4) {
+				wall[i][j] = 8;  // 中心区域高成本
+			}
+			
+			// Pattern 5: 垂直条纹 - 创建垂直障碍
+			if (j % 3 == 0) {
+				wall[i][j] = 6;  // 垂直障碍
+			}
+			
+			// Pattern 6: 水平条纹 - 创建水平障碍
+			if (i % 4 == 0) {
+				wall[i][j] = 5;  // 水平障碍
+			}
+			
+			// Pattern 7: 随机噪声 - 增加不可预测性
+			if (rand() % 15 == 0) {  // 约6.7%概率
+				wall[i][j] = rand() % 10;
+			}
+			
+			// Pattern 8: 角落特殊值 - 测试边界处理
+			if ((i == 0 && j == 0) || (i == 0 && j == cols-1) || 
+				(i == rows-1 && j == 0) || (i == rows-1 && j == cols-1)) {
+				wall[i][j] = 3;  // 角落特殊值
+			}
 		}
 	}
 }
@@ -227,53 +273,11 @@ void run(int argc, char** argv)
 
     cudaMemcpy(result, gpuResult[final_ret], sizeof(int)*cols, cudaMemcpyDeviceToHost);
 
-    // 读取result.txt文件进行比对
-    FILE *file = fopen("result.txt", "r");
-    if (file == NULL) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
+    // output result array to console instead of txt file
+    for (int i = 0; i < cols; ++i) {
+        printf("%d%c", result[i], (i == cols - 1) ? '\n' : ' ');
     }
-    
-    int expected_result[cols];
-    int i = 0;
-    while (fscanf(file, "%d", &expected_result[i]) == 1 && i < cols) {
-        i++;
-    }
-    fclose(file);
-    
-    // 检查是否读取了足够的元素
-    if (i != cols) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
-    }
-    
-    // 比对结果
-    bool match = true;
-    for (i = 0; i < cols; i++) {
-        if (result[i] != expected_result[i]) {
-            match = false;
-            break;
-        }
-    }
-    
-    
-    if (match) {
-        printf("Success\n");
-    } else {
-        printf("Failed\n");
-    }
+
 
     cudaFree(gpuWall);
     cudaFree(gpuResult[0]);

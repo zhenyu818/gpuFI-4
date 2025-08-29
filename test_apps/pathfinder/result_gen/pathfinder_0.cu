@@ -226,54 +226,11 @@ void run(int argc, char** argv)
 #endif
 
     cudaMemcpy(result, gpuResult[final_ret], sizeof(int)*cols, cudaMemcpyDeviceToHost);
+    // output result array to console instead of txt file
+    for (int i = 0; i < cols; ++i) {
+        printf("%d%c", result[i], (i == cols - 1) ? '\n' : ' ');
+    }
 
-    // 读取result.txt文件进行比对
-    FILE *file = fopen("result.txt", "r");
-    if (file == NULL) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
-    }
-    
-    int expected_result[cols];
-    int i = 0;
-    while (fscanf(file, "%d", &expected_result[i]) == 1 && i < cols) {
-        i++;
-    }
-    fclose(file);
-    
-    // 检查是否读取了足够的元素
-    if (i != cols) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
-    }
-    
-    // 比对结果
-    bool match = true;
-    for (i = 0; i < cols; i++) {
-        if (result[i] != expected_result[i]) {
-            match = false;
-            break;
-        }
-    }
-    
-    
-    if (match) {
-        printf("Success\n");
-    } else {
-        printf("Failed\n");
-    }
 
     cudaFree(gpuWall);
     cudaFree(gpuResult[0]);

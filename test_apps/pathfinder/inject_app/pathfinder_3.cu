@@ -31,8 +31,8 @@ int** wall;
 int* result;
 int pyramid_height;
 
-// 从pathfinder_gen_input_1.cu集成的输入生成函数
-static void generate_input_1(int argc, char **argv)
+// 从pathfinder_gen_input_4.cu集成的输入生成函数
+static void generate_input_4(int argc, char **argv)
 {
 	if (argc == 4) {
 		cols = atoi(argv[1]);
@@ -53,16 +53,17 @@ static void generate_input_1(int argc, char **argv)
 	srand(M_SEED);
 	for (int i = 0; i < rows; i++) {
 		for (int j = 0; j < cols; j++) {
-			wall[i][j] = rand() % 10;
+			wall[i][j] = 1;
 		}
 	}
+
 }
 
 void
 init(int argc, char** argv)
 {
 	// 调用集成的输入生成函数
-	generate_input_1(argc, argv);
+	generate_input_4(argc, argv);
 }
 
 void 

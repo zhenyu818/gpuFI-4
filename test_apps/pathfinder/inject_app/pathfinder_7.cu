@@ -3,6 +3,7 @@
 #include <time.h>
 #include <assert.h>
 #include <string.h>
+#include <limits.h>
 
 struct timeval tv;
 struct timeval tv_total_start, tv_total_end;
@@ -49,11 +50,25 @@ static void generate_input_1(int argc, char **argv)
 		wall[n]=data+cols*n;
 	result = new int[cols];
 
-	// 直接生成输入数据，而不是从文件读取
+	// 生成包含特殊值的随机输入数据
 	srand(M_SEED);
 	for (int i = 0; i < rows; i++) {
 		for (int j = 0; j < cols; j++) {
-			wall[i][j] = rand() % 10;
+			int rand_val = rand() % 100;
+			// 构造包含特殊值的输入
+			if (rand_val < 20) {
+				// 20% 概率生成INT_MAX
+				wall[i][j] = INT_MAX;
+			} else if (rand_val < 40) {
+				// 20% 概率生成INT_MIN
+				wall[i][j] = INT_MIN;
+			} else if (rand_val < 60) {
+				// 20% 概率生成负数
+				wall[i][j] = -(rand() % 100);
+			} else {
+				// 40% 概率生成正常的0-9值
+				wall[i][j] = rand() % 10;
+			}
 		}
 	}
 }

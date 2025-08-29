@@ -19,7 +19,7 @@ float init_time = 0, mem_alloc_time = 0, h2d_time = 0, kernel_time = 0,
 #define DEVICE 0
 #define HALO 1 // halo width along one direction when advancing to the next iteration
 
-#define M_SEED 3415
+#define M_SEED 5325
 
 //#define BENCH_PRINT
 
@@ -31,8 +31,8 @@ int** wall;
 int* result;
 int pyramid_height;
 
-// 从pathfinder_gen_input_1.cu集成的输入生成函数
-static void generate_input_1(int argc, char **argv)
+// 从pathfinder_gen_input_2.cu集成的输入生成函数
+static void generate_input_2(int argc, char **argv)
 {
 	if (argc == 4) {
 		cols = atoi(argv[1]);
@@ -62,7 +62,7 @@ void
 init(int argc, char** argv)
 {
 	// 调用集成的输入生成函数
-	generate_input_1(argc, argv);
+	generate_input_2(argc, argv);
 }
 
 void 
@@ -226,54 +226,11 @@ void run(int argc, char** argv)
 #endif
 
     cudaMemcpy(result, gpuResult[final_ret], sizeof(int)*cols, cudaMemcpyDeviceToHost);
+    // output result array to console instead of txt file
+    for (int i = 0; i < cols; ++i) {
+        printf("%d%c", result[i], (i == cols - 1) ? '\n' : ' ');
+    }
 
-    // 读取result.txt文件进行比对
-    FILE *file = fopen("result.txt", "r");
-    if (file == NULL) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
-    }
-    
-    int expected_result[cols];
-    int i = 0;
-    while (fscanf(file, "%d", &expected_result[i]) == 1 && i < cols) {
-        i++;
-    }
-    fclose(file);
-    
-    // 检查是否读取了足够的元素
-    if (i != cols) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
-    }
-    
-    // 比对结果
-    bool match = true;
-    for (i = 0; i < cols; i++) {
-        if (result[i] != expected_result[i]) {
-            match = false;
-            break;
-        }
-    }
-    
-    
-    if (match) {
-        printf("Success\n");
-    } else {
-        printf("Failed\n");
-    }
 
     cudaFree(gpuWall);
     cudaFree(gpuResult[0]);

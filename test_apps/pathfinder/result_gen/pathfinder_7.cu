@@ -3,6 +3,7 @@
 #include <time.h>
 #include <assert.h>
 #include <string.h>
+#include <limits.h>
 
 struct timeval tv;
 struct timeval tv_total_start, tv_total_end;
@@ -49,11 +50,25 @@ static void generate_input_1(int argc, char **argv)
 		wall[n]=data+cols*n;
 	result = new int[cols];
 
-	// 直接生成输入数据，而不是从文件读取
+	// 生成包含特殊值的随机输入数据
 	srand(M_SEED);
 	for (int i = 0; i < rows; i++) {
 		for (int j = 0; j < cols; j++) {
-			wall[i][j] = rand() % 10;
+			int rand_val = rand() % 100;
+			// 构造包含特殊值的输入
+			if (rand_val < 20) {
+				// 20% 概率生成INT_MAX
+				wall[i][j] = INT_MAX;
+			} else if (rand_val < 40) {
+				// 20% 概率生成INT_MIN
+				wall[i][j] = INT_MIN;
+			} else if (rand_val < 60) {
+				// 20% 概率生成负数
+				wall[i][j] = -(rand() % 100);
+			} else {
+				// 40% 概率生成正常的0-9值
+				wall[i][j] = rand() % 10;
+			}
 		}
 	}
 }
@@ -227,53 +242,11 @@ void run(int argc, char** argv)
 
     cudaMemcpy(result, gpuResult[final_ret], sizeof(int)*cols, cudaMemcpyDeviceToHost);
 
-    // 读取result.txt文件进行比对
-    FILE *file = fopen("result.txt", "r");
-    if (file == NULL) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
+    // output result array to console instead of txt file
+    for (int i = 0; i < cols; ++i) {
+        printf("%d%c", result[i], (i == cols - 1) ? '\n' : ' ');
     }
-    
-    int expected_result[cols];
-    int i = 0;
-    while (fscanf(file, "%d", &expected_result[i]) == 1 && i < cols) {
-        i++;
-    }
-    fclose(file);
-    
-    // 检查是否读取了足够的元素
-    if (i != cols) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
-    }
-    
-    // 比对结果
-    bool match = true;
-    for (i = 0; i < cols; i++) {
-        if (result[i] != expected_result[i]) {
-            match = false;
-            break;
-        }
-    }
-    
-    
-    if (match) {
-        printf("Success\n");
-    } else {
-        printf("Failed\n");
-    }
+
 
     cudaFree(gpuWall);
     cudaFree(gpuResult[0]);

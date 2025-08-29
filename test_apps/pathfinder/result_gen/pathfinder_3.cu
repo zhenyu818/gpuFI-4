@@ -31,8 +31,8 @@ int** wall;
 int* result;
 int pyramid_height;
 
-// 从pathfinder_gen_input_1.cu集成的输入生成函数
-static void generate_input_1(int argc, char **argv)
+// 从pathfinder_gen_input_4.cu集成的输入生成函数
+static void generate_input_4(int argc, char **argv)
 {
 	if (argc == 4) {
 		cols = atoi(argv[1]);
@@ -53,16 +53,17 @@ static void generate_input_1(int argc, char **argv)
 	srand(M_SEED);
 	for (int i = 0; i < rows; i++) {
 		for (int j = 0; j < cols; j++) {
-			wall[i][j] = rand() % 10;
+			wall[i][j] = 1;
 		}
 	}
+
 }
 
 void
 init(int argc, char** argv)
 {
 	// 调用集成的输入生成函数
-	generate_input_1(argc, argv);
+	generate_input_4(argc, argv);
 }
 
 void 
@@ -227,53 +228,11 @@ void run(int argc, char** argv)
 
     cudaMemcpy(result, gpuResult[final_ret], sizeof(int)*cols, cudaMemcpyDeviceToHost);
 
-    // 读取result.txt文件进行比对
-    FILE *file = fopen("result.txt", "r");
-    if (file == NULL) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
+    // output result array to console instead of txt file
+    for (int i = 0; i < cols; ++i) {
+        printf("%d%c", result[i], (i == cols - 1) ? '\n' : ' ');
     }
-    
-    int expected_result[cols];
-    int i = 0;
-    while (fscanf(file, "%d", &expected_result[i]) == 1 && i < cols) {
-        i++;
-    }
-    fclose(file);
-    
-    // 检查是否读取了足够的元素
-    if (i != cols) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
-    }
-    
-    // 比对结果
-    bool match = true;
-    for (i = 0; i < cols; i++) {
-        if (result[i] != expected_result[i]) {
-            match = false;
-            break;
-        }
-    }
-    
-    
-    if (match) {
-        printf("Success\n");
-    } else {
-        printf("Failed\n");
-    }
+
 
     cudaFree(gpuWall);
     cudaFree(gpuResult[0]);

@@ -3,6 +3,7 @@
 #include <time.h>
 #include <assert.h>
 #include <string.h>
+#include <stdbool.h>
 
 struct timeval tv;
 struct timeval tv_total_start, tv_total_end;
@@ -19,7 +20,9 @@ float init_time = 0, mem_alloc_time = 0, h2d_time = 0, kernel_time = 0,
 #define DEVICE 0
 #define HALO 1 // halo width along one direction when advancing to the next iteration
 
-#define M_SEED 3415
+#define M_SEED 3415          // 保留原随机种子
+#define SPARSE_N 2           // 2:4稀疏中的N（每M个元素保留的非零值数量）
+#define SPARSE_M 4           // 2:4稀疏中的M（连续元素分组大小）
 
 //#define BENCH_PRINT
 
@@ -31,38 +34,83 @@ int** wall;
 int* result;
 int pyramid_height;
 
-// 从pathfinder_gen_input_1.cu集成的输入生成函数
-static void generate_input_1(int argc, char **argv)
-{
-	if (argc == 4) {
-		cols = atoi(argv[1]);
-		rows = atoi(argv[2]);
-		pyramid_height = atoi(argv[3]);
-	} else {
-		printf("Usage: dynproc row_len col_len pyramid_height\n");
-		exit(0);
-	}
+// 从pathfinder_gen_input_6.cu集成的2:4稀疏输入生成函数
+// 生成2:4结构化稀疏的随机值（每4个连续元素中随机选2个置非零，其余置0）
+static void generate_2to4_sparse_value(int *group, int group_len) {
+    // 1. 初始化分组为全0（满足稀疏约束的基础）
+    for (int k = 0; k < group_len; k++) {
+        group[k] = 0;
+    }
+    
+    // 2. 随机选择2个不同的位置作为非零值索引（确保每4个元素仅保留2个非零）
+    bool selected[SPARSE_M] = {false};
+    int selected_count = 0;
+    while (selected_count < SPARSE_N) {
+        int rand_idx = rand() % SPARSE_M;  // 0~3范围内随机选索引
+        if (!selected[rand_idx]) {
+            selected[rand_idx] = true;
+            selected_count++;
+        }
+    }
+    
+    // 3. 为选中的位置生成0~9的随机非零值（匹配原代码的随机值范围）
+    for (int k = 0; k < SPARSE_M; k++) {
+        if (selected[k]) {
+            group[k] = rand() % 10;
+            // 确保非零（若随机到0则重新生成，避免与稀疏置0混淆）
+            while (group[k] == 0) {
+                group[k] = rand() % 10;
+            }
+        }
+    }
+}
 
-	data = new int[rows*cols];
-	wall = new int*[rows];
-	for(int n=0; n<rows; n++)
-		wall[n]=data+cols*n;
-	result = new int[cols];
+// 生成2:4结构化稀疏的输入矩阵
+static void generate_input_6(int argc, char **argv) {
+    if (argc == 4) {
+        cols = atoi(argv[1]);
+        rows = atoi(argv[2]);
+        pyramid_height = atoi(argv[3]);
+        // 检查列数是否为4的整数倍（确保2:4稀疏分组完整，若不满足则自动补齐）
+        if (cols % SPARSE_M != 0) {
+            int new_cols = (cols / SPARSE_M + 1) * SPARSE_M;
+            printf("Warning: Column length (%d) is not a multiple of %d. Auto-adjust to %d\n", 
+                   cols, SPARSE_M, new_cols);
+            cols = new_cols;
+        }
+    } else {
+        printf("Usage: dynproc row_len col_len pyramid_height\n");
+        exit(0);
+    }
 
-	// 直接生成输入数据，而不是从文件读取
-	srand(M_SEED);
-	for (int i = 0; i < rows; i++) {
-		for (int j = 0; j < cols; j++) {
-			wall[i][j] = rand() % 10;
-		}
-	}
+    // 内存分配（与原代码逻辑一致）
+    data = new int[rows * cols];
+    wall = new int*[rows];
+    for (int n = 0; n < rows; n++) {
+        wall[n] = data + cols * n;
+    }
+    result = new int[cols];
+
+    srand(M_SEED);  // 保留原随机种子，确保可复现性
+    // 按行生成2:4稀疏数据
+    for (int i = 0; i < rows; i++) {
+        // 按4个元素为一组处理，确保每组满足2:4稀疏约束
+        for (int j = 0; j < cols; j += SPARSE_M) {
+            int group[SPARSE_M];
+            generate_2to4_sparse_value(group, SPARSE_M);
+            // 将稀疏分组赋值到矩阵对应位置
+            for (int k = 0; k < SPARSE_M; k++) {
+                wall[i][j + k] = group[k];
+            }
+        }
+    }
 }
 
 void
 init(int argc, char** argv)
 {
 	// 调用集成的输入生成函数
-	generate_input_1(argc, argv);
+	generate_input_6(argc, argv);
 }
 
 void 
@@ -227,53 +275,11 @@ void run(int argc, char** argv)
 
     cudaMemcpy(result, gpuResult[final_ret], sizeof(int)*cols, cudaMemcpyDeviceToHost);
 
-    // 读取result.txt文件进行比对
-    FILE *file = fopen("result.txt", "r");
-    if (file == NULL) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
+    // output result array to console instead of txt file
+    for (int i = 0; i < cols; ++i) {
+        printf("%d%c", result[i], (i == cols - 1) ? '\n' : ' ');
     }
-    
-    int expected_result[cols];
-    int i = 0;
-    while (fscanf(file, "%d", &expected_result[i]) == 1 && i < cols) {
-        i++;
-    }
-    fclose(file);
-    
-    // 检查是否读取了足够的元素
-    if (i != cols) {
-        printf("Failed\n");
-        cudaFree(gpuWall);
-        cudaFree(gpuResult[0]);
-        cudaFree(gpuResult[1]);
-        delete [] data;
-        delete [] wall;
-        delete [] result;
-        return;
-    }
-    
-    // 比对结果
-    bool match = true;
-    for (i = 0; i < cols; i++) {
-        if (result[i] != expected_result[i]) {
-            match = false;
-            break;
-        }
-    }
-    
-    
-    if (match) {
-        printf("Success\n");
-    } else {
-        printf("Failed\n");
-    }
+
 
     cudaFree(gpuWall);
     cudaFree(gpuResult[0]);
