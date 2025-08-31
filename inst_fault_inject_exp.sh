@@ -254,49 +254,49 @@ main() {
     # load environment variables
     source setup_environment
 
-    # # compile project
-    # make -j$(nproc)
+    # compile project
+    make -j$(nproc)
 
-    # # 删除test_apps/${TEST_APP_NAME}/result下的所有文件
-    # rm -rf test_apps/${TEST_APP_NAME}/result/*
+    # 删除test_apps/${TEST_APP_NAME}/result下的所有文件
+    rm -rf test_apps/${TEST_APP_NAME}/result/*
 
 
-    # # 生成result
-    # idx=0
-    # while IFS= read -r line || [[ -n "$line" ]]; do
-    #     echo "$idx: $line"
-    # if [[ "$idx" == "1" || "$idx" == "3" || "$idx" == "5" ]]; then
-    #     cu_file="test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_0.cu"
-    #     if [[ -f "$cu_file" ]]; then
-    #         filename=$(basename "$cu_file")
-    #         x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
-    #         if [[ -n "$x_val" ]]; then
-    #             cp "$cu_file" "${cu_file}.bak"
-    #             /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
-    #             # 将输出重定向到目录下的txt文件
-    #             ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-    #             rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
-    #             mv "${cu_file}.bak" "$cu_file"
-    #         fi
-    #     fi
-    # else
-    #     for cu_file in test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_*.cu; do
-    #         filename=$(basename "$cu_file")
-    #         x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
-    #         if [[ -z "$x_val" ]]; then
-    #             continue
-    #         fi
+    # 生成result
+    idx=0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        echo "$idx: $line"
+    if [[ "$idx" == "1" || "$idx" == "3" || "$idx" == "5" ]]; then
+        cu_file="test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_0.cu"
+        if [[ -f "$cu_file" ]]; then
+            filename=$(basename "$cu_file")
+            x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
+            if [[ -n "$x_val" ]]; then
+                cp "$cu_file" "${cu_file}.bak"
+                /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
+                # 将输出重定向到目录下的txt文件
+                ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
+                mv "${cu_file}.bak" "$cu_file"
+            fi
+        fi
+    else
+        for cu_file in test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_*.cu; do
+            filename=$(basename "$cu_file")
+            x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
+            if [[ -z "$x_val" ]]; then
+                continue
+            fi
 
-    #         cp "$cu_file" "${cu_file}.bak"
-    #         /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
-    #         # 将输出重定向到目录下的txt文件
-    #         ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-    #         rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
-    #         mv "${cu_file}.bak" "$cu_file"
-    #     done
-    # fi
-    #     idx=$((idx+1))
-    # done < test_apps/${TEST_APP_NAME}/size_list.txt
+            cp "$cu_file" "${cu_file}.bak"
+            /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
+            # 将输出重定向到目录下的txt文件
+            ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+            rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
+            mv "${cu_file}.bak" "$cu_file"
+        done
+    fi
+        idx=$((idx+1))
+    done < test_apps/${TEST_APP_NAME}/size_list.txt
 
 
 
@@ -320,12 +320,12 @@ main() {
 
         echo "正在进行输入规模${a}、输入内容${b}的故障注入"
         nvcc ${TEST_APP_NAME}.cu -o ${TEST_APP_NAME} -g -lcudart -arch=sm_75
-        ldd ${TEST_APP_NAME}
+
+        bash campaign_profile.sh
         if [ ! -f "$FILE_PATH" ]; then
             echo "Error: file not found: $FILE_PATH" >&2
         exit 1
         fi
-        bash campaign_profile.sh
         get_metrics
         # 读取size_list.txt的第a行（a从0开始）
         size_list_file="test_apps/${TEST_APP_NAME}/size_list.txt"
@@ -343,7 +343,7 @@ main() {
             echo "Error: 未找到campaign_exec.sh: $campaign_file" >&2
             exit 1
         fi
-
+        bash generate_cycles.sh $GLOBAL_CYCLES $GLOBAL_CYCLES
 
         # 生成新的内容
         awk -v test_app_name="$TEST_APP_NAME" -v size_line="$size_line" \
@@ -398,7 +398,13 @@ main() {
             print $0
         }' "$campaign_file" > "${campaign_file}.tmp" && mv "${campaign_file}.tmp" "$campaign_file"
 
-        bash campaign_exec.sh
+
+        bash campaign_exec.sh > inst_exec.log
+        python3 parse_exec.py
+        # 删除 inst_exec.log 文件
+        rm -f inst_exec.log
+
+        
     done
 }
 

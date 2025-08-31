@@ -7,7 +7,7 @@ CONFIG_FILE=./gpgpusim.config
 TMP_DIR=./logs
 CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
-RUNS=10
+RUNS=90000
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
 DELETE_LOGS=0 # if 1 then all logs will be deleted at the end of the script
 # ---------------------------------------------- END ONE-TIME PARAMETERS ------------------------------------------------
@@ -22,7 +22,7 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./pathfinder 640 24 23"
+CUDA_UUT="./pathfinder 4 4 3"
 # total cycles for all kernels
 CYCLES=4040
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
@@ -135,25 +135,32 @@ gather_results() {
             grep -h "FI_VALIDATION:" "$file"
         fi
         result=${success_msg_grep}${cycles_grep}${failed_msg_grep}
+        
+        # 获取文件名用于显示
+        filename=$(basename "$file")
+        
         case $result in
         "001")
             let RUNS--
-            let masked++ ;;
+            let masked++
+            echo "[Run ${1}] ${filename}: Masked (no performance impact)" ;;
         "011")
             let RUNS--
             let masked++ 
-            let performance++ ;;
+            let performance++
+            echo "[Run ${1}] ${filename}: Masked (with performance impact)" ;;
         "100" | "110")
             let RUNS--
-            let SDC++ ;;
+            let SDC++
+            echo "[Run ${1}] ${filename}: SDC" ;;
         *)
             grep -iq "${FAULT_INJECTION_OCCURRED}" $file
             if [ $? -eq 0 ]; then
                 let RUNS--
                 let crashes++
-                echo "Crash appeared in loop ${1}" # DEBUG
+                echo "[Run ${1}] ${filename}: DUE (Crash)"
             else
-                echo "Unclassified in loop ${1} ${result}" # DEBUG
+                echo "[Run ${1}] ${filename}: Unclassified (${result})"
             fi ;;
         esac
     done
