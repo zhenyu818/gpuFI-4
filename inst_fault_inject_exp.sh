@@ -257,46 +257,46 @@ main() {
     # compile project
     make -j$(nproc)
 
-    # 删除test_apps/${TEST_APP_NAME}/result下的所有文件
-    rm -rf test_apps/${TEST_APP_NAME}/result/*
+    # # 删除test_apps/${TEST_APP_NAME}/result下的所有文件
+    # rm -rf test_apps/${TEST_APP_NAME}/result/*
 
 
-    # 生成result
-    idx=0
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        echo "$idx: $line"
-    if [[ "$idx" == "1" || "$idx" == "3" || "$idx" == "5" ]]; then
-        cu_file="test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_0.cu"
-        if [[ -f "$cu_file" ]]; then
-            filename=$(basename "$cu_file")
-            x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
-            if [[ -n "$x_val" ]]; then
-                cp "$cu_file" "${cu_file}.bak"
-                /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
-                # 将输出重定向到目录下的txt文件
-                ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-                rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
-                mv "${cu_file}.bak" "$cu_file"
-            fi
-        fi
-    else
-        for cu_file in test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_*.cu; do
-            filename=$(basename "$cu_file")
-            x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
-            if [[ -z "$x_val" ]]; then
-                continue
-            fi
+    # # 生成result
+    # idx=0
+    # while IFS= read -r line || [[ -n "$line" ]]; do
+    #     echo "$idx: $line"
+    # if [[ "$idx" == "1" || "$idx" == "3" || "$idx" == "5" ]]; then
+    #     cu_file="test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_0.cu"
+    #     if [[ -f "$cu_file" ]]; then
+    #         filename=$(basename "$cu_file")
+    #         x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
+    #         if [[ -n "$x_val" ]]; then
+    #             cp "$cu_file" "${cu_file}.bak"
+    #             /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
+    #             # 将输出重定向到目录下的txt文件
+    #             ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+    #             rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
+    #             mv "${cu_file}.bak" "$cu_file"
+    #         fi
+    #     fi
+    # else
+    #     for cu_file in test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_*.cu; do
+    #         filename=$(basename "$cu_file")
+    #         x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
+    #         if [[ -z "$x_val" ]]; then
+    #             continue
+    #         fi
 
-            cp "$cu_file" "${cu_file}.bak"
-            /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
-            # 将输出重定向到目录下的txt文件
-            ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-            rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
-            mv "${cu_file}.bak" "$cu_file"
-        done
-    fi
-        idx=$((idx+1))
-    done < test_apps/${TEST_APP_NAME}/size_list.txt
+    #         cp "$cu_file" "${cu_file}.bak"
+    #         /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
+    #         # 将输出重定向到目录下的txt文件
+    #         ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+    #         rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
+    #         mv "${cu_file}.bak" "$cu_file"
+    #     done
+    # fi
+    #     idx=$((idx+1))
+    # done < test_apps/${TEST_APP_NAME}/size_list.txt
 
 
 

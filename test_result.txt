@@ -1,0 +1,115 @@
+Kernel               | Instr_ID | Instruction                                                  | Masked | SDC    | DUE   
+------------------------------------------------------------------------------------------------------------------------
+dynproc_kernel       | 1        | ld.param.u32 %r11, [_Z14dynproc_kerneliPiS_S_iiii_param_0];  |     15 |      7 |     11
+dynproc_kernel       | 2        | ld.param.u64 %rd1, [_Z14dynproc_kerneliPiS_S_iiii_param_1];  |     16 |      7 |      0
+dynproc_kernel       | 3        | ld.param.u64 %rd2, [_Z14dynproc_kerneliPiS_S_iiii_param_2];  |     12 |      4 |      0
+dynproc_kernel       | 4        | ld.param.u64 %rd3, [_Z14dynproc_kerneliPiS_S_iiii_param_3];  |      9 |      9 |      0
+dynproc_kernel       | 5        | ld.param.u32 %r12, [_Z14dynproc_kerneliPiS_S_iiii_param_4];  |     12 |      8 |      0
+dynproc_kernel       | 6        | ld.param.u32 %r13, [_Z14dynproc_kerneliPiS_S_iiii_param_6];  |     10 |      5 |      0
+dynproc_kernel       | 7        | ld.param.u32 %r14, [_Z14dynproc_kerneliPiS_S_iiii_param_7];  |     14 |     12 |      0
+dynproc_kernel       | 8        | mov.u32 %r15, %ctaid.x;                                      |      8 |      6 |      0
+dynproc_kernel       | 11       | sub.s32 %r18, %r17, %r16;                                    |      7 |      3 |      0
+dynproc_kernel       | 12       | mul.lo.s32 %r19, %r15, %r18;                                 |      2 |      0 |      0
+dynproc_kernel       | 13       | sub.s32 %r20, %r19, %r14;                                    |     30 |     12 |      0
+dynproc_kernel       | 14       | shr.s32 %r21, %r20, 31;                                      |      3 |      3 |      0
+dynproc_kernel       | 15       | mov.u32 %r22, %tid.x;                                        |     12 |      7 |      0
+dynproc_kernel       | 16       | add.s32 %r23, %r20, %r22;                                    |      4 |      8 |      0
+dynproc_kernel       | 18       | and.b32 %r25, %r21, %r24;                                    |      6 |      1 |      0
+dynproc_kernel       | 19       | add.s32 %r26, %r12, -1;                                      |      8 |      0 |      0
+dynproc_kernel       | 20       | add.s32 %r27, %r22, -1;                                      |      1 |      1 |      0
+dynproc_kernel       | 21       | max.s32 %r1, %r25, %r27;                                     |      8 |      4 |      0
+dynproc_kernel       | 22       | setp.gt.s32%p1, %r23, -1;                                    |      3 |      1 |      0
+dynproc_kernel       | 30       | ld.global.u32 %r36, [%rd6];                                  |      3 |      0 |      0
+dynproc_kernel       | 31       | shl.b32 %r37, %r22, 2;                                       |      1 |      0 |      0
+dynproc_kernel       | 32       | mov.u32 %r38, _ZZ14dynproc_kerneliPiS_S_iiiiE4prev;          |      0 |      1 |      0
+dynproc_kernel       | 34       | mad.lo.s32 %r46, %r13, %r12, %r22;                           |      2 |      0 |      0
+dynproc_kernel       | 37       | mov.u32 %r121, 0;                                            |      4 |      0 |      0
+dynproc_kernel       | 39       | mov.u32 %r42, _ZZ14dynproc_kerneliPiS_S_iiiiE4prev;          |     17 |     17 |      0
+dynproc_kernel       | 39       | mov.u32 %r52, 254;                                           |      1 |      0 |      0
+dynproc_kernel       | 40       | sub.s32 %r53, %r52, %r121;                                   |      8 |      0 |      0
+dynproc_kernel       | 41       | setp.le.s32%p5, %r22, %r53;                                  |      7 |      0 |      0
+dynproc_kernel       | 42       | sub.s32 %r120, %r45, %r11;                                   |      1 |      0 |      0
+dynproc_kernel       | 43       | setp.ge.s32%p6, %r22, %r121;                                 |      8 |      0 |      0
+dynproc_kernel       | 44       | and.pred %p7, %p5, %p6;                                      |      7 |      0 |      0
+dynproc_kernel       | 45       | sub.s32 %r119, %r50, %r14;                                   |     18 |     16 |      0
+dynproc_kernel       | 45       | add.s32 %r61, %r20, 255;                                     |      7 |      1 |      0
+dynproc_kernel       | 46       | setp.gt.s32%p8, %r61, %r26;                                  |      7 |      0 |      0
+dynproc_kernel       | 47       | cvta.to.global.u64 %rd7, %rd1;                               |     13 |     15 |      0
+dynproc_kernel       | 47       | mov.u32 %r63, -255;                                          |     13 |      0 |      0
+dynproc_kernel       | 48       | mov.u32 %r52, 254;                                           |     33 |      1 |      0
+dynproc_kernel       | 49       | sub.s32 %r53, %r52, %r121;                                   |     17 |      1 |      0
+dynproc_kernel       | 50       | add.s32 %r66, %r65, 254;                                     |      7 |      0 |      0
+dynproc_kernel       | 51       | selp.b32%r67, %r66, 255, %p8;                                |      8 |      0 |      0
+dynproc_kernel       | 51       | add.s32 %r121, %r121, 1;                                     |      0 |      1 |      0
+dynproc_kernel       | 52       | setp.ge.s32%p6, %r22, %r121;                                 |      2 |      0 |      0
+dynproc_kernel       | 53       | and.pred %p7, %p5, %p6;                                      |      5 |      0 |      0
+dynproc_kernel       | 54       | add.s32 %r61, %r20, 255;                                     |     20 |      0 |      0
+dynproc_kernel       | 55       | setp.gt.s32%p8, %r61, %r26;                                  |     26 |      0 |      0
+dynproc_kernel       | 56       | mov.u32 %r63, -255;                                          |      5 |      0 |      0
+dynproc_kernel       | 56       | mov.u16 %rs8, 0;                                             |      7 |      0 |      0
+dynproc_kernel       | 59       | setp.eq.s32%p15, %r120, 0;                                   |      5 |      0 |      0
+dynproc_kernel       | 61       | setp.eq.s16%p16, %rs8, 0;                                    |      6 |      0 |      0
+dynproc_kernel       | 65       | mov.u16 %rs8, 0;                                             |     12 |      1 |      0
+dynproc_kernel       | 66       | setp.lt.s32%p17, %r121, %r11;                                |      3 |      0 |      0
+dynproc_kernel       | 68       | ld.shared.u32 %r70, [%r2];                                   |     16 |      1 |      0
+dynproc_kernel       | 69       | shl.b32 %r72, %r22, 2;                                       |      3 |      3 |      0
+dynproc_kernel       | 69       | sub.s32 %r53, %r52, %r121;                                   |      1 |      0 |      0
+dynproc_kernel       | 70       | add.s32 %r74, %r42, %r72;                                    |     21 |      1 |      0
+dynproc_kernel       | 72       | add.s32 %r88, %r22, 1;                                       |      8 |      0 |      0
+dynproc_kernel       | 72       | setp.ge.s32%p6, %r22, %r121;                                 |      3 |      0 |      0
+dynproc_kernel       | 73       | selp.b32%r89, %r88, %r67, %p14;                              |     13 |      0 |      0
+dynproc_kernel       | 73       | and.pred %p7, %p5, %p6;                                      |      7 |      0 |      0
+dynproc_kernel       | 74       | add.s32 %r61, %r20, 255;                                     |      3 |      0 |      0
+dynproc_kernel       | 75       | setp.gt.s32%p8, %r61, %r26;                                  |      3 |      0 |      0
+dynproc_kernel       | 76       | mov.u32 %r63, -255;                                          |      2 |      0 |      0
+dynproc_kernel       | 79       | add.s32 %r66, %r65, 254;                                     |      6 |      0 |      0
+dynproc_kernel       | 80       | mul.wide.s32 %rd8, %r119, 4;                                 |     10 |      0 |      0
+dynproc_kernel       | 80       | selp.b32%r67, %r66, 255, %p8;                                |      1 |      0 |      0
+dynproc_kernel       | 81       | add.s64 %rd9, %rd7, %rd8;                                    |      6 |      0 |      0
+dynproc_kernel       | 82       | ld.global.u32 %r96, [%rd9];                                  |      2 |      0 |      0
+dynproc_kernel       | 85       | mov.u16 %rs8, 0;                                             |      2 |      0 |      0
+dynproc_kernel       | 88       | setp.eq.s32%p15, %r120, 0;                                   |      3 |      0 |      0
+dynproc_kernel       | 90       | setp.eq.s16%p16, %rs8, 0;                                    |      3 |      0 |      0
+dynproc_kernel       | 93       | shl.b32 %r101, %r22, 2;                                      |     16 |      3 |      0
+dynproc_kernel       | 94       | mov.u32 %r102, _ZZ14dynproc_kerneliPiS_S_iiiiE6result;       |     17 |      0 |      0
+dynproc_kernel       | 95       | setp.lt.s32%p17, %r121, %r11;                                |      2 |      0 |      0
+dynproc_kernel       | 95       | add.s32 %r103, %r102, %r101;                                 |      5 |      0 |      0
+dynproc_kernel       | 96       | ld.shared.u32 %r104, [%r103];                                |      4 |      1 |      0
+dynproc_kernel       | 97       | add.s32 %r106, %r42, %r101;                                  |     17 |      1 |      0
+dynproc_kernel       | 98       | sub.s32 %r53, %r52, %r121;                                   |      5 |      0 |      0
+dynproc_kernel       | 100      | add.s32 %r120, %r120, 1;                                     |     12 |      1 |      0
+dynproc_kernel       | 101      | setp.ge.s32%p6, %r22, %r121;                                 |      2 |      0 |      0
+dynproc_kernel       | 102      | and.pred %p7, %p5, %p6;                                      |      4 |      0 |      0
+dynproc_kernel       | 103      | add.s32 %r61, %r20, 255;                                     |      3 |      0 |      0
+dynproc_kernel       | 104      | setp.gt.s32%p8, %r61, %r26;                                  |     12 |      0 |      0
+dynproc_kernel       | 105      | mov.u32 %r63, -255;                                          |      8 |      0 |      0
+dynproc_kernel       | 107      | add.s32 %r121, %r121, 1;                                     |      3 |      5 |      0
+dynproc_kernel       | 108      | add.s32 %r66, %r65, 254;                                     |      5 |      0 |      0
+dynproc_kernel       | 109      | selp.b32%r67, %r66, 255, %p8;                                |      4 |      0 |      0
+dynproc_kernel       | 114      | mov.u16 %rs8, 0;                                             |      3 |      0 |      0
+dynproc_kernel       | 117      | setp.eq.s32%p15, %r120, 0;                                   |      2 |      0 |      0
+dynproc_kernel       | 124      | setp.lt.s32%p17, %r121, %r11;                                |      6 |      1 |      0
+dynproc_kernel       | 127      | sub.s32 %r53, %r52, %r121;                                   |      2 |      0 |      0
+dynproc_kernel       | 130      | setp.ge.s32%p6, %r22, %r121;                                 |      1 |      0 |      0
+dynproc_kernel       | 131      | and.pred %p7, %p5, %p6;                                      |      4 |      0 |      0
+dynproc_kernel       | 132      | add.s32 %r61, %r20, 255;                                     |      1 |      0 |      0
+dynproc_kernel       | 138      | ld.global.u32 %r96, [%rd9];                                  |      7 |      0 |      0
+dynproc_kernel       | 149      | shl.b32 %r101, %r22, 2;                                      |      9 |      0 |      0
+dynproc_kernel       | 150      | mov.u32 %r102, _ZZ14dynproc_kerneliPiS_S_iiiiE6result;       |     11 |      0 |      0
+dynproc_kernel       | 151      | add.s32 %r103, %r102, %r101;                                 |      6 |      1 |      0
+dynproc_kernel       | 152      | ld.shared.u32 %r104, [%r103];                                |      4 |      0 |      0
+dynproc_kernel       | 153      | add.s32 %r106, %r42, %r101;                                  |      7 |      0 |      0
+dynproc_kernel       | 156      | add.s32 %r120, %r120, 1;                                     |     13 |      3 |      0
+dynproc_kernel       | 163      | add.s32 %r121, %r121, 1;                                     |      0 |      4 |      0
+dynproc_kernel       | 194      | ld.global.u32 %r96, [%rd9];                                  |     14 |      1 |      0
+dynproc_kernel       | 205      | shl.b32 %r101, %r22, 2;                                      |      8 |      0 |      0
+dynproc_kernel       | 206      | mov.u32 %r102, _ZZ14dynproc_kerneliPiS_S_iiiiE6result;       |      1 |      0 |      0
+dynproc_kernel       | 207      | add.s32 %r103, %r102, %r101;                                 |      5 |      1 |      0
+dynproc_kernel       | 209      | add.s32 %r106, %r42, %r101;                                  |      3 |      0 |      0
+dynproc_kernel       | 212      | add.s32 %r120, %r120, 1;                                     |      5 |      0 |      0
+dynproc_kernel       | 219      | add.s32 %r121, %r121, 1;                                     |     10 |      3 |      0
+
+Summary (per kernel):
+Kernel               | Masked | SDC    | DUE   
+---------------------------------------------
+dynproc_kernel       |    807 |    182 |     11

@@ -7,9 +7,9 @@ CONFIG_FILE=./gpgpusim.config
 TMP_DIR=./logs
 CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
-RUNS=90000
+RUNS=1000
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
-DELETE_LOGS=0 # if 1 then all logs will be deleted at the end of the script
+DELETE_LOGS=1 # if 1 then all logs will be deleted at the end of the script
 # ---------------------------------------------- END ONE-TIME PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER GPGPU CARD PARAMETERS ----------------------------------------------
@@ -22,7 +22,7 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./pathfinder 4 4 3"
+CUDA_UUT="./pathfinder 640 24 23"
 # total cycles for all kernels
 CYCLES=4040
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
