@@ -64,4 +64,5 @@ gpu-app-collection/
 # Ignore any directories starting with 'log' and everything inside them
 log*/
 **/log*/
-
+.vscode/
+.vscode/*

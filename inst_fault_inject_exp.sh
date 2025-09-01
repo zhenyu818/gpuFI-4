@@ -400,9 +400,13 @@ main() {
 
 
         bash campaign_exec.sh > inst_exec.log
-        python3 parse_exec.py
+        python3 parse_exec.py > parse_exec.log
+        # 如果$filename以.txt结尾，先去掉再传入
+        filename_no_ext="${filename%.txt}"
+        python3 analyze_fault.py $TEST_APP_NAME $filename_no_ext
+
         # 删除 inst_exec.log 文件
-        rm -f inst_exec.log
+        # rm -f inst_exec.log
 
         
     done

@@ -7,43 +7,58 @@ LOGFILE = "inst_exec.log"   # 你可以改成 exec.log 或别的
 # {(kernel, instr_id, instr): {"Masked":x, "SDC":y, "DUE":z}}
 stats = defaultdict(lambda: {"Masked": 0, "SDC": 0, "DUE": 0})
 
-kernel = ""
-instr = ""
-instr_id = ""
+# 存储每个故障注入对应的指令信息
+injection_to_instruction = {}
 
 with open(LOGFILE, "r", encoding="utf-8", errors="ignore") as f:
-    for line in f:
+    lines = f.readlines()
+    
+    # 第一遍：建立故障注入编号到指令信息的映射
+    for i, line in enumerate(lines):
         line = line.strip()
-
-        # 提取 kernel 名称
-        m_kernel = re.search(r"inst=\s*([a-zA-Z0-9_]+)\s+PC", line)
-        if m_kernel:
-            kernel = m_kernel.group(1)
-
-        # 提取目标指令编号 A(dst)_icount
-        m_id = re.search(r"A\(dst\)_icount=(\d+)", line)
-        if m_id:
-            instr_id = m_id.group(1)
-
-        # 提取指令内容（分号结尾）
-        m_instr = re.search(r"inst=\s*[a-zA-Z0-9_]+\s+PC=.*?\)\s*([^;]+;)", line)
-        if m_instr:
-            instr = m_instr.group(1).strip()
-
+        
+        # 查找 Effects from 行
+        m_injection = re.search(r"Effects from \./logs1/tmp\.out(\d+):", line)
+        if m_injection:
+            injection_num = m_injection.group(1)
+            
+            # 在下一行查找指令信息
+            if i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                
+                # 提取指令信息
+                m_kernel = re.search(r"inst=\s*([a-zA-Z0-9_]+)\s+PC", next_line)
+                m_id = re.search(r"A\(dst\)_icount=(\d+)", next_line)
+                m_instr = re.search(r"inst=\s*[a-zA-Z0-9_]+\s+PC=.*?\)\s*([^;]+;)", next_line)
+                
+                if m_kernel and m_id and m_instr:
+                    kernel = m_kernel.group(1)
+                    instr_id = m_id.group(1)
+                    instr = m_instr.group(1).strip()
+                    injection_to_instruction[injection_num] = (kernel, instr_id, instr)
+    
+    # 第二遍：统计故障注入结果
+    for line in lines:
+        line = line.strip()
+        
         # 判断结果
         if "tmp.out" in line and ":" in line:
-            if "Masked" in line:
-                result = "Masked"
-            elif "SDC" in line:
-                result = "SDC"
-            elif "DUE" in line:
-                result = "DUE"
-            else:
-                result = None
-
-            if result:
-                key = (kernel or "N/A", instr_id or "N/A", instr or "N/A")
-                stats[key][result] += 1
+            m_result = re.search(r"tmp\.out(\d+):\s*(\w+)(?:\s*\([^)]*\))?", line)
+            if m_result:
+                injection_num = m_result.group(1)
+                result = m_result.group(2)
+                
+                # 跳过 Unclassified 类型，不记录到统计中
+                if result == "Unclassified":
+                    continue
+                
+                if injection_num in injection_to_instruction:
+                    # 有指令信息的情况
+                    stats[injection_to_instruction[injection_num]][result] += 1
+                else:
+                    # 没有指令信息的情况，统计到"未知指令"
+                    unknown_key = ("Invalid Injection", "-", "-")
+                    stats[unknown_key][result] += 1
 
 # ---------------- 输出结果 ----------------
 print(f"{'Kernel':20} | {'Instr_ID':8} | {'Instruction':60} | {'Masked':6} | {'SDC':6} | {'DUE':6}")
@@ -62,3 +77,11 @@ print(f"{'Kernel':20} | {'Masked':6} | {'SDC':6} | {'DUE':6}")
 print("-" * 45)
 for k, c in kernel_sum.items():
     print(f"{k:20} | {c['Masked']:6d} | {c['SDC']:6d} | {c['DUE']:6d}")
+
+# ---------------- 总计 ----------------
+total = {"Masked": 0, "SDC": 0, "DUE": 0}
+for c in stats.values():
+    for t in ("Masked", "SDC", "DUE"):
+        total[t] += c[t]
+
+print(f"\nTotal: Masked: {total['Masked']}, SDC: {total['SDC']}, DUE: {total['DUE']}")

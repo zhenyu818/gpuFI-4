@@ -787,6 +787,8 @@ ptx_reg_t ptx_thread_info::get_reg(const symbol *reg) {
   }
   if (m_enable_debug_trace)
     m_debug_trace_regs_read.back()[reg] = regs_iter->second;
+  // 统一在任何读取寄存器时触发一次性有效性判定（若存在挂起的注入窗口）
+  fi_on_read_access(reg);
   return regs_iter->second;
 }
 

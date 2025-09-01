@@ -46,12 +46,15 @@ void ptx_thread_info::fi_on_read_access(const symbol* sym) {
   unsigned pc_now = get_pc();
   unsigned icount_now = get_icount();
   int effective = rec.hasA ? 1 : 0;
-  printf("FI_VALIDATION: effective=%d reg=%s thread_uid=%u hw(sid=%u,wid=%u,tid=%u) inject_icount=%u inject_pc=%u | A(dst)_icount=%u pc=%u inst= ",
-         effective, sym->name().c_str(), get_uid(), get_hw_sid(), get_hw_wid(), get_hw_tid(), rec.inject_icount, rec.inject_pc, rec.A_icount, rec.A_pc);
-  if (rec.hasA) print_insn(rec.A_pc, stdout); else fprintf(stdout, "<NA>");
-  printf(" | B(src)_icount=%u pc=%u inst= ", icount_now, pc_now);
-  print_insn(pc_now, stdout);
-  printf("\n");
+  if (effective == 1) {
+    printf("FI_VALIDATION: effective=%d reg=%s thread_uid=%u hw(sid=%u,wid=%u,tid=%u) inject_icount=%u inject_pc=%u | A(dst)_icount=%u pc=%u inst= ",
+          effective, sym->name().c_str(), get_uid(), get_hw_sid(), get_hw_wid(), get_hw_tid(), rec.inject_icount, rec.inject_pc, rec.A_icount, rec.A_pc);
+    if (rec.hasA) print_insn(rec.A_pc, stdout); else fprintf(stdout, "<NA>");
+    printf(" | B(src)_icount=%u pc=%u inst= ", icount_now, pc_now);
+    print_insn(pc_now, stdout);
+    printf("\n");
+  }
+
   m_fi_effect_pending.erase(it);
 }
 
@@ -61,12 +64,6 @@ void ptx_thread_info::fi_on_write_access(const symbol* sym) {
   const fi_effect_record &rec = it->second;
   unsigned pc_now = get_pc();
   unsigned icount_now = get_icount();
-  printf("FI_VALIDATION: effective=0 reg=%s thread_uid=%u hw(sid=%u,wid=%u,tid=%u) inject_icount=%u inject_pc=%u | A(dst)_icount=%u pc=%u inst= ",
-         sym->name().c_str(), get_uid(), get_hw_sid(), get_hw_wid(), get_hw_tid(), rec.inject_icount, rec.inject_pc, rec.A_icount, rec.A_pc);
-  if (rec.hasA) print_insn(rec.A_pc, stdout); else fprintf(stdout, "<NA>");
-  printf(" | next_access=WRITE icount=%u pc=%u inst= ", icount_now, pc_now);
-  print_insn(pc_now, stdout);
-  printf("\n");
   m_fi_effect_pending.erase(it);
 }
 
