@@ -39,9 +39,8 @@
 #include <list>
 #include <map>
 #include <set>
-#include <map>
 #include <string>
-#include <set>
+#include <vector>
 
 #include "memory.h"
 
@@ -422,6 +421,37 @@ class ptx_thread_info {
     m_debug_trace_regs_modified.back().clear();
     m_debug_trace_regs_read.back().clear();
   }
+  // Fault-injection: register read/write tracking API
+  struct reg_write_info {
+    const ptx_instruction *inst;
+    unsigned pc;
+    unsigned long long cycle;
+    reg_write_info() : inst(NULL), pc(0), cycle(0) {}
+  };
+
+  struct reg_injection_info {
+    bool pending;
+    std::vector<unsigned> bits; // 1-based bit indices that were flipped
+    unsigned long long inject_cycle;
+    unsigned inject_pc;
+    reg_write_info last_writer_at_inject;
+    reg_injection_info()
+        : pending(false), inject_cycle(0), inject_pc(0) {}
+  };
+
+  void register_reg_injection(const symbol *reg,
+                              const std::vector<unsigned> &bits,
+                              unsigned long long inject_cycle,
+                              unsigned inject_pc,
+                              const reg_write_info &writer_info);
+
+  void on_reg_read(const symbol *reg, const ptx_instruction *reader_inst,
+                   unsigned reader_pc, unsigned long long cycle);
+  void on_reg_write_bookkeeping(const symbol *reg,
+                                const ptx_instruction *writer_inst,
+                                unsigned writer_pc,
+                                unsigned long long cycle);
+  reg_write_info get_last_writer(const symbol *reg) const;
   function_info *get_finfo() { return m_func_info; }
   const function_info *get_finfo() const { return m_func_info; }
   void push_breakaddr(const operand_info &breakaddr);
@@ -464,74 +494,6 @@ class ptx_thread_info {
   std::list<tr1_hash_map<const symbol *, ptx_reg_t>>& get_regs() {
     return m_regs;
   }
-
-  // Fault-injection tracking helpers (RF): mark and consume on first use
-  void fi_mark_faulted_reg(const symbol* sym) { m_fi_faulted_regs.insert(sym); }
-  bool fi_consume_if_faulted_reg(const symbol* sym) {
-    std::set<const symbol*>::iterator it = m_fi_faulted_regs.find(sym);
-    if (it != m_fi_faulted_regs.end()) { m_fi_faulted_regs.erase(it); return true; }
-    return false;
-  }
-
-  // Mark a destination register to flip on next write and bit index (1-based)
-  void fi_mark_pending_dst_flip(const symbol* sym, unsigned bit1based) { m_fi_pending_dst_bit[sym] = bit1based; }
-  bool fi_take_pending_dst_flip(const symbol* sym, ptx_reg_t &value, unsigned &bit1based) {
-    std::map<const symbol*, unsigned>::iterator it = m_fi_pending_dst_bit.find(sym);
-    if (it == m_fi_pending_dst_bit.end()) return false;
-    bit1based = it->second;
-    m_fi_pending_dst_bit.erase(it);
-    unsigned b = bit1based - 1;
-    unsigned long long *p = &value.u64;
-    *p ^= 1ULL << b;
-    return true;
-  }
-
-  // Mark next destination write as directly affected by a memory/cache flip
-  void fi_set_next_dst_from_mem(const char* component, unsigned bit1based) {
-    m_fi_next_dst_from_mem = true;
-    m_fi_next_dst_bit1 = bit1based;
-    strncpy(m_fi_next_dst_component, component, sizeof(m_fi_next_dst_component)-1);
-    m_fi_next_dst_component[sizeof(m_fi_next_dst_component)-1] = '\0';
-  }
-  bool fi_consume_next_dst_from_mem(std::string &component, unsigned &bit1based) {
-    if (!m_fi_next_dst_from_mem) return false;
-    m_fi_next_dst_from_mem = false;
-    bit1based = m_fi_next_dst_bit1;
-    component = std::string(m_fi_next_dst_component);
-    return true;
-  }
-
-  // Mark a source register as faulted with specific bit flip information
-  void fi_mark_faulted_src_reg(const symbol* sym, unsigned bit1based) { 
-    m_fi_faulted_src_regs[sym] = bit1based; 
-  }
-  bool fi_consume_if_faulted_src_reg(const symbol* sym, unsigned &bit1based) {
-    std::map<const symbol*, unsigned>::iterator it = m_fi_faulted_src_regs.find(sym);
-    if (it == m_fi_faulted_src_regs.end()) return false;
-    bit1based = it->second;
-    m_fi_faulted_src_regs.erase(it);
-    return true;
-  }
-
-  // =============== FI effectiveness tracking (A: dst write, B: src read) ===============
-  void fi_update_last_write_pc(const symbol* sym) {
-    m_fi_last_write_pc[sym] = get_pc();
-    m_fi_last_write_icount[sym] = get_icount();
-  }
-  void fi_start_effect_check(const symbol* sym) {
-    // Record a pending effectiveness check at injection time
-    fi_effect_record rec;
-    rec.inject_pc = get_pc();
-    rec.inject_icount = get_icount();
-    std::map<const symbol*, unsigned>::iterator itw = m_fi_last_write_pc.find(sym);
-    rec.hasA = (itw != m_fi_last_write_pc.end());
-    rec.A_pc = rec.hasA ? itw->second : (unsigned)-1;
-    std::map<const symbol*, unsigned>::iterator itwi = m_fi_last_write_icount.find(sym);
-    rec.A_icount = (itwi != m_fi_last_write_icount.end()) ? itwi->second : (unsigned)-1;
-    m_fi_effect_pending[sym] = rec;
-  }
-  void fi_on_read_access(const symbol* sym);
-  void fi_on_write_access(const symbol* sym);
 
  public:
   addr_t m_last_effective_address;
@@ -588,33 +550,9 @@ class ptx_thread_info {
 
   std::stack<class operand_info, std::vector<operand_info> > m_breakaddrs;
 
-  // Set of registers that have been fault-injected (flip applied) and
-  // should trigger a one-time FI_DIRECT print when first read as a source.
-  std::set<const symbol*> m_fi_faulted_regs;
-  // Map of destination registers scheduled to be flipped on next write
-  std::map<const symbol*, unsigned> m_fi_pending_dst_bit;
-
-  bool m_fi_next_dst_from_mem = false;
-  unsigned m_fi_next_dst_bit1 = 0;
-  char m_fi_next_dst_component[16];
-
-  // Map of source registers that have been fault-injected (flip applied)
-  // with specific bit flip information for source operand tracking
-  std::map<const symbol*, unsigned> m_fi_faulted_src_regs;
-
-  // Record last write PC per register symbol (for A)
-  std::map<const symbol*, unsigned> m_fi_last_write_pc;
-  struct fi_effect_record {
-    unsigned inject_pc;
-    unsigned inject_icount;
-    unsigned A_pc;
-    unsigned A_icount;
-    bool hasA;
-  };
-  // Pending effectiveness checks keyed by symbol
-  std::map<const symbol*, fi_effect_record> m_fi_effect_pending;
-  // Record last write icount per register symbol (for A)
-  std::map<const symbol*, unsigned> m_fi_last_write_icount;
+  // Fault-injection tracking containers
+  std::map<const symbol *, reg_write_info> m_last_reg_writer;
+  std::map<const symbol *, reg_injection_info> m_reg_injections;
 };
 
 addr_t generic_to_local(unsigned smid, unsigned hwtid, addr_t addr);

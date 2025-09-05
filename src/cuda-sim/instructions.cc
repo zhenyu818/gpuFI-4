@@ -204,11 +204,6 @@ void check_and_apply_l2_bf(ptx_thread_info *thread, addr_t addr, ptx_reg_t &data
 //            printf("bit_start=%u, bit_end=%u, bf_line_sz_bits_idx=%u, bf_size_bits_idx=%u\n", bit_start, bit_end, gpu_sim->l2_line_bitflip_bits_idx[j]+1, bf_size_bits_idx+1);
 //            printf("Before bit flip of thread=%u, value = %llu, reg_bf=%u\n", thread->get_uid(), data.u64, bf_size_bits_idx+1);
           *reg_bf ^= 1UL << bf_size_bits_idx;
-          // 标记下一次目的寄存器写回为直接受影响（来自L2缓存注入）
-          thread->fi_set_next_dst_from_mem("L1T_cache", bf_size_bits_idx+1);
-          thread->fi_set_next_dst_from_mem("L2_cache", bf_size_bits_idx+1);
-          // 同时标记源寄存器，用于源操作数追踪
-          // 注意：这里需要知道哪个寄存器将被用作源操作数，暂时先不标记
 //            printf("After bit flip value = %llu\n", data.u64);
 //            printf("DATA INSIDE= %llu\n", data.u64);
         }
@@ -274,10 +269,6 @@ void l1t_bit_flip(ptx_thread_info *thread, unsigned data_tex_array_index, unsign
 //          printf("bit_start=%u, bit_end=%u, bf_line_sz_bits_idx=%u, bf_size_bits_idx=%u\n", bit_start, bit_end, l1t_line_bitflip_bits_idx_vector[j]+1, bf_size_bits_idx+1);
 //          printf("Before bit flip value = %llu, reg_bf=%u\n", data_bf.u64, bf_size_bits_idx+1);
           *reg_bf ^= 1UL << bf_size_bits_idx;
-          // 标记下一次目的寄存器写回为直接受影响（来自L1T缓存注入）
-          thread->fi_set_next_dst_from_mem("L2_cache", bf_size_bits_idx+1);
-          // 同时标记源寄存器，用于源操作数追踪
-          // 注意：这里需要知道哪个寄存器将被用作源操作数，暂时先不标记
 //          printf("After bit flip value = %llu\n", data_bf.u64);
         }
       } else if (l1t_tag_vector[j] == tag && probe_status == MISS) { // miss
@@ -377,12 +368,6 @@ void local_global_read_l1D_bf(ptx_thread_info *thread, ptx_reg_t &data, size_t s
 //                printf("Thread on chunk %u, bit_start=%u, bit_end=%u, bf_line_sz_bits_idx=%u, bf_size_bits_idx=%u\n", chunk_idx, bit_start, bit_end, l1d_line_bitflip_bits_idx_vector[j]+1, bf_size_bits_idx+1);
 //                printf("Before bit flip of thread=%u, value = %llu, reg_bf=%u\n", thread->get_uid(), data.u64, bf_size_bits_idx+1);
               *reg_bf ^= 1UL << bf_size_bits_idx;
-              // 标记：来自本地内存位翻转
-              thread->fi_set_next_dst_from_mem("local_mem", bf_size_bits_idx+1);
-              // 标记下一次目的寄存器写回为直接受影响（来自L1D缓存注入）
-              thread->fi_set_next_dst_from_mem("L1D_cache", bf_size_bits_idx+1);
-              // 同时标记源寄存器，用于源操作数追踪
-              // 注意：这里需要知道哪个寄存器将被用作源操作数，暂时先不标记
 //                printf("After bit flip value = %llu\n", data.u64);
 //                printf("DATA INSIDE= %f\n", data.f32);
             }
@@ -456,8 +441,6 @@ void constant_read_l1C_bf (ptx_thread_info *thread, ptx_reg_t &data, size_t size
 //            printf("bit_start=%u, bit_end=%u, bf_line_sz_bits_idx=%u, bf_size_bits_idx=%u\n", bit_start, bit_end, l1c_line_bitflip_bits_idx_vector[j]+1, bf_size_bits_idx+1);
 //            printf("Before bit flip of thread=%u, value = %llu, reg_bf=%u\n", thread->get_uid(), data.u64, bf_size_bits_idx+1);
             *reg_bf ^= 1UL << bf_size_bits_idx;
-            // 同时标记源寄存器，用于源操作数追踪
-            // 注意：这里需要知道哪个寄存器将被用作源操作数，暂时先不标记
 //            printf("After bit flip value = %llu\n", data.u64);
 //            printf("DATA INSIDE= %f\n", data.f64);
           }
@@ -709,12 +692,29 @@ void ptx_thread_info::set_reg(const symbol *reg, const ptx_reg_t &value) {
   assert(!m_regs.empty());
   assert(reg->uid() > 0);
   m_regs.back()[reg] = value;
-  // 故障注入有效性追踪：第一次写访问到被注入寄存器则判为无效并输出
-  fi_on_write_access(reg);
   if (m_enable_debug_trace) m_debug_trace_regs_modified.back()[reg] = value;
   m_last_set_operand_value = value;
-  // 记录该寄存器的最近写PC（作为A）
-  fi_update_last_write_pc(reg);
+
+  // Bookkeep last writer and resolve potential pending injections (overwrite-before-read)
+  const ptx_instruction *curr_inst = get_inst(get_pc());
+  unsigned long long cyc = m_gpu->gpu_sim_cycle + m_gpu->gpu_tot_sim_cycle;
+  reg_write_info winfo;
+  winfo.inst = curr_inst;
+  winfo.pc = get_pc();
+  winfo.cycle = cyc;
+  m_last_reg_writer[reg] = winfo;
+
+  std::map<const symbol *, reg_injection_info>::iterator it = m_reg_injections.find(reg);
+  if (it != m_reg_injections.end() && it->second.pending) {
+    // Injection was pending, but a write occurs before any read -> ineffective (overwritten)
+    printf("[REG_FI_OVERWRITTEN] tid=%u reg=%s at cycle=%llu by PC=%u\n",
+           get_uid(), reg->name().c_str(), cyc, get_pc());
+    if (curr_inst) {
+      print_insn(get_pc(), stdout);
+      printf("\n");
+    }
+    it->second.pending = false;
+  }
 }
 
 void ptx_thread_info::print_reg_thread(char *fname) {
@@ -787,9 +787,69 @@ ptx_reg_t ptx_thread_info::get_reg(const symbol *reg) {
   }
   if (m_enable_debug_trace)
     m_debug_trace_regs_read.back()[reg] = regs_iter->second;
-  // 统一在任何读取寄存器时触发一次性有效性判定（若存在挂起的注入窗口）
-  fi_on_read_access(reg);
+
+  // FI: detect effective read of an injected register
+  const ptx_instruction *curr_inst = get_inst(get_pc());
+  unsigned long long cyc = m_gpu->gpu_sim_cycle + m_gpu->gpu_tot_sim_cycle;
+  std::map<const symbol *, reg_injection_info>::iterator it = m_reg_injections.find(reg);
+  if (it != m_reg_injections.end() && it->second.pending) {
+    printf("[REG_FI_EFFECTIVE] tid=%u reg=%s bits=", get_uid(), reg->name().c_str());
+    for (size_t bi = 0; bi < it->second.bits.size(); ++bi) {
+      printf("%u%s", it->second.bits[bi], (bi + 1 < it->second.bits.size()) ? ":" : "");
+    }
+    printf(" inject_cycle=%llu read_cycle=%llu reader_PC=%u\n", it->second.inject_cycle, cyc, get_pc());
+    if (curr_inst) {
+      print_insn(get_pc(), stdout);
+      printf("\n");
+    }
+    it->second.pending = false; // consume
+  }
   return regs_iter->second;
+}
+
+// Exposed helpers for FI bookkeeping
+void ptx_thread_info::register_reg_injection(const symbol *reg,
+                                             const std::vector<unsigned> &bits,
+                                             unsigned long long inject_cycle,
+                                             unsigned inject_pc,
+                                             const reg_write_info &writer_info) {
+  reg_injection_info info;
+  info.pending = true;
+  info.bits = bits;
+  info.inject_cycle = inject_cycle;
+  info.inject_pc = inject_pc;
+  info.last_writer_at_inject = writer_info;
+  m_reg_injections[reg] = info;
+
+  printf("[REG_FI_INJECT] tid=%u reg=%s bits=", get_uid(), reg->name().c_str());
+  for (size_t bi = 0; bi < bits.size(); ++bi) {
+    printf("%u%s", bits[bi], (bi + 1 < bits.size()) ? ":" : "");
+  }
+  printf(" at cycle=%llu inj_PC=%u\n", inject_cycle, inject_pc);
+  if (writer_info.inst) {
+    unsigned writer_uid = writer_info.inst->uid();
+    printf("[REG_FI_WRITER] last_writer uid=%u at cycle=%llu PC=%u -> ", writer_uid, writer_info.cycle, writer_info.pc);
+    print_insn(writer_info.pc, stdout);
+    printf("\n");
+  }
+}
+
+void ptx_thread_info::on_reg_read(const symbol *reg, const ptx_instruction *reader_inst,
+                                  unsigned reader_pc, unsigned long long cycle) {
+  // Not used currently since get_reg already handles read path
+}
+
+void ptx_thread_info::on_reg_write_bookkeeping(const symbol *reg,
+                                               const ptx_instruction *writer_inst,
+                                               unsigned writer_pc,
+                                               unsigned long long cycle) {
+  // Not used currently since set_reg already handles write path
+}
+
+ptx_thread_info::reg_write_info ptx_thread_info::get_last_writer(const symbol *reg) const {
+  std::map<const symbol *, reg_write_info>::const_iterator it = m_last_reg_writer.find(reg);
+  if (it != m_last_reg_writer.end()) return it->second;
+  return reg_write_info();
 }
 
 ptx_reg_t ptx_thread_info::get_operand_value(const operand_info &op,
@@ -804,21 +864,7 @@ ptx_reg_t ptx_thread_info::get_operand_value(const operand_info &op,
          (opType != FF64_TYPE)) ||
         (op.get_addr_space() != undefined_space)) {
       if (op.is_reg()) {
-        const symbol* src_sym = op.get_symbol();
-        result = get_reg(src_sym);
-        // 打印“直接受影响”的指令：当读取到被翻转过的寄存器时，仅打印一次
-        // 使用新的源寄存器追踪机制，获取具体的位翻转信息
-        unsigned src_bit1based = 0;
-        if (fi_consume_if_faulted_src_reg(src_sym, src_bit1based)) {
-          unsigned pc_now = get_pc();
-          unsigned icount_now = get_icount();
-          printf("FI_DIRECT: component=RF thread_uid=%u hw(sid=%u,wid=%u,tid=%u) icount=%u pc=%u inst= ",
-                 get_uid(), get_hw_sid(), get_hw_wid(), get_hw_tid(), icount_now, pc_now);
-          print_insn(pc_now, stdout);
-          printf(" | src_reg=%s bit=%u\n", src_sym->name().c_str(), src_bit1based);
-        }
-        // 故障注入有效性追踪：第一次读访问到被注入寄存器则判为有效并输出
-        fi_on_read_access(src_sym);
+        result = get_reg(op.get_symbol());
       } else if (op.is_builtin()) {
         result.u32 = get_builtin(op.get_int(), op.get_addr_offset());
       } else if (op.is_immediate_address()) {
@@ -7393,4 +7439,3 @@ void video_mem_instruction(const ptx_instruction *pI, ptx_thread_info *thread, i
 
   return;
 }
-

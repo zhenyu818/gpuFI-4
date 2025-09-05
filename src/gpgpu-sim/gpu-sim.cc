@@ -1928,27 +1928,17 @@ void bitflip_n_nregs(std::vector<ptx_thread_info*> &threads_vector, char *regist
         ptx_reg_t *reg_to_bitflip = regs[reg_idx];
         unsigned long* reg_64b = (unsigned long*) reg_to_bitflip; // 8 bytes
         for(std::vector<unsigned>::iterator bf_it = reg_bitflip_vector.begin(); bf_it != reg_bitflip_vector.end(); ++bf_it) {
-          printf("FI_EFFECT: Before bit flip of reg=%s, value = %lu; ", reg_symbols[reg_idx]->name().c_str(), *reg_to_bitflip);
+//          printf("Before bit flip of reg=%s, value = %lu\n", reg_symbols[reg_idx]->name().c_str(), *reg_to_bitflip);
           *reg_64b ^= 1UL << (*bf_it-1);
-          printf("After bit %u flip of reg=%s, value = %lu;", *bf_it, reg_symbols[reg_idx]->name().c_str(), *reg_to_bitflip);
-          unsigned pc = (*threads_it)->get_pc();
-          unsigned icount = (*threads_it)->get_icount();
-          printf("pc=%u, icount=%u; ", pc, icount);
-          (*threads_it)->print_insn(pc, stdout);
-          printf("\n");
-
-          printf("FI_EFFECT: component=RF reg_idx=%d reg_name=%s bit=%u thread_uid=%u hw(sid=%u,wid=%u,tid=%u) icount=%u pc=%u inst= ",
-                 reg_idx+1, reg_symbols[reg_idx]->name().c_str(), *bf_it, (*threads_it)->get_uid(), (*threads_it)->get_hw_sid(), (*threads_it)->get_hw_wid(), (*threads_it)->get_hw_tid(), icount, pc);
-          (*threads_it)->print_insn(pc, stdout);
-          printf("\n");
-          // 如果翻转的是谓词/源寄存器，不保证下一条指令使用；为确保“被该指令计算的结果”受影响，
-          // 将该寄存器标记为目的寄存器的下一次写回时翻转（覆盖到结果），从而保证影响的是该指令的输出。
-          (*threads_it)->fi_mark_pending_dst_flip(reg_symbols[reg_idx], *bf_it);
-          // 同时标记源寄存器，用于源操作数追踪
-          (*threads_it)->fi_mark_faulted_src_reg(reg_symbols[reg_idx], *bf_it);
-          // 启动一次性有效性检查窗口：当前注入，仅在其后的第一次访问时判定有效性
-          (*threads_it)->fi_start_effect_check(reg_symbols[reg_idx]);
+//          printf("After bit %u flip of reg=%s, value = %lu\n", *bf_it, reg_symbols[reg_idx]->name().c_str(), *reg_to_bitflip);
         }
+        // Register the injection for effectiveness tracking and print last-writer info
+        std::vector<unsigned> flipped_bits = reg_bitflip_vector;
+        gpgpu_sim *gpu = (gpgpu_sim *)((*threads_it)->get_gpu());
+        unsigned long long cyc = gpu->gpu_sim_cycle + gpu->gpu_tot_sim_cycle;
+        unsigned pc = (*threads_it)->get_pc();
+        ptx_thread_info::reg_write_info lastw = (*threads_it)->get_last_writer(reg_symbols[reg_idx]);
+        (*threads_it)->register_reg_injection(reg_symbols[reg_idx], flipped_bits, cyc, pc, lastw);
       }
     }
 //    (*threads_it)->dump_regs(stdout);
@@ -1980,12 +1970,6 @@ void bitflip_n_local_mem(std::vector<ptx_thread_info*> &threads_vector, char *lo
 //        g_print_memory_space((*threads_it)->m_local_mem, "%d");
       }
       printf("bf=%u, block_idx=%u, bit_in_block=%u, idx_64b=%u, bit_in_64b=%u\n", bf, block_idx, bit_in_block, idx_64b, bit_in_64b);
-      unsigned pc = (*threads_it)->get_pc();
-      unsigned icount = (*threads_it)->get_icount();
-      printf("FI_EFFECT: component=local_mem bit=%u thread_uid=%u hw(sid=%u,wid=%u,tid=%u) icount=%u pc=%u inst= ",
-             bf, (*threads_it)->get_uid(), (*threads_it)->get_hw_sid(), (*threads_it)->get_hw_wid(), (*threads_it)->get_hw_tid(), icount, pc);
-      (*threads_it)->print_insn(pc, stdout);
-      printf("\n");
     }
   }
 }
@@ -2017,7 +2001,6 @@ void bitflip_n_shared_mem_nblocks(std::vector<memory_space*> shared_memories, un
 //        shared_mem_to_bitflip->print("%08x", stdout);
       }
       printf("bf=%u, block_idx=%u, bit_in_block=%u, idx_64b=%u, bit_in_64b=%u\n", bf, block_idx, bit_in_block, idx_64b, bit_in_64b);
-      printf("FI_EFFECT: component=shared_mem bit=%u block_idx=%u\n", bf, block_idx);
     }
 
     shared_memories.erase(shared_memories.begin() + block_idx);
@@ -2113,15 +2096,6 @@ void gpgpu_sim::bitflip_l1_cache(unsigned cache_type) {
         l1_index.push_back(bf_line_idx);
 
         printf("L1 %s ENABLED: bf_l1d = %u, l1d_line_sz_bits = %u, bf_line_idx = %u, bf_1024bits_idx = %u and tag = %x\n", m_name.c_str(), bf_l1, l1_line_sz_extra_bits, bf_line_idx, l1_line_sz_data_bits_idx+1, line->m_tag);
-        // 记录影响信息（无法直接定位到具体指令，这里记录cache与着色器/行/位）
-        const char* comp = cache_type==0 ? "L1D_cache" : (cache_type==1 ? "L1C_cache" : "L1T_cache");
-        printf("FI_EFFECT: component=%s shader_sid=%u cluster=%u line=%u data_bit=%u tag=%llu\n",
-               comp,
-               m_cluster[l1_cluster_to_bitflip[i]]->get_core()[l1_shader_to_bitflip[i]]->get_sid(),
-               l1_cluster_to_bitflip[i],
-               bf_line_idx,
-               l1_line_sz_data_bits_idx+1,
-               (unsigned long long)line->m_tag);
       }
     }
     // different variables because we might run bit flips on more than one cache type
@@ -2456,7 +2430,6 @@ void gpgpu_sim::cycle() {
               printf("Tag before = %x, bf_tag=%u\n", line->m_tag, bf_tag);
               line->m_tag ^= 1UL << bf_tag;
               printf("Tag after = %x, bf_tag=%u\n", line->m_tag, bf_tag);
-              printf("FI_EFFECT: component=L2_cache bank=%u line=%u tag_bit=%u tag_after=%llu\n", bank_id, bf_line_idx, bf_tag+1, (unsigned long long)line->m_tag);
               continue;
             }
 
@@ -2470,7 +2443,6 @@ void gpgpu_sim::cycle() {
               this->l2_index.push_back(bf_line_idx);
 
               printf("L2 %s ENABLED: bf_l2_cache_bank = %u, l2_line_sz_bits = %u, bf_line_idx = %u, bf_line_sz_bits_idx = %u and tag = llu%\n", l2_cache_bank->m_name.c_str(), bf_l2_cache_bank, l2_line_sz_extra_bits, bf_line_idx, l2_line_sz_data_bits_idx+1, line->m_tag);
-              printf("FI_EFFECT: component=L2_cache bank=%u line=%u data_bit=%u tag=%llu\n", bank_id, bf_line_idx, l2_line_sz_data_bits_idx+1, (unsigned long long)line->m_tag);
             }
           }
         }

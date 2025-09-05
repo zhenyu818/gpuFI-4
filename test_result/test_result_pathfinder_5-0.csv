@@ -1,17 +1,14 @@
-Kernel,Instr_ID,Instruction,Masked,SDC,DUE,Eff_rate,SDC_rate,Total_Injections
-Invalid Injection,-,-,6831,1315,58,0.532727,0.160288,8204
-dynproc_kernel,1,"ld.param.u32 %r11, [_Z14dynproc_kerneliPiS_S_iiii_param_0];",379,82,4,0.030195,0.176344,465
-dynproc_kernel,2,"ld.param.u64 %rd1, [_Z14dynproc_kerneliPiS_S_iiii_param_1];",379,85,2,0.030260,0.182403,466
-dynproc_kernel,4,"ld.param.u64 %rd3, [_Z14dynproc_kerneliPiS_S_iiii_param_3];",396,64,5,0.030195,0.137634,465
-dynproc_kernel,5,"ld.param.u32 %r12, [_Z14dynproc_kerneliPiS_S_iiii_param_4];",1148,233,13,0.090519,0.167145,1394
-dynproc_kernel,6,"ld.param.u32 %r13, [_Z14dynproc_kerneliPiS_S_iiii_param_6];",405,88,5,0.032338,0.176707,498
-dynproc_kernel,8,"mov.u32 %r15, %ctaid.x;",412,82,2,0.032208,0.165323,496
-dynproc_kernel,13,"sub.s32 %r20, %r19, %r14;",23,9,0,0.002078,0.281250,32
-dynproc_kernel,16,"add.s32 %r23, %r20, %r22;",56,9,0,0.004221,0.138462,65
-dynproc_kernel,18,"and.b32 %r25, %r21, %r24;",381,78,6,0.030195,0.167742,465
-dynproc_kernel,19,"add.s32 %r26, %r12, -1;",30,2,0,0.002078,0.062500,32
-dynproc_kernel,39,"mov.u32 %r42, _ZZ14dynproc_kerneliPiS_S_iiiiE4prev;",760,161,8,0.060325,0.173305,929
-dynproc_kernel,42,"sub.s32 %r120, %r45, %r11;",768,149,11,0.060260,0.160560,928
-dynproc_kernel,45,"sub.s32 %r119, %r50, %r14;",384,75,5,0.030130,0.161638,464
-dynproc_kernel,96,"ld.shared.u32 %r104, [%r103];",366,95,3,0.030130,0.204741,464
-dynproc_kernel,107,"add.s32 %r121, %r121, 1;",25,6,2,0.002143,0.181818,33
+kernel,inst_line,inst_text,Masked,SDC,DUE,tot_inj,valid_rate,SDC_rate
+dynproc_kernel,37,"ld.param.u32 %r11, [_Z14dynproc_kerneliPiS_S_iiii_param_0];",0,1,2,3,0.050000,0.333333
+dynproc_kernel,40,"ld.param.u64 %rd3, [_Z14dynproc_kerneliPiS_S_iiii_param_3];",0,1,0,1,0.016667,1.000000
+dynproc_kernel,41,"ld.param.u32 %r12, [_Z14dynproc_kerneliPiS_S_iiii_param_4];",1,1,0,2,0.033333,0.500000
+dynproc_kernel,44,"mov.u32 %r15, %ctaid.x;",0,1,0,1,0.016667,1.000000
+dynproc_kernel,49,"sub.s32 %r20, %r19, %r14;",1,0,0,1,0.016667,0.000000
+dynproc_kernel,70,"mov.u32 %r38, _ZZ14dynproc_kerneliPiS_S_iiiiE4prev;",1,0,0,1,0.016667,0.000000
+dynproc_kernel,80,"mov.u32 %r42, _ZZ14dynproc_kerneliPiS_S_iiiiE4prev;",0,1,0,1,0.016667,1.000000
+dynproc_kernel,81,"add.s32 %r2, %r42, %r41;",1,0,0,1,0.016667,0.000000
+dynproc_kernel,88,"cvta.to.global.u64 %rd7, %rd1;",0,1,0,1,0.016667,1.000000
+dynproc_kernel,94,"add.s32 %r121, %r121, 1;",1,1,0,2,0.033333,0.500000
+dynproc_kernel,114,"shl.b32 %r72, %r22, 2;",1,1,0,2,0.033333,0.500000
+dynproc_kernel,151,"add.s32 %r120, %r120, 1;",1,0,0,1,0.016667,0.000000
+invalid_summary,,,43,0,0,43,0.716667,0.000000

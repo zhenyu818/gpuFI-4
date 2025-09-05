@@ -29,7 +29,6 @@
 #include "ptx_sim.h"
 #include <string>
 #include "ptx_ir.h"
-#include "ptx_ir.h"
 class ptx_recognizer;
 typedef void *yyscan_t;
 #include "../../libcuda/gpgpu_context.h"
@@ -38,34 +37,6 @@ typedef void *yyscan_t;
 #include "ptx.tab.h"
 
 void feature_not_implemented(const char *f);
-// ---- FI validation helpers moved from header to avoid incomplete type use ----
-void ptx_thread_info::fi_on_read_access(const symbol* sym) {
-  std::map<const symbol*, fi_effect_record>::iterator it = m_fi_effect_pending.find(sym);
-  if (it == m_fi_effect_pending.end()) return;
-  const fi_effect_record &rec = it->second;
-  unsigned pc_now = get_pc();
-  unsigned icount_now = get_icount();
-  int effective = rec.hasA ? 1 : 0;
-  if (effective == 1) {
-    printf("FI_VALIDATION: effective=%d reg=%s thread_uid=%u hw(sid=%u,wid=%u,tid=%u) inject_icount=%u inject_pc=%u | A(dst)_icount=%u pc=%u inst= ",
-          effective, sym->name().c_str(), get_uid(), get_hw_sid(), get_hw_wid(), get_hw_tid(), rec.inject_icount, rec.inject_pc, rec.A_icount, rec.A_pc);
-    if (rec.hasA) print_insn(rec.A_pc, stdout); else fprintf(stdout, "<NA>");
-    printf(" | B(src)_icount=%u pc=%u inst= ", icount_now, pc_now);
-    print_insn(pc_now, stdout);
-    printf("\n");
-  }
-
-  m_fi_effect_pending.erase(it);
-}
-
-void ptx_thread_info::fi_on_write_access(const symbol* sym) {
-  std::map<const symbol*, fi_effect_record>::iterator it = m_fi_effect_pending.find(sym);
-  if (it == m_fi_effect_pending.end()) return;
-  const fi_effect_record &rec = it->second;
-  unsigned pc_now = get_pc();
-  unsigned icount_now = get_icount();
-  m_fi_effect_pending.erase(it);
-}
 
 ptx_cta_info::ptx_cta_info(unsigned sm_idx, gpgpu_context *ctx) {
   assert(ctx->func_sim->g_ptx_cta_info_sm_idx_used.find(sm_idx) ==
