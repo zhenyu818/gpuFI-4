@@ -1969,6 +1969,14 @@ void bitflip_n_local_mem(std::vector<ptx_thread_info*> &threads_vector, char *lo
 //        printf("AFTER BIT FLIP: address=%p\n", i_data);
 //        g_print_memory_space((*threads_it)->m_local_mem, "%d");
       }
+      // Register for effectiveness tracking in the thread's local FI state
+      gpgpu_sim *gpu = (gpgpu_sim *)((*threads_it)->get_gpu());
+      unsigned long long cyc = gpu->gpu_sim_cycle + gpu->gpu_tot_sim_cycle;
+      unsigned pc = (*threads_it)->get_pc();
+      mem_addr_t byte_addr = block_idx * bsize + (bit_in_block - 1) / 8;
+      unsigned bit_in_byte_1based = ((bit_in_block - 1) % 8) + 1;
+      ptx_thread_info::reg_write_info lastw = (*threads_it)->get_last_local_mem_writer(byte_addr);
+      (*threads_it)->register_local_mem_injection(byte_addr, bit_in_byte_1based, cyc, pc, lastw);
       printf("bf=%u, block_idx=%u, bit_in_block=%u, idx_64b=%u, bit_in_64b=%u\n", bf, block_idx, bit_in_block, idx_64b, bit_in_64b);
     }
   }

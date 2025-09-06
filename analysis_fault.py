@@ -25,8 +25,8 @@ def parse_log(log_path: str):
 
     # Regex patterns (capture run id and tmp.out name)
     re_effects_start = re.compile(r"^\[Run\s+(\d+)\]\s+Effects from\s+(?:.+/)?(tmp\.out\d+):\s*$")
-    re_writer = re.compile(r"^\[REG_FI_WRITER\].*?->\s*(\S+)\s+PC=.*\(([^:()]+):(\d+)\)\s*(.*)$")
-    re_effective = re.compile(r"^\[REG_FI_EFFECTIVE\]")
+    re_writer = re.compile(r"^\[.*FI_WRITER\].*?->\s*(\S+)\s+PC=.*\(([^:()]+):(\d+)\)\s*(.*)$")
+    re_effective = re.compile(r"^\[.*FI_EFFECTIVE\]")
     re_result = re.compile(r"^\[Run\s+(\d+)\]\s+(tmp\.out\d+):\s*(.*?)\s*$")
 
     current_key = None

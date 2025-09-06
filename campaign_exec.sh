@@ -7,7 +7,7 @@ CONFIG_FILE=./gpgpusim.config
 TMP_DIR=./logs
 CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
-RUNS=50
+RUNS=10
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
 DELETE_LOGS=1 # if 1 then all logs will be deleted at the end of the script
 # ---------------------------------------------- END ONE-TIME PARAMETERS ------------------------------------------------
@@ -57,7 +57,7 @@ crashes=0
 # 3: single fault-free execution
 profile=0
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache (e.g. components_to_flip=0:1 for both RF and local_mem)
-components_to_flip=0
+components_to_flip=1
 # 1: per warp bit flip, 0: per thread bit flip
 per_warp=0
 # in which kernels to inject the fault. e.g. 0: for all running kernels, 1: for kernel 1, 1:2 for kernel 1 & 2 
@@ -130,9 +130,9 @@ gather_results() {
         grep -iq "${SUCCESS_MSG}" $file; success_msg_grep=$(echo $?)
 	grep -i "${CYCLES_MSG}" $file | tail -1 | grep -q "${CYCLES}"; cycles_grep=$(echo $?)
         grep -iq "${FAILED_MSG}" $file; failed_msg_grep=$(echo $?)
-        if grep -qE "REG_FI_INJECT|REG_FI_WRITER|REG_FI_EFFECTIVE|REG_FI_OVERWRITTEN" "$file"; then
+        if grep -qE "FI_INJECT|FI_WRITER|FI_EFFECTIVE|FI_OVERWRITTEN" "$file"; then
             echo "[Run ${1}] Effects from ${file}:"
-            grep -hE "REG_FI_INJECT|REG_FI_WRITER|REG_FI_EFFECTIVE|REG_FI_OVERWRITTEN" "$file"
+            grep -hE "FI_INJECT|FI_WRITER|FI_EFFECTIVE|FI_OVERWRITTEN" "$file"
         fi
         result=${success_msg_grep}${cycles_grep}${failed_msg_grep}
         

@@ -452,6 +452,18 @@ class ptx_thread_info {
                                 unsigned writer_pc,
                                 unsigned long long cycle);
   reg_write_info get_last_writer(const symbol *reg) const;
+
+  // Local memory FI tracking API
+  void register_local_mem_injection(mem_addr_t byte_addr,
+                                    unsigned bit_in_byte_1based,
+                                    unsigned long long inject_cycle,
+                                    unsigned inject_pc,
+                                    const reg_write_info &writer_info);
+  void mark_local_mem_read(mem_addr_t addr, size_t length,
+                           const ptx_instruction *reader_inst);
+  void mark_local_mem_write(mem_addr_t addr, size_t length,
+                            const ptx_instruction *writer_inst);
+  reg_write_info get_last_local_mem_writer(mem_addr_t byte_addr) const;
   function_info *get_finfo() { return m_func_info; }
   const function_info *get_finfo() const { return m_func_info; }
   void push_breakaddr(const operand_info &breakaddr);
@@ -553,6 +565,20 @@ class ptx_thread_info {
   // Fault-injection tracking containers
   std::map<const symbol *, reg_write_info> m_last_reg_writer;
   std::map<const symbol *, reg_injection_info> m_reg_injections;
+
+  struct local_injection_info {
+    bool pending;
+    std::vector<unsigned> bits_in_byte_1based; // 1..8
+    unsigned long long inject_cycle;
+    unsigned inject_pc;
+    reg_write_info last_writer_at_inject;
+    local_injection_info()
+        : pending(false), inject_cycle(0), inject_pc(0) {}
+  };
+  // key: local memory byte address within the thread's local memory space
+  std::map<mem_addr_t, local_injection_info> m_local_injections;
+  // last writer per local memory byte
+  std::map<mem_addr_t, reg_write_info> m_local_last_writer_byte;
 };
 
 addr_t generic_to_local(unsigned smid, unsigned hwtid, addr_t addr);

@@ -852,6 +852,87 @@ ptx_thread_info::reg_write_info ptx_thread_info::get_last_writer(const symbol *r
   return reg_write_info();
 }
 
+// ---- Local memory FI helpers ----
+void ptx_thread_info::register_local_mem_injection(mem_addr_t byte_addr,
+                                                   unsigned bit_in_byte_1based,
+                                                   unsigned long long inject_cycle,
+                                                   unsigned inject_pc,
+                                                   const reg_write_info &writer_info) {
+  local_injection_info &info = m_local_injections[byte_addr];
+  info.pending = true;
+  // append bit if not duplicate
+  if (std::find(info.bits_in_byte_1based.begin(), info.bits_in_byte_1based.end(), bit_in_byte_1based) == info.bits_in_byte_1based.end()) {
+    info.bits_in_byte_1based.push_back(bit_in_byte_1based);
+  }
+  info.inject_cycle = inject_cycle;
+  info.inject_pc = inject_pc;
+  info.last_writer_at_inject = writer_info;
+
+  printf("[LOCAL_MEM_FI_INJECT] tid=%u byte_addr=%u bits=", get_uid(), (unsigned)byte_addr);
+  for (size_t i = 0; i < info.bits_in_byte_1based.size(); ++i) {
+    printf("%u%s", info.bits_in_byte_1based[i], (i + 1 < info.bits_in_byte_1based.size()) ? ":" : "");
+  }
+  printf(" at cycle=%llu inj_PC=%u\n", inject_cycle, inject_pc);
+  if (writer_info.inst) {
+    unsigned writer_uid = writer_info.inst->uid();
+    printf("[LOCAL_MEM_FI_WRITER] last_writer uid=%u at cycle=%llu PC=%u -> ", writer_uid, writer_info.cycle, writer_info.pc);
+    print_insn(writer_info.pc, stdout);
+    printf("\n");
+  }
+}
+
+void ptx_thread_info::mark_local_mem_read(mem_addr_t addr, size_t length,
+                                          const ptx_instruction *reader_inst) {
+  unsigned long long cyc = m_gpu->gpu_sim_cycle + m_gpu->gpu_tot_sim_cycle;
+  for (size_t off = 0; off < length; ++off) {
+    mem_addr_t byte_addr = addr + off;
+    std::map<mem_addr_t, local_injection_info>::iterator it = m_local_injections.find(byte_addr);
+    if (it != m_local_injections.end() && it->second.pending) {
+      printf("[LOCAL_MEM_FI_EFFECTIVE] tid=%u byte_addr=%u bits=", get_uid(), (unsigned)byte_addr);
+      for (size_t i = 0; i < it->second.bits_in_byte_1based.size(); ++i) {
+        printf("%u%s", it->second.bits_in_byte_1based[i], (i + 1 < it->second.bits_in_byte_1based.size()) ? ":" : "");
+      }
+      printf(" inject_cycle=%llu read_cycle=%llu reader_PC=%u\n", it->second.inject_cycle, cyc, get_pc());
+      if (reader_inst) {
+        print_insn(get_pc(), stdout);
+        printf("\n");
+      }
+      it->second.pending = false;
+    }
+  }
+}
+
+void ptx_thread_info::mark_local_mem_write(mem_addr_t addr, size_t length,
+                                           const ptx_instruction *writer_inst) {
+  unsigned long long cyc = m_gpu->gpu_sim_cycle + m_gpu->gpu_tot_sim_cycle;
+  // update last-writer per byte and detect overwrite-before-read
+  for (size_t off = 0; off < length; ++off) {
+    mem_addr_t byte_addr = addr + off;
+    reg_write_info winfo;
+    winfo.inst = writer_inst;
+    winfo.pc = get_pc();
+    winfo.cycle = cyc;
+    m_local_last_writer_byte[byte_addr] = winfo;
+
+    std::map<mem_addr_t, local_injection_info>::iterator it = m_local_injections.find(byte_addr);
+    if (it != m_local_injections.end() && it->second.pending) {
+      printf("[LOCAL_MEM_FI_OVERWRITTEN] tid=%u byte_addr=%u at cycle=%llu by PC=%u\n",
+             get_uid(), (unsigned)byte_addr, cyc, get_pc());
+      if (writer_inst) {
+        print_insn(get_pc(), stdout);
+        printf("\n");
+      }
+      it->second.pending = false;
+    }
+  }
+}
+
+ptx_thread_info::reg_write_info ptx_thread_info::get_last_local_mem_writer(mem_addr_t byte_addr) const {
+  std::map<mem_addr_t, reg_write_info>::const_iterator it = m_local_last_writer_byte.find(byte_addr);
+  if (it != m_local_last_writer_byte.end()) return it->second;
+  return reg_write_info();
+}
+
 ptx_reg_t ptx_thread_info::get_operand_value(const operand_info &op,
                                              operand_info dstInfo,
                                              unsigned opType,
@@ -3998,6 +4079,9 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
   type_info_key::type_decode(type, size, t);
   if (!vector_spec) {
     mem->read(addr, size / 8, &data.s64);
+    if (space.get_type() == local_space) {
+      thread->mark_local_mem_read(addr, size / 8, pI);
+    }
     local_global_read_l1D_bf(thread, data, size, addr, space);
     local_global_read_l2_bf(thread, data, size, addr, space);
 //    constant_read_l1C_bf(thread, data, size, addr, space);
@@ -4008,12 +4092,18 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
   } else {
     ptx_reg_t data1, data2, data3, data4;
     mem->read(addr, size / 8, &data1.s64);
+    if (space.get_type() == local_space) {
+      thread->mark_local_mem_read(addr, size / 8, pI);
+    }
     local_global_read_l1D_bf(thread, data1, size, addr, space);
     local_global_read_l2_bf(thread, data1, size, addr, space);
 //    constant_read_l1C_bf(thread, data1, size, addr, space);
 //    constant_read_l2_bf(thread, data1, size, addr, space);
 
     mem->read(addr + size / 8, size / 8, &data2.s64);
+    if (space.get_type() == local_space) {
+      thread->mark_local_mem_read(addr + size / 8, size / 8, pI);
+    }
     local_global_read_l1D_bf(thread, data2, size, addr + size / 8, space);
     local_global_read_l2_bf(thread, data2, size, addr + size / 8, space);
 //    constant_read_l1C_bf(thread, data2, size, addr + size / 8, space);
@@ -4021,12 +4111,18 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
 
     if (vector_spec != V2_TYPE) {  // either V3 or V4
       mem->read(addr + 2 * size / 8, size / 8, &data3.s64);
+      if (space.get_type() == local_space) {
+        thread->mark_local_mem_read(addr + 2 * size / 8, size / 8, pI);
+      }
       local_global_read_l1D_bf(thread, data3, size, addr + 2 * size / 8, space);
       local_global_read_l2_bf(thread, data3, size, addr + 2 * size / 8, space);
 //      constant_read_l1C_bf(thread, data3, size, addr + 2 * size / 8, space);
 //      constant_read_l2_bf(thread, data3, size, addr + 2 * size / 8, space);
       if (vector_spec != V3_TYPE) {  // v4
         mem->read(addr + 3 * size / 8, size / 8, &data4.s64);
+        if (space.get_type() == local_space) {
+          thread->mark_local_mem_read(addr + 3 * size / 8, size / 8, pI);
+        }
         local_global_read_l1D_bf(thread, data4, size, addr + 3 * size / 8, space);
         local_global_read_l2_bf(thread, data4, size, addr + 3 * size / 8, space);
 //        constant_read_l1C_bf(thread, data4, size, addr + 3 * size / 8, space);
@@ -6456,6 +6552,9 @@ void st_impl(const ptx_instruction *pI, ptx_thread_info *thread) {
 
     local_global_write_l1D_bf(thread, data, size, addr, space);
     local_global_write_l2_bf(thread, data, size, addr, space);
+    if (space.get_type() == local_space) {
+      thread->mark_local_mem_write(addr, size / 8, pI);
+    }
     mem->write(addr, size / 8, &data.s64, thread, pI);
   } else {
     if (vector_spec == V2_TYPE) {

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 TEST_APP_NAME="pathfinder"
-COMPONENTS_TO_FLIP=0
+COMPONENTS_TO_FLIP=1
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache (e.g. components_to_flip=0:1 for both RF and local_mem)
 
 # set cuda installation path

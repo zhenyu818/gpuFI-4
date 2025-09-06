@@ -27,6 +27,7 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 #include "memory.h"
+#include "ptx_sim.h"
 #include <stdlib.h>
 #include "../../libcuda/gpgpu_context.h"
 #include "../debug.h"
@@ -98,6 +99,15 @@ void memory_space_impl<BSIZE>::write(mem_addr_t addr, size_t length,
           ((addr > wa) && (addr < (wa + 4))))
         thd->get_gpu()->gpgpu_ctx->the_gpgpusim->g_the_gpu->hit_watchpoint(
             i->first, thd, pI);
+    }
+  }
+
+  // Local memory FI overwrite tracking (local memories are named "local_*")
+  // BSIZE==32 is used for per-thread local memory (see allocations in cuda-sim.cc)
+  if (BSIZE == 32 && thd && pI) {
+    if (!m_name.empty() && m_name.find("local_") == 0) {
+      // mark possible overwrite and update last-writer per byte
+      thd->mark_local_mem_write(addr, length, pI);
     }
   }
 }
