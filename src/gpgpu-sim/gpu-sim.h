@@ -684,6 +684,23 @@ class gpgpu_sim : public gpgpu_t {
   std::vector<std::vector<unsigned>> l1d_line_bitflip_bits_idx;
   std::vector<std::vector<new_addr_type>> l1d_tag;
   std::vector<std::vector<unsigned>> l1d_index;
+  struct cache_writer_info {
+    const ptx_instruction *inst;
+    unsigned pc;
+    unsigned long long cycle;
+    cache_writer_info() : inst(NULL), pc(0), cycle(0) {}
+  };
+  struct cache_injection_info {
+    bool pending;
+    unsigned long long inject_cycle;
+    unsigned inject_pc;
+    cache_writer_info last_writer_at_inject;
+    cache_injection_info() : pending(false), inject_cycle(0), inject_pc(0) {}
+  };
+  // per L1D target cache (vector index), per injected line (inner index)
+  std::vector<std::vector<cache_injection_info>> l1d_inject_info;
+  // last writer per L1D cache object and line (index,tag)
+  std::map<cache_t*, std::map<std::pair<unsigned, new_addr_type>, cache_writer_info>> l1d_last_writers;
 
   // L1 constant cache fault injection
   std::vector<bool> l1c_enabled;
@@ -693,6 +710,7 @@ class gpgpu_sim : public gpgpu_t {
   std::vector<std::vector<unsigned>> l1c_line_bitflip_bits_idx;
   std::vector<std::vector<new_addr_type>> l1c_tag;
   std::vector<std::vector<unsigned>> l1c_index;
+  std::vector<std::vector<cache_injection_info>> l1c_inject_info;
 
   // L1 texture cache fault injection
   std::vector<bool> l1t_enabled;
@@ -702,6 +720,7 @@ class gpgpu_sim : public gpgpu_t {
   std::vector<std::vector<unsigned>> l1t_line_bitflip_bits_idx;
   std::vector<std::vector<new_addr_type>> l1t_tag;
   std::vector<std::vector<unsigned>> l1t_index;
+  std::vector<std::vector<cache_injection_info>> l1t_inject_info;
 
   // L2 cache
   bool l2_enabled;
@@ -710,6 +729,9 @@ class gpgpu_sim : public gpgpu_t {
   std::vector<unsigned> l2_line_bitflip_bits_idx;
   std::vector<new_addr_type> l2_tag;
   std::vector<unsigned> l2_index;
+  std::vector<cache_injection_info> l2_inject_info;
+  // last writer per L2 bank (sub_partition), line (index,tag)
+  std::map<unsigned, std::map<std::pair<unsigned, new_addr_type>, cache_writer_info>> l2_last_writers;
 
   // performance counter for stalls due to congestion.
   unsigned int gpu_stall_dramfull;

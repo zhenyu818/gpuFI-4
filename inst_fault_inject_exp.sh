@@ -1,7 +1,7 @@
 #!/bin/bash
 
 TEST_APP_NAME="pathfinder"
-COMPONENTS_TO_FLIP=2
+COMPONENTS_TO_FLIP=6
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache (e.g. components_to_flip=0:1 for both RF and local_mem)
 
 # set cuda installation path
@@ -404,8 +404,8 @@ main() {
         bash campaign_exec.sh > inst_exec.log
         # python3 parse_exec.py > parse_exec.log
         # # 如果$filename以.txt结尾，先去掉再传入
-        filename_no_ext="${filename%.txt}"
-        python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext
+        # filename_no_ext="${filename%.txt}"
+        # python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext
 
         # 删除 inst_exec.log 文件
         # rm -f inst_exec.log

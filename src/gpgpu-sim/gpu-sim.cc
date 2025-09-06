@@ -2086,7 +2086,7 @@ void gpgpu_sim::bitflip_l1_cache(unsigned cache_type) {
     outfile.open(file, std::ios::app); // append instead of overwrite
 
     unsigned tag_array_size_bits = 57;
-    for(int j=0; j<l1_bitflip_vector.size(); j++) {
+  for(int j=0; j<l1_bitflip_vector.size(); j++) {
       unsigned bf_l1 = l1_bitflip_vector[j] - 1;
       unsigned l1_line_sz_extra_bits = m_config.get_line_sz()*8 + tag_array_size_bits;
       unsigned bf_line_idx = bf_l1 / l1_line_sz_extra_bits;
@@ -2124,7 +2124,47 @@ void gpgpu_sim::bitflip_l1_cache(unsigned cache_type) {
         l1_tag.push_back(line->m_tag);
         l1_index.push_back(bf_line_idx);
 
+        // Track injection info and print injection logs
+        cache_injection_info inj;
+        inj.pending = true;
+        inj.inject_cycle = gpu_sim_cycle + gpu_tot_sim_cycle;
+        inj.inject_pc = 0; // cache injection not tied to a thread PC
+
+        // Try to fetch last writer for this line (L1D only; L1C/L1T are read-only)
+        if (cache_type == 0) {
+          cache_t *cache_obj = l1;
+          std::pair<unsigned, new_addr_type> key = std::make_pair(bf_line_idx, line->m_tag);
+          if (l1d_last_writers[cache_obj].find(key) != l1d_last_writers[cache_obj].end()) {
+            inj.last_writer_at_inject = l1d_last_writers[cache_obj][key];
+          }
+        }
+
+        const char *label = cache_type==0 ? "L1D_cache" : (cache_type==1 ? "L1C_cache" : "L1T_cache");
+        printf("[%s_FI_INJECT] cache=%s line_idx=%u tag=%u bit_idx=%u at cycle=%llu\n",
+               label, m_name.c_str(), bf_line_idx, (unsigned)line->m_tag, l1_line_sz_data_bits_idx+1, inj.inject_cycle);
+        if (inj.last_writer_at_inject.inst) {
+          unsigned writer_uid = inj.last_writer_at_inject.inst->uid();
+          printf("[%s_FI_WRITER] last_writer uid=%u at cycle=%llu PC=%u -> ",
+                 label, writer_uid, inj.last_writer_at_inject.cycle, inj.last_writer_at_inject.pc);
+          // print by PC using global context
+          this->gpgpu_ctx->func_sim->ptx_print_insn(inj.last_writer_at_inject.pc, stdout);
+          printf("\n");
+        }
+
         printf("L1 %s ENABLED: bf_l1d = %u, l1d_line_sz_bits = %u, bf_line_idx = %u, bf_1024bits_idx = %u and tag = %x\n", m_name.c_str(), bf_l1, l1_line_sz_extra_bits, bf_line_idx, l1_line_sz_data_bits_idx+1, line->m_tag);
+
+        // store injection info parallel to metadata vectors
+        if (cache_type==0) {
+          // ensure container size
+          if (l1d_inject_info.size() <= i) l1d_inject_info.resize(i+1);
+          l1d_inject_info[i].push_back(inj);
+        } else if (cache_type==1) {
+          if (l1c_inject_info.size() <= i) l1c_inject_info.resize(i+1);
+          l1c_inject_info[i].push_back(inj);
+        } else {
+          if (l1t_inject_info.size() <= i) l1t_inject_info.resize(i+1);
+          l1t_inject_info[i].push_back(inj);
+        }
       }
     }
     // different variables because we might run bit flips on more than one cache type
@@ -2477,6 +2517,28 @@ void gpgpu_sim::cycle() {
               this->l2_line_bitflip_bits_idx.push_back(l2_line_sz_data_bits_idx);
               this->l2_tag.push_back(line->m_tag);
               this->l2_index.push_back(bf_line_idx);
+
+              // Track injection info and print injection logs
+              cache_injection_info inj;
+              inj.pending = true;
+              inj.inject_cycle = gpu_sim_cycle + gpu_tot_sim_cycle;
+              inj.inject_pc = 0;
+              std::pair<unsigned, new_addr_type> key = std::make_pair(bf_line_idx, line->m_tag);
+              if (this->l2_last_writers[bank_id].find(key) != this->l2_last_writers[bank_id].end()) {
+                inj.last_writer_at_inject = this->l2_last_writers[bank_id][key];
+              }
+              this->l2_inject_info.push_back(inj);
+
+              printf("[L2_cache_FI_INJECT] bank=%u line_idx=%u tag=%u bit_idx=%u at cycle=%llu\n",
+                     bank_id, bf_line_idx, (unsigned)line->m_tag, l2_line_sz_data_bits_idx+1,
+                     (unsigned long long)inj.inject_cycle);
+              if (inj.last_writer_at_inject.inst) {
+                unsigned writer_uid = inj.last_writer_at_inject.inst->uid();
+                printf("[L2_cache_FI_WRITER] last_writer uid=%u at cycle=%llu PC=%u -> ",
+                       writer_uid, inj.last_writer_at_inject.cycle, inj.last_writer_at_inject.pc);
+                this->gpgpu_ctx->func_sim->ptx_print_insn(inj.last_writer_at_inject.pc, stdout);
+                printf("\n");
+              }
 
               printf("L2 %s ENABLED: bf_l2_cache_bank = %u, l2_line_sz_bits = %u, bf_line_idx = %u, bf_line_sz_bits_idx = %u and tag = llu%\n", l2_cache_bank->m_name.c_str(), bf_l2_cache_bank, l2_line_sz_extra_bits, bf_line_idx, l2_line_sz_data_bits_idx+1, line->m_tag);
             }
