@@ -4081,6 +4081,10 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
     mem->read(addr, size / 8, &data.s64);
     if (space.get_type() == local_space) {
       thread->mark_local_mem_read(addr, size / 8, pI);
+    } else if (space.get_type() == shared_space) {
+      if (thread->m_cta_info) {
+        thread->m_cta_info->mark_shared_mem_read(addr, size / 8, pI, thread);
+      }
     }
     local_global_read_l1D_bf(thread, data, size, addr, space);
     local_global_read_l2_bf(thread, data, size, addr, space);
@@ -4094,6 +4098,10 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
     mem->read(addr, size / 8, &data1.s64);
     if (space.get_type() == local_space) {
       thread->mark_local_mem_read(addr, size / 8, pI);
+    } else if (space.get_type() == shared_space) {
+      if (thread->m_cta_info) {
+        thread->m_cta_info->mark_shared_mem_read(addr, size / 8, pI, thread);
+      }
     }
     local_global_read_l1D_bf(thread, data1, size, addr, space);
     local_global_read_l2_bf(thread, data1, size, addr, space);
@@ -4103,6 +4111,10 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
     mem->read(addr + size / 8, size / 8, &data2.s64);
     if (space.get_type() == local_space) {
       thread->mark_local_mem_read(addr + size / 8, size / 8, pI);
+    } else if (space.get_type() == shared_space) {
+      if (thread->m_cta_info) {
+        thread->m_cta_info->mark_shared_mem_read(addr + size / 8, size / 8, pI, thread);
+      }
     }
     local_global_read_l1D_bf(thread, data2, size, addr + size / 8, space);
     local_global_read_l2_bf(thread, data2, size, addr + size / 8, space);
@@ -4113,6 +4125,10 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
       mem->read(addr + 2 * size / 8, size / 8, &data3.s64);
       if (space.get_type() == local_space) {
         thread->mark_local_mem_read(addr + 2 * size / 8, size / 8, pI);
+      } else if (space.get_type() == shared_space) {
+        if (thread->m_cta_info) {
+          thread->m_cta_info->mark_shared_mem_read(addr + 2 * size / 8, size / 8, pI, thread);
+        }
       }
       local_global_read_l1D_bf(thread, data3, size, addr + 2 * size / 8, space);
       local_global_read_l2_bf(thread, data3, size, addr + 2 * size / 8, space);
@@ -4122,6 +4138,10 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
         mem->read(addr + 3 * size / 8, size / 8, &data4.s64);
         if (space.get_type() == local_space) {
           thread->mark_local_mem_read(addr + 3 * size / 8, size / 8, pI);
+        } else if (space.get_type() == shared_space) {
+          if (thread->m_cta_info) {
+            thread->m_cta_info->mark_shared_mem_read(addr + 3 * size / 8, size / 8, pI, thread);
+          }
         }
         local_global_read_l1D_bf(thread, data4, size, addr + 3 * size / 8, space);
         local_global_read_l2_bf(thread, data4, size, addr + 3 * size / 8, space);

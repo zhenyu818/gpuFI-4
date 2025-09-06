@@ -1982,7 +1982,10 @@ void bitflip_n_local_mem(std::vector<ptx_thread_info*> &threads_vector, char *lo
   }
 }
 
-void bitflip_n_shared_mem_nblocks(std::vector<memory_space*> shared_memories, unsigned block_rand, unsigned block_n, char *shared_mem_bitflip_rand_n) {
+void bitflip_n_shared_mem_nblocks(std::vector<memory_space*> shared_memories,
+                                  unsigned block_rand, unsigned block_n,
+                                  char *shared_mem_bitflip_rand_n,
+                                  std::vector<ptx_thread_info*> &active_threads) {
   std::vector<unsigned> shared_mem_bitflip_vector;
   read_colon_option(shared_mem_bitflip_vector, shared_mem_bitflip_rand_n);
 
@@ -1995,20 +1998,38 @@ void bitflip_n_shared_mem_nblocks(std::vector<memory_space*> shared_memories, un
 
     for(std::vector<unsigned>::iterator bf_it = shared_mem_bitflip_vector.begin(); bf_it != shared_mem_bitflip_vector.end(); ++bf_it) {
       unsigned bf = *bf_it;
-      unsigned block_idx = bf/(bsize*8); // this in fact is the mem_addr_t of memory_data
-      unsigned bit_in_block = bf - block_idx*bsize*8;
+      unsigned page_idx = bf/(bsize*8); // mem_addr_t (index) of memory_data page
+      unsigned bit_in_block = bf - page_idx*bsize*8;
       unsigned idx_64b = bit_in_block/64;
       unsigned bit_in_64b = bit_in_block - idx_64b*64;
 
-      if (memory_data.find(block_idx) != memory_data.end()) {
-        unsigned long long *i_data = (unsigned long long *)memory_data[block_idx].get_m_data();
+      if (memory_data.find(page_idx) != memory_data.end()) {
+        unsigned long long *i_data = (unsigned long long *)memory_data[page_idx].get_m_data();
 //        printf("BEFORE BIT FLIP: address=%p\n", i_data);
 //        shared_mem_to_bitflip->print("%d", stdout);
         i_data[idx_64b] ^= 1UL << (bit_in_64b-1);
 //        printf("AFTER BIT FLIP: address=%p\n", i_data);
 //        shared_mem_to_bitflip->print("%08x", stdout);
       }
-      printf("bf=%u, block_idx=%u, bit_in_block=%u, idx_64b=%u, bit_in_64b=%u\n", bf, block_idx, bit_in_block, idx_64b, bit_in_64b);
+      // Register for shared-memory FI effectiveness tracking (CTA-scoped)
+      // Find a thread belonging to this shared memory to access its CTA info
+      ptx_thread_info *t0 = NULL;
+      for (size_t ti = 0; ti < active_threads.size(); ++ti) {
+        if (active_threads[ti] && active_threads[ti]->m_shared_mem == shared_mem_to_bitflip) {
+          t0 = active_threads[ti];
+          break;
+        }
+      }
+      if (t0 && t0->m_cta_info) {
+        gpgpu_sim *gpu = (gpgpu_sim *)(t0->get_gpu());
+        unsigned long long cyc = gpu->gpu_sim_cycle + gpu->gpu_tot_sim_cycle;
+        unsigned pc = t0->get_pc();
+        mem_addr_t byte_addr = page_idx * bsize + (bit_in_block - 1) / 8;
+        unsigned bit_in_byte_1based = ((bit_in_block - 1) % 8) + 1;
+        ptx_cta_info::smem_write_info lastw = t0->m_cta_info->get_last_shared_mem_writer(byte_addr);
+        t0->m_cta_info->register_shared_mem_injection(byte_addr, bit_in_byte_1based, cyc, pc, lastw, t0);
+      }
+      printf("bf=%u, page_idx=%u, bit_in_block=%u, idx_64b=%u, bit_in_64b=%u\n", bf, page_idx, bit_in_block, idx_64b, bit_in_64b);
     }
 
     shared_memories.erase(shared_memories.begin() + block_idx);
@@ -2400,7 +2421,14 @@ void gpgpu_sim::cycle() {
         }
         if (shared_memory) {
           find_active_shared_memories(shared_memories, active_kernels_warps, kernel_vector);
-          bitflip_n_shared_mem_nblocks(shared_memories, m_config.block_rand, m_config.block_n, m_config.shared_mem_bitflip_rand_n);
+          // Ensure we have a list of active threads to map shared-mem owners
+          if (active_threads.empty()) {
+            find_active_threads(active_threads, active_kernels_warps, kernel_vector);
+          }
+          bitflip_n_shared_mem_nblocks(shared_memories, m_config.block_rand,
+                                       m_config.block_n,
+                                       m_config.shared_mem_bitflip_rand_n,
+                                       active_threads);
         }
         if (l1d_cache) {
           bitflip_l1_cache(0);

@@ -110,6 +110,16 @@ void memory_space_impl<BSIZE>::write(mem_addr_t addr, size_t length,
       thd->mark_local_mem_write(addr, length, pI);
     }
   }
+
+  // Shared memory FI overwrite tracking (shared memories are named "shared_*")
+  // BSIZE==16*1024 is used for per-CTA shared memory
+  if (BSIZE == 16 * 1024 && thd && pI) {
+    if (!m_name.empty() && m_name.find("shared_") == 0) {
+      if (thd->m_cta_info) {
+        thd->m_cta_info->mark_shared_mem_write(addr, length, pI, thd);
+      }
+    }
+  }
 }
 
 template <unsigned BSIZE>

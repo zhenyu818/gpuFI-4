@@ -165,9 +165,32 @@ class ptx_cta_info {
   void register_thread_exit(ptx_thread_info *thd);
   void register_deleted_thread(ptx_thread_info *thd);
   unsigned get_sm_idx() const;
+  unsigned long long get_uid() const { return m_uid; }
   unsigned get_bar_threads() const;
   void inc_bar_threads();
   void reset_bar_threads();
+
+  // Shared-memory FI tracking API (CTA-scoped)
+  struct smem_write_info {
+    const class ptx_instruction *inst;
+    unsigned pc;
+    unsigned long long cycle;
+    smem_write_info() : inst(NULL), pc(0), cycle(0) {}
+  };
+
+  void register_shared_mem_injection(mem_addr_t byte_addr,
+                                     unsigned bit_in_byte_1based,
+                                     unsigned long long inject_cycle,
+                                     unsigned inject_pc,
+                                     const smem_write_info &writer_info,
+                                     class ptx_thread_info *printer);
+  void mark_shared_mem_read(mem_addr_t addr, size_t length,
+                            const class ptx_instruction *reader_inst,
+                            class ptx_thread_info *printer);
+  void mark_shared_mem_write(mem_addr_t addr, size_t length,
+                             const class ptx_instruction *writer_inst,
+                             class ptx_thread_info *printer);
+  smem_write_info get_last_shared_mem_writer(mem_addr_t byte_addr) const;
 
  private:
   // backward pointer
@@ -178,6 +201,20 @@ class ptx_cta_info {
   std::set<ptx_thread_info *> m_threads_in_cta;
   std::set<ptx_thread_info *> m_threads_that_have_exited;
   std::set<ptx_thread_info *> m_dangling_pointers;
+
+  // Shared-memory FI bookkeeping (per-CTA shared space)
+  struct shared_injection_info {
+    bool pending;
+    std::vector<unsigned> bits_in_byte_1based; // 1..8
+    unsigned long long inject_cycle;
+    unsigned inject_pc;
+    smem_write_info last_writer_at_inject;
+    shared_injection_info() : pending(false), inject_cycle(0), inject_pc(0) {}
+  };
+  // key: shared memory byte address within CTA's shared memory space
+  std::map<mem_addr_t, shared_injection_info> m_shared_injections;
+  // last writer per shared memory byte
+  std::map<mem_addr_t, smem_write_info> m_shared_last_writer_byte;
 };
 
 class ptx_warp_info {

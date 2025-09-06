@@ -29,6 +29,7 @@
 #include "ptx_sim.h"
 #include <string>
 #include "ptx_ir.h"
+#include <algorithm>
 class ptx_recognizer;
 typedef void *yyscan_t;
 #include "../../libcuda/gpgpu_context.h"
@@ -134,6 +135,111 @@ unsigned ptx_cta_info::get_bar_threads() const { return m_bar_threads; }
 void ptx_cta_info::inc_bar_threads() { m_bar_threads++; }
 
 void ptx_cta_info::reset_bar_threads() { m_bar_threads = 0; }
+
+// ---- Shared memory FI (CTA-scoped) ----
+void ptx_cta_info::register_shared_mem_injection(
+    mem_addr_t byte_addr, unsigned bit_in_byte_1based,
+    unsigned long long inject_cycle, unsigned inject_pc,
+    const smem_write_info &writer_info,
+    ptx_thread_info *printer) {
+  shared_injection_info &info = m_shared_injections[byte_addr];
+  info.pending = true;
+  // append bit if not duplicate
+  if (std::find(info.bits_in_byte_1based.begin(), info.bits_in_byte_1based.end(),
+                bit_in_byte_1based) == info.bits_in_byte_1based.end()) {
+    info.bits_in_byte_1based.push_back(bit_in_byte_1based);
+  }
+  info.inject_cycle = inject_cycle;
+  info.inject_pc = inject_pc;
+  info.last_writer_at_inject = writer_info;
+
+  printf("[SHARED_MEM_FI_INJECT] cta_uid=%llu byte_addr=%u bits=",
+         get_uid(), (unsigned)byte_addr);
+  for (size_t i = 0; i < info.bits_in_byte_1based.size(); ++i) {
+    printf("%u%s", info.bits_in_byte_1based[i],
+           (i + 1 < info.bits_in_byte_1based.size()) ? ":" : "");
+  }
+  printf(" at cycle=%llu inj_PC=%u\n", inject_cycle, inject_pc);
+  if (writer_info.inst && printer) {
+    unsigned writer_uid = writer_info.inst->uid();
+    printf("[SHARED_MEM_FI_WRITER] last_writer uid=%u at cycle=%llu PC=%u -> ",
+           writer_uid, writer_info.cycle, writer_info.pc);
+    printer->print_insn(writer_info.pc, stdout);
+    printf("\n");
+  }
+}
+
+void ptx_cta_info::mark_shared_mem_read(mem_addr_t addr, size_t length,
+                                        const ptx_instruction *reader_inst,
+                                        ptx_thread_info *printer) {
+  unsigned long long cyc = 0;
+  if (printer && printer->get_gpu()) {
+    gpgpu_sim *gpu = (gpgpu_sim *)(printer->get_gpu());
+    cyc = gpu->gpu_sim_cycle + gpu->gpu_tot_sim_cycle;
+  }
+  for (size_t off = 0; off < length; ++off) {
+    mem_addr_t byte_addr = addr + off;
+    std::map<mem_addr_t, shared_injection_info>::iterator it =
+        m_shared_injections.find(byte_addr);
+    if (it != m_shared_injections.end() && it->second.pending) {
+      printf("[SHARED_MEM_FI_EFFECTIVE] tid=%u cta_uid=%llu byte_addr=%u bits=",
+             printer ? printer->get_uid() : (unsigned)0, get_uid(),
+             (unsigned)byte_addr);
+      for (size_t i = 0; i < it->second.bits_in_byte_1based.size(); ++i) {
+        printf("%u%s", it->second.bits_in_byte_1based[i],
+               (i + 1 < it->second.bits_in_byte_1based.size()) ? ":" : "");
+      }
+      printf(" inject_cycle=%llu read_cycle=%llu reader_PC=%u\n",
+             it->second.inject_cycle, cyc, printer ? printer->get_pc() : 0);
+      if (reader_inst && printer) {
+        printer->print_insn(printer->get_pc(), stdout);
+        printf("\n");
+      }
+      it->second.pending = false;
+    }
+  }
+}
+
+void ptx_cta_info::mark_shared_mem_write(mem_addr_t addr, size_t length,
+                                         const ptx_instruction *writer_inst,
+                                         ptx_thread_info *printer) {
+  unsigned long long cyc = 0;
+  if (printer && printer->get_gpu()) {
+    gpgpu_sim *gpu = (gpgpu_sim *)(printer->get_gpu());
+    cyc = gpu->gpu_sim_cycle + gpu->gpu_tot_sim_cycle;
+  }
+  for (size_t off = 0; off < length; ++off) {
+    mem_addr_t byte_addr = addr + off;
+    smem_write_info winfo;
+    winfo.inst = writer_inst;
+    winfo.pc = printer ? printer->get_pc() : 0;
+    winfo.cycle = cyc;
+    m_shared_last_writer_byte[byte_addr] = winfo;
+
+    std::map<mem_addr_t, shared_injection_info>::iterator it =
+        m_shared_injections.find(byte_addr);
+    if (it != m_shared_injections.end() && it->second.pending) {
+      printf(
+          "[SHARED_MEM_FI_OVERWRITTEN] tid=%u cta_uid=%llu byte_addr=%u at "
+          "cycle=%llu by PC=%u\n",
+          printer ? printer->get_uid() : (unsigned)0, get_uid(),
+          (unsigned)byte_addr, cyc, winfo.pc);
+      if (writer_inst && printer) {
+        printer->print_insn(winfo.pc, stdout);
+        printf("\n");
+      }
+      it->second.pending = false;
+    }
+  }
+}
+
+ptx_cta_info::smem_write_info ptx_cta_info::get_last_shared_mem_writer(
+    mem_addr_t byte_addr) const {
+  std::map<mem_addr_t, smem_write_info>::const_iterator it =
+      m_shared_last_writer_byte.find(byte_addr);
+  if (it != m_shared_last_writer_byte.end()) return it->second;
+  return smem_write_info();
+}
 
 ptx_warp_info::ptx_warp_info() { reset_done_threads(); }
 
