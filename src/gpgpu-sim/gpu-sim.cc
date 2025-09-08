@@ -1113,6 +1113,54 @@ void gpgpu_sim::print_stats() {
   gpgpu_ctx->stats->ptx_file_line_stats_write_file();
   gpu_print_stat();
 
+  // Print aggregated active-thread counts per static PTX instruction
+  if (!gpgpu_ctx->ptx_pc_active_agg.empty()) {
+    printf("\n[PTX_INST_SUM] Aggregated active threads per PTX instruction:\n");
+    for (std::map<unsigned, unsigned long long>::const_iterator it =
+             gpgpu_ctx->ptx_pc_active_agg.begin();
+         it != gpgpu_ctx->ptx_pc_active_agg.end(); ++it) {
+      unsigned pc = it->first;
+      unsigned long long total_active = it->second;
+      const ptx_instruction *pi = gpgpu_ctx->pc_to_instruction(pc);
+      unsigned uid = pi ? pi->uid() : 0u;
+      // kernel/function name
+      std::string kname = "<unknown>";
+      {
+        std::map<unsigned, function_info *>::iterator f =
+            gpgpu_ctx->func_sim->g_pc_to_finfo.find(pc);
+        if (f != gpgpu_ctx->func_sim->g_pc_to_finfo.end() && f->second) {
+          kname = f->second->get_name();
+        }
+      }
+      std::string insn_str = gpgpu_ctx->func_sim->ptx_get_insn_str(pc);
+      printf(
+          "[PTX_INST_SUM] id=%u pc=%u kernel=\"%s\" text=\"%s\" total_active=%llu\n",
+          uid, pc, kname.c_str(), insn_str.c_str(), total_active);
+    }
+  }
+
+  // Print aggregated PTX register usage counts (sorted desc by uses)
+  if (!gpgpu_ctx->ptx_reg_use_counts.empty()) {
+    printf("\n[PTX_REG_SUM] Aggregated register usage across program (reads+writes):\n");
+    std::vector<std::pair<std::string, unsigned long long> > regs;
+    regs.reserve(gpgpu_ctx->ptx_reg_use_counts.size());
+    for (std::map<std::string, unsigned long long>::const_iterator it =
+             gpgpu_ctx->ptx_reg_use_counts.begin();
+         it != gpgpu_ctx->ptx_reg_use_counts.end(); ++it) {
+      regs.push_back(*it);
+    }
+    std::sort(regs.begin(), regs.end(),
+              [](const std::pair<std::string, unsigned long long> &a,
+                 const std::pair<std::string, unsigned long long> &b) {
+                if (a.second != b.second) return a.second > b.second;
+                return a.first < b.first;
+              });
+    for (size_t i = 0; i < regs.size(); ++i) {
+      printf("[PTX_REG_SUM] reg=\"%s\" uses=%llu\n", regs[i].first.c_str(),
+             regs[i].second);
+    }
+  }
+
   if (g_network_mode) {
     printf(
         "----------------------------Interconnect-DETAILS----------------------"

@@ -1,6 +1,8 @@
 #ifndef __gpgpu_context_h__
 #define __gpgpu_context_h__
 #include "../src/cuda-sim/cuda-sim.h"
+#include <map>
+#include <string>
 #include "../src/cuda-sim/cuda_device_runtime.h"
 #include "../src/cuda-sim/ptx-stats.h"
 #include "../src/cuda-sim/ptx_loader.h"
@@ -52,6 +54,11 @@ class gpgpu_context {
   cuda_sim *func_sim;
   cuda_device_runtime *device_runtime;
   ptx_stats *stats;
+  // Aggregated active-thread counts per static PTX instruction (keyed by PC)
+  std::map<unsigned, unsigned long long> ptx_pc_active_agg;
+  // Aggregated register usage counts across the whole program (reads+writes)
+  // Keyed by PTX register name (e.g., "%r12", "%p4", "%rd2")
+  std::map<std::string, unsigned long long> ptx_reg_use_counts;
   // member function list
   void synchronize();
   void exit_simulation();

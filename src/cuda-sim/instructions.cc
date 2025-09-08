@@ -772,6 +772,13 @@ void ptx_thread_info::set_reg(const symbol *reg, const ptx_reg_t &value) {
   if (reg->name() == "_") return;
   assert(!m_regs.empty());
   assert(reg->uid() > 0);
+  // Count register write usage
+  {
+    const std::string &rname = reg->name();
+    if (rname != "_") {
+      m_gpu->gpgpu_ctx->ptx_reg_use_counts[rname]++;
+    }
+  }
   m_regs.back()[reg] = value;
   if (m_enable_debug_trace) m_debug_trace_regs_modified.back()[reg] = value;
   m_last_set_operand_value = value;
@@ -868,6 +875,14 @@ ptx_reg_t ptx_thread_info::get_reg(const symbol *reg) {
   }
   if (m_enable_debug_trace)
     m_debug_trace_regs_read.back()[reg] = regs_iter->second;
+
+  // Count register read usage
+  {
+    const std::string &rname = reg->name();
+    if (rname != "_") {
+      m_gpu->gpgpu_ctx->ptx_reg_use_counts[rname]++;
+    }
+  }
 
   // FI: detect effective read of an injected register
   const ptx_instruction *curr_inst = get_inst(get_pc());

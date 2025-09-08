@@ -1176,6 +1176,12 @@ void simt_stack::update(simt_mask_t &thread_done, addr_vector_t &next_pc,
 }
 
 void core_t::execute_warp_inst_t(warp_inst_t &inst, unsigned warpId) {
+  // Aggregate active thread counts per static PTX instruction (by PC)
+  {
+    unsigned pc = inst.pc;
+    unsigned active_cnt = inst.get_active_mask().count();
+    m_gpu->gpgpu_ctx->ptx_pc_active_agg[pc] += active_cnt;
+  }
   for (unsigned t = 0; t < m_warp_size; t++) {
     if (inst.active(t)) {
       if (warpId == (unsigned(-1))) warpId = inst.warp_id();

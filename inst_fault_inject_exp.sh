@@ -1,7 +1,7 @@
 #!/bin/bash
 
 TEST_APP_NAME="pathfinder"
-COMPONENTS_TO_FLIP=6
+COMPONENTS_TO_FLIP=0
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache (e.g. components_to_flip=0:1 for both RF and local_mem)
 
 # set cuda installation path
@@ -259,46 +259,46 @@ main() {
     # compile project
     make -j$(nproc)
 
-    # # 删除test_apps/${TEST_APP_NAME}/result下的所有文件
-    # rm -rf test_apps/${TEST_APP_NAME}/result/*
+    # 删除test_apps/${TEST_APP_NAME}/result下的所有文件
+    rm -rf test_apps/${TEST_APP_NAME}/result/*
 
 
-    # # 生成result
-    # idx=0
-    # while IFS= read -r line || [[ -n "$line" ]]; do
-    #     echo "$idx: $line"
-    # if [[ "$idx" == "1" || "$idx" == "3" || "$idx" == "5" ]]; then
-    #     cu_file="test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_0.cu"
-    #     if [[ -f "$cu_file" ]]; then
-    #         filename=$(basename "$cu_file")
-    #         x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
-    #         if [[ -n "$x_val" ]]; then
-    #             cp "$cu_file" "${cu_file}.bak"
-    #             /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
-    #             # 将输出重定向到目录下的txt文件
-    #             ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-    #             rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
-    #             mv "${cu_file}.bak" "$cu_file"
-    #         fi
-    #     fi
-    # else
-    #     for cu_file in test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_*.cu; do
-    #         filename=$(basename "$cu_file")
-    #         x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
-    #         if [[ -z "$x_val" ]]; then
-    #             continue
-    #         fi
+    # 生成result
+    idx=0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        echo "$idx: $line"
+    if [[ "$idx" == "1" || "$idx" == "3" || "$idx" == "5" ]]; then
+        cu_file="test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_0.cu"
+        if [[ -f "$cu_file" ]]; then
+            filename=$(basename "$cu_file")
+            x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
+            if [[ -n "$x_val" ]]; then
+                cp "$cu_file" "${cu_file}.bak"
+                /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
+                # 将输出重定向到目录下的txt文件
+                ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
+                mv "${cu_file}.bak" "$cu_file"
+            fi
+        fi
+    else
+        for cu_file in test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_*.cu; do
+            filename=$(basename "$cu_file")
+            x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
+            if [[ -z "$x_val" ]]; then
+                continue
+            fi
 
-    #         cp "$cu_file" "${cu_file}.bak"
-    #         /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
-    #         # 将输出重定向到目录下的txt文件
-    #         ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-    #         rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
-    #         mv "${cu_file}.bak" "$cu_file"
-    #     done
-    # fi
-    #     idx=$((idx+1))
-    # done < test_apps/${TEST_APP_NAME}/size_list.txt
+            cp "$cu_file" "${cu_file}.bak"
+            /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
+            # 将输出重定向到目录下的txt文件
+            ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+            rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
+            mv "${cu_file}.bak" "$cu_file"
+        done
+    fi
+        idx=$((idx+1))
+    done < test_apps/${TEST_APP_NAME}/size_list.txt
 
 
 
@@ -404,8 +404,8 @@ main() {
         bash campaign_exec.sh > inst_exec.log
         # python3 parse_exec.py > parse_exec.log
         # # 如果$filename以.txt结尾，先去掉再传入
-        # filename_no_ext="${filename%.txt}"
-        # python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext
+        filename_no_ext="${filename%.txt}"
+        python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext -c $COMPONENTS_TO_FLIP
 
         # 删除 inst_exec.log 文件
         # rm -f inst_exec.log
@@ -414,4 +414,8 @@ main() {
     done
 }
 
-main "$@"
+# Run main 7 times with COMPONENTS_TO_FLIP = 0..6
+for COMPONENTS_TO_FLIP in 0 1 2 3 4 5 6; do
+    echo "=== Running main with COMPONENTS_TO_FLIP=${COMPONENTS_TO_FLIP} ==="
+    main "$@"
+done

@@ -82,10 +82,10 @@ def parse_log(log_path: str):
     return effects, results, all_runs
 
 
-def write_csv(app: str, test: str, effects, results, all_runs):
+def write_csv(app: str, test: str, components: str, effects, results, all_runs):
     out_dir = os.path.join('test_result')
     os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, f"test_result_{app}_{test}.csv")
+    out_path = os.path.join(out_dir, f"test_result_{app}_{test}_{components}.csv")
 
     invalid_counts = {'SDC': 0, 'DUE': 0, 'Masked': 0, 'others': 0}
 
@@ -228,12 +228,13 @@ def main():
     parser = argparse.ArgumentParser(description='Analyze inst_exec.log and summarize fault injection results.')
     parser.add_argument('--app', '-a', required=True, help='Application name')
     parser.add_argument('--test', '-t', required=True, help='Test identifier', type=str)
+    parser.add_argument('--components', '-c', required=True, help='Components identifier', type=str)
     args = parser.parse_args()
 
     log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'inst_exec.log')
     effects, results, all_runs = parse_log(log_path)
 
-    out_path, invalid_counts, totals = write_csv(args.app, args.test, effects, results, all_runs)
+    out_path, invalid_counts, totals = write_csv(args.app, args.test, args.components, effects, results, all_runs)
 
     total_injections = totals['Masked'] + totals['SDC'] + totals['DUE']
     print(f"CSV written: {out_path}")

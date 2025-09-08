@@ -7,7 +7,7 @@ CONFIG_FILE=./gpgpusim.config
 TMP_DIR=./logs
 CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
-RUNS=10
+RUNS=384
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
 DELETE_LOGS=1 # if 1 then all logs will be deleted at the end of the script
 # ---------------------------------------------- END ONE-TIME PARAMETERS ------------------------------------------------
@@ -22,7 +22,7 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./pathfinder 640 24 23"
+CUDA_UUT="./pathfinder 256 12 11"
 # total cycles for all kernels
 CYCLES=4040
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
@@ -57,7 +57,7 @@ crashes=0
 # 3: single fault-free execution
 profile=0
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache (e.g. components_to_flip=0:1 for both RF and local_mem)
-components_to_flip=6
+components_to_flip=0
 # 1: per warp bit flip, 0: per thread bit flip
 per_warp=0
 # in which kernels to inject the fault. e.g. 0: for all running kernels, 1: for kernel 1, 1:2 for kernel 1 & 2 
