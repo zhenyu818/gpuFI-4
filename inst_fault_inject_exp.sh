@@ -251,6 +251,10 @@ get_metrics() {
 
 main() {
 
+    pip3 install pathlib -i https://pypi.tuna.tsinghua.edu.cn/simple
+    pip3 install numpy -i https://pypi.tuna.tsinghua.edu.cn/simple
+    pip3 install pandas -i https://pypi.tuna.tsinghua.edu.cn/simple
+
     # load environment variables
     source setup_environment
 
@@ -259,46 +263,46 @@ main() {
     # compile project
     make -j$(nproc)
 
-    # 删除test_apps/${TEST_APP_NAME}/result下的所有文件
-    rm -rf test_apps/${TEST_APP_NAME}/result/*
+    # # 删除test_apps/${TEST_APP_NAME}/result下的所有文件
+    # rm -rf test_apps/${TEST_APP_NAME}/result/*
 
 
-    # 生成result
-    idx=0
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        echo "$idx: $line"
-    if [[ "$idx" == "1" || "$idx" == "3" || "$idx" == "5" ]]; then
-        cu_file="test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_0.cu"
-        if [[ -f "$cu_file" ]]; then
-            filename=$(basename "$cu_file")
-            x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
-            if [[ -n "$x_val" ]]; then
-                cp "$cu_file" "${cu_file}.bak"
-                /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
-                # 将输出重定向到目录下的txt文件
-                ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-                rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
-                mv "${cu_file}.bak" "$cu_file"
-            fi
-        fi
-    else
-        for cu_file in test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_*.cu; do
-            filename=$(basename "$cu_file")
-            x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
-            if [[ -z "$x_val" ]]; then
-                continue
-            fi
+    # # 生成result
+    # idx=0
+    # while IFS= read -r line || [[ -n "$line" ]]; do
+    #     echo "$idx: $line"
+    # if [[ "$idx" == "1" || "$idx" == "3" || "$idx" == "5" ]]; then
+    #     cu_file="test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_0.cu"
+    #     if [[ -f "$cu_file" ]]; then
+    #         filename=$(basename "$cu_file")
+    #         x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
+    #         if [[ -n "$x_val" ]]; then
+    #             cp "$cu_file" "${cu_file}.bak"
+    #             /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
+    #             # 将输出重定向到目录下的txt文件
+    #             ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+    #             rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
+    #             mv "${cu_file}.bak" "$cu_file"
+    #         fi
+    #     fi
+    # else
+    #     for cu_file in test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_*.cu; do
+    #         filename=$(basename "$cu_file")
+    #         x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
+    #         if [[ -z "$x_val" ]]; then
+    #             continue
+    #         fi
 
-            cp "$cu_file" "${cu_file}.bak"
-            /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
-            # 将输出重定向到目录下的txt文件
-            ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-            rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
-            mv "${cu_file}.bak" "$cu_file"
-        done
-    fi
-        idx=$((idx+1))
-    done < test_apps/${TEST_APP_NAME}/size_list.txt
+    #         cp "$cu_file" "${cu_file}.bak"
+    #         /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
+    #         # 将输出重定向到目录下的txt文件
+    #         ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+    #         rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
+    #         mv "${cu_file}.bak" "$cu_file"
+    #     done
+    # fi
+    #     idx=$((idx+1))
+    # done < test_apps/${TEST_APP_NAME}/size_list.txt
 
 
 
@@ -400,22 +404,25 @@ main() {
             print $0
         }' "$campaign_file" > "${campaign_file}.tmp" && mv "${campaign_file}.tmp" "$campaign_file"
 
+        echo "正在执行${TEST_APP_NAME}、${filename}的故障注入实验，注入组件：${COMPONENTS_TO_FLIP}，共50次"
 
-        bash campaign_exec.sh > inst_exec.log
-        # python3 parse_exec.py > parse_exec.log
-        # # 如果$filename以.txt结尾，先去掉再传入
-        filename_no_ext="${filename%.txt}"
-        python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext -c $COMPONENTS_TO_FLIP
-
-        # 删除 inst_exec.log 文件
-        # rm -f inst_exec.log
-
+        for i in {1..50}; do
+            echo "  --- Run $i / 50 ---"
+            bash campaign_exec.sh > inst_exec.log
+            # # 如果$filename以.txt结尾，先去掉再传入
+            filename_no_ext="${filename%.txt}"
+            python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext -c $COMPONENTS_TO_FLIP
+            python3 split_rank_spearman.py $TEST_APP_NAME $filename_no_ext $COMPONENTS_TO_FLIP $i
+            # 删除 inst_exec.log 文件
+            # rm -f inst_exec.log
+        done
         
     done
 }
 
 # Run main 7 times with COMPONENTS_TO_FLIP = 0..6
-for COMPONENTS_TO_FLIP in 0 1 2 3 4 5 6; do
+for COMPONENTS_TO_FLIP in 0; do
     echo "=== Running main with COMPONENTS_TO_FLIP=${COMPONENTS_TO_FLIP} ==="
     main "$@"
 done
+

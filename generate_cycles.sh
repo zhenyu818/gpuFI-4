@@ -47,9 +47,3 @@ awk -v m="$m" -v n="$n" 'BEGIN {
 }' > cycles.txt
 
 echo "完成！已在 cycles.txt 中生成 $n 个数字"
-echo "文件内容预览："
-head -10 cycles.txt
-if [ $(wc -l < cycles.txt) -gt 10 ]; then
-    echo "..."
-    tail -5 cycles.txt
-fi
