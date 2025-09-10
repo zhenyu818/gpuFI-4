@@ -406,15 +406,18 @@ main() {
 
         echo "正在执行${TEST_APP_NAME}、${filename}的故障注入实验，注入组件：${COMPONENTS_TO_FLIP}，共50次"
 
-        for i in {1..50}; do
-            echo "  --- Run $i / 50 ---"
+        for i in $(seq 1 100); do
+            echo "  --- Run $i / 100 ---"
             bash campaign_exec.sh > inst_exec.log
             # # 如果$filename以.txt结尾，先去掉再传入
             filename_no_ext="${filename%.txt}"
             python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext -c $COMPONENTS_TO_FLIP
             python3 split_rank_spearman.py $TEST_APP_NAME $filename_no_ext $COMPONENTS_TO_FLIP $i
-            # 删除 inst_exec.log 文件
-            # rm -f inst_exec.log
+            ret=$?
+            if [ $ret -eq 99 ]; then
+                echo "Early stopping triggered. Exiting loop."
+                break
+            fi
         done
         
     done

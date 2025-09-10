@@ -3,7 +3,6 @@
 #include <time.h>
 #include <assert.h>
 #include <string.h>
-#include <stdbool.h>
 
 struct timeval tv;
 struct timeval tv_total_start, tv_total_end;
@@ -20,9 +19,7 @@ float init_time = 0, mem_alloc_time = 0, h2d_time = 0, kernel_time = 0,
 #define DEVICE 0
 #define HALO 1 // halo width along one direction when advancing to the next iteration
 
-#define M_SEED 3415          // 保留原随机种子
-#define SPARSE_N 3           // 2:4稀疏中的N（每M个元素保留的非零值数量）
-#define SPARSE_M 4           // 2:4稀疏中的M（连续元素分组大小）
+#define M_SEED 3415
 
 //#define BENCH_PRINT
 
@@ -34,84 +31,84 @@ int** wall;
 int* result;
 int pyramid_height;
 
-// 从pathfinder_gen_input_7.cu集成的2:4稀疏输入生成函数
-// 生成2:4结构化稀疏的随机值（每4个连续元素中随机选2个置非零，其余置0）
-static void generate_2to4_sparse_value(int *group, int group_len) {
-    // 1. 初始化分组为全0（满足稀疏约束的基础）
-    for (int k = 0; k < group_len; k++) {
-        group[k] = 0;
-    }
-    
-    // 2. 随机选择2个不同的位置作为非零值索引（确保每4个元素仅保留2个非零）
-    bool selected[SPARSE_M] = {false};
-    int selected_count = 0;
-    while (selected_count < SPARSE_N) {
-        int rand_idx = rand() % SPARSE_M;  // 0~3范围内随机选索引
-        if (!selected[rand_idx]) {
-            selected[rand_idx] = true;
-            selected_count++;
-        }
-    }
-    
-    // 3. 为选中的位置生成0~9的随机非零值（匹配原代码的随机值范围）
-    for (int k = 0; k < SPARSE_M; k++) {
-        if (selected[k]) {
-            group[k] = rand() % 10;
-            // 确保非零（若随机到0则重新生成，避免与稀疏置0混淆）
-            while (group[k] == 0) {
-                group[k] = rand() % 10;
-            }
-        }
-    }
-}
+// 从pathfinder_gen_input_1.cu集成的输入生成函数
+static void generate_input_1(int argc, char **argv)
+{
+	if (argc == 4) {
+		cols = atoi(argv[1]);
+		rows = atoi(argv[2]);
+		pyramid_height = atoi(argv[3]);
+	} else {
+		printf("Usage: dynproc row_len col_len pyramid_height\n");
+		exit(0);
+	}
 
-// 生成2:4结构化稀疏的输入矩阵
-static void generate_input_7(int argc, char **argv) {
-    if (argc == 4) {
-        cols = atoi(argv[1]);
-        rows = atoi(argv[2]);
-        pyramid_height = atoi(argv[3]);
-        // 检查列数是否为4的整数倍（确保2:4稀疏分组完整，若不满足则自动补齐）
-        if (cols % SPARSE_M != 0) {
-            int new_cols = (cols / SPARSE_M + 1) * SPARSE_M;
-            printf("Warning: Column length (%d) is not a multiple of %d. Auto-adjust to %d\n", 
-                   cols, SPARSE_M, new_cols);
-            cols = new_cols;
-        }
-    } else {
-        printf("Usage: dynproc row_len col_len pyramid_height\n");
-        exit(0);
-    }
+	data = new int[rows*cols];
+	wall = new int*[rows];
+	for(int n=0; n<rows; n++)
+		wall[n]=data+cols*n;
+	result = new int[cols];
 
-    // 内存分配（与原代码逻辑一致）
-    data = new int[rows * cols];
-    wall = new int*[rows];
-    for (int n = 0; n < rows; n++) {
-        wall[n] = data + cols * n;
-    }
-    result = new int[cols];
-
-    srand(M_SEED);  // 保留原随机种子，确保可复现性
-    // 按行生成2:4稀疏数据
-    for (int i = 0; i < rows; i++) {
-        // 按4个元素为一组处理，确保每组满足2:4稀疏约束
-        for (int j = 0; j < cols; j += SPARSE_M) {
-            int group[SPARSE_M];
-            generate_2to4_sparse_value(group, SPARSE_M);
-            // 将稀疏分组赋值到矩阵对应位置
-            for (int k = 0; k < SPARSE_M; k++) {
-                wall[i][j + k] = group[k];
-            }
-        }
-    }
-
+	// 构造包含Adversarial patterns的输入数据
+	srand(M_SEED);
+	
+	// 生成Adversarial patterns
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			// 基础值设为0
+			wall[i][j] = 0;
+			
+			// Pattern 1: 棋盘模式 - 交替极值 (0和9)
+			if ((i + j) % 2 == 0) {
+				wall[i][j] = 0;  // 最小值
+			} else {
+				wall[i][j] = 9;  // 最大值
+			}
+			
+			// Pattern 2: 边界特殊情况 - 创建边界障碍
+			if (i == 0 || i == rows-1 || j == 0 || j == cols-1) {
+				wall[i][j] = 7;  // 边界高值，增加路径寻找难度
+			}
+			
+			// Pattern 3: 对角线路径 - 创建最优路径
+			if (i == j) {
+				wall[i][j] = 0;  // 对角线最优路径
+			}
+			
+			// Pattern 4: 中心区域陷阱 - 高成本区域
+			if (i >= rows/4 && i < 3*rows/4 && j >= cols/4 && j < 3*cols/4) {
+				wall[i][j] = 8;  // 中心区域高成本
+			}
+			
+			// Pattern 5: 垂直条纹 - 创建垂直障碍
+			if (j % 3 == 0) {
+				wall[i][j] = 6;  // 垂直障碍
+			}
+			
+			// Pattern 6: 水平条纹 - 创建水平障碍
+			if (i % 4 == 0) {
+				wall[i][j] = 5;  // 水平障碍
+			}
+			
+			// Pattern 7: 随机噪声 - 增加不可预测性
+			if (rand() % 15 == 0) {  // 约6.7%概率
+				wall[i][j] = rand() % 10;
+			}
+			
+			// Pattern 8: 角落特殊值 - 测试边界处理
+			if ((i == 0 && j == 0) || (i == 0 && j == cols-1) || 
+				(i == rows-1 && j == 0) || (i == rows-1 && j == cols-1)) {
+				wall[i][j] = 3;  // 角落特殊值
+			}
+		}
+	}
 }
 
 void
 init(int argc, char** argv)
 {
 	// 调用集成的输入生成函数
-	generate_input_7(argc, argv);
+	generate_input_1(argc, argv);
 }
 
 void 

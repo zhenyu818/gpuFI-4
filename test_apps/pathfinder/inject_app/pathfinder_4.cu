@@ -21,8 +21,7 @@ float init_time = 0, mem_alloc_time = 0, h2d_time = 0, kernel_time = 0,
 #define HALO 1 // halo width along one direction when advancing to the next iteration
 
 #define M_SEED 3415          // 保留原随机种子
-
-#define SPARSE_N 1           // 2:4稀疏中的N（每M个元素保留的非零值数量）
+#define SPARSE_N 2           // 2:4稀疏中的N（每M个元素保留的非零值数量）
 #define SPARSE_M 4           // 2:4稀疏中的M（连续元素分组大小）
 
 //#define BENCH_PRINT
@@ -35,7 +34,7 @@ int** wall;
 int* result;
 int pyramid_height;
 
-// 从pathfinder_gen_input_5.cu集成的2:4稀疏输入生成函数
+// 从pathfinder_gen_input_6.cu集成的2:4稀疏输入生成函数
 // 生成2:4结构化稀疏的随机值（每4个连续元素中随机选2个置非零，其余置0）
 static void generate_2to4_sparse_value(int *group, int group_len) {
     // 1. 初始化分组为全0（满足稀疏约束的基础）
@@ -67,7 +66,7 @@ static void generate_2to4_sparse_value(int *group, int group_len) {
 }
 
 // 生成2:4结构化稀疏的输入矩阵
-static void generate_input_5(int argc, char **argv) {
+static void generate_input_6(int argc, char **argv) {
     if (argc == 4) {
         cols = atoi(argv[1]);
         rows = atoi(argv[2]);
@@ -111,7 +110,7 @@ void
 init(int argc, char** argv)
 {
 	// 调用集成的输入生成函数
-	generate_input_5(argc, argv);
+	generate_input_6(argc, argv);
 }
 
 void 
