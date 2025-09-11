@@ -22,7 +22,7 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./pathfinder 4 4 3"
+CUDA_UUT="./stencil1d 256"
 # total cycles for all kernels
 CYCLES=4040
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
@@ -55,7 +55,7 @@ crashes=0
 # ---------------------------------------------- START PER INJECTION CAMPAIGN PARAMETERS (profile=0) ----------------------------------------------
 # 0: perform injection campaign, 1: get cycles of each kernel, 2: get mean value of active threads, during all cycles in CYCLES_FILE, per SM,
 # 3: single fault-free execution
-profile=3
+profile=1
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache (e.g. components_to_flip=0:1 for both RF and local_mem)
 components_to_flip=0
 # 1: per warp bit flip, 0: per thread bit flip

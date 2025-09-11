@@ -22,26 +22,26 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./pathfinder 640 24 23"
+CUDA_UUT="./stencil1d 256"
 # total cycles for all kernels
-CYCLES=4040
+CYCLES=2269
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
 # fix cycles.txt with kernel execution cycles
 # (e.g. seq 1 10 >> cycles.txt, or multiple seq commands if a kernel has multiple executions)
 # use the following command from profiling execution for easier creation of cycles.txt file
 # e.g. grep "_Z12lud_diagonalPfii" cycles.in | awk  '{ system("seq " $12 " " $18 ">> cycles.txt")}'
 CYCLES_FILE=./cycles.txt
-MAX_REGISTERS_USED=15
-SHADER_USED=0
+MAX_REGISTERS_USED=24
+SHADER_USED="0"
 SUCCESS_MSG='Success'
 FAILED_MSG='Failed'
-TIMEOUT_VAL=10s
+TIMEOUT_VAL=6s
 DATATYPE_SIZE=32
 # lmem and smem values are taken from gpgpu-sim ptx output per kernel
 # e.g. GPGPU-Sim PTX: Kernel '_Z9vectorAddPKdS0_Pdi' : regs=8, lmem=0, smem=0, cmem=380
 # if 0 put a random value > 0
 LMEM_SIZE_BITS=1
-SMEM_SIZE_BITS=16384
+SMEM_SIZE_BITS=8640
 # ---------------------------------------------- END PER KERNEL/APPLICATION PARAMETERS (+profile=1) ------------------------------------------------
 
 FAULT_INJECTION_OCCURRED="Fault injection"

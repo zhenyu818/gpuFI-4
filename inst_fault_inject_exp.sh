@@ -1,7 +1,9 @@
 #!/bin/bash
 
-TEST_APP_NAME="pathfinder"
+TEST_APP_NAME="stencil1d"
 COMPONENTS_TO_FLIP=0
+RUN_TIMES=1000
+TIME_OUT=6s
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache (e.g. components_to_flip=0:1 for both RF and local_mem)
 
 # set cuda installation path
@@ -263,46 +265,46 @@ main() {
     # compile project
     make -j$(nproc)
 
-    # # 删除test_apps/${TEST_APP_NAME}/result下的所有文件
-    # rm -rf test_apps/${TEST_APP_NAME}/result/*
+    # 删除test_apps/${TEST_APP_NAME}/result下的所有文件
+    rm -rf test_apps/${TEST_APP_NAME}/result/*
 
 
-    # # 生成result
-    # idx=0
-    # while IFS= read -r line || [[ -n "$line" ]]; do
-    #     echo "$idx: $line"
-    # if [[ "$idx" == "1" || "$idx" == "3" || "$idx" == "5" ]]; then
-    #     cu_file="test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_0.cu"
-    #     if [[ -f "$cu_file" ]]; then
-    #         filename=$(basename "$cu_file")
-    #         x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
-    #         if [[ -n "$x_val" ]]; then
-    #             cp "$cu_file" "${cu_file}.bak"
-    #             /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
-    #             # 将输出重定向到目录下的txt文件
-    #             ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-    #             rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
-    #             mv "${cu_file}.bak" "$cu_file"
-    #         fi
-    #     fi
-    # else
-    #     for cu_file in test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_*.cu; do
-    #         filename=$(basename "$cu_file")
-    #         x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
-    #         if [[ -z "$x_val" ]]; then
-    #             continue
-    #         fi
+    # 生成result
+    idx=0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        echo "$idx: $line"
+    if [[ "$idx" == "1" || "$idx" == "3" || "$idx" == "5" ]]; then
+        cu_file="test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_0.cu"
+        if [[ -f "$cu_file" ]]; then
+            filename=$(basename "$cu_file")
+            x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
+            if [[ -n "$x_val" ]]; then
+                cp "$cu_file" "${cu_file}.bak"
+                /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
+                # 将输出重定向到目录下的txt文件
+                ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
+                mv "${cu_file}.bak" "$cu_file"
+            fi
+        fi
+    else
+        for cu_file in test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_*.cu; do
+            filename=$(basename "$cu_file")
+            x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
+            if [[ -z "$x_val" ]]; then
+                continue
+            fi
 
-    #         cp "$cu_file" "${cu_file}.bak"
-    #         /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
-    #         # 将输出重定向到目录下的txt文件
-    #         ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-    #         rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
-    #         mv "${cu_file}.bak" "$cu_file"
-    #     done
-    # fi
-    #     idx=$((idx+1))
-    # done < test_apps/${TEST_APP_NAME}/size_list.txt
+            cp "$cu_file" "${cu_file}.bak"
+            /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
+            # 将输出重定向到目录下的txt文件
+            ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+            rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
+            mv "${cu_file}.bak" "$cu_file"
+        done
+    fi
+        idx=$((idx+1))
+    done < test_apps/${TEST_APP_NAME}/size_list.txt
 
 
 
@@ -327,12 +329,6 @@ main() {
         echo "正在进行输入规模${a}、输入内容${b}的故障注入"
         nvcc ${TEST_APP_NAME}.cu -o ${TEST_APP_NAME} -g -lcudart -arch=sm_75
 
-        bash campaign_profile.sh
-        if [ ! -f "$FILE_PATH" ]; then
-            echo "Error: file not found: $FILE_PATH" >&2
-        exit 1
-        fi
-        get_metrics
         # 读取size_list.txt的第a行（a从0开始）
         size_list_file="test_apps/${TEST_APP_NAME}/size_list.txt"
         if [[ ! -f "$size_list_file" ]]; then
@@ -343,6 +339,20 @@ main() {
         # a变量已由上文提取
         size_line=$(awk "NR==$((a+1))" "$size_list_file")
         echo "第${a}行内容: $size_line"
+
+        FILE="campaign_profile.sh"
+
+        # 使用 sed 替换 CUDA_UUT 开头的行
+        sed -i "s|^CUDA_UUT.*|CUDA_UUT=\"./${TEST_APP_NAME} ${size_line}\"|" "$FILE"
+
+        bash campaign_profile.sh
+
+        if [ ! -f "$FILE_PATH" ]; then
+            echo "Error: file not found: $FILE_PATH" >&2
+        exit 1
+        fi
+        get_metrics
+
         # 读取campaign.sh内容到变量
         campaign_file="campaign_exec.sh"
         if [[ ! -f "$campaign_file" ]]; then
@@ -359,7 +369,9 @@ main() {
             -v global_datatype_size="$GLOBAL_DATATYPE_SIZE" \
             -v global_lmem_size_bits="$GLOBAL_LMEM_SIZE_BITS" \
             -v global_smem_size_bits="$GLOBAL_SMEM_SIZE_BITS" \
-            -v components_to_flip="$COMPONENTS_TO_FLIP" '
+            -v components_to_flip="$COMPONENTS_TO_FLIP" \
+            -v run_times="$RUN_TIMES" \
+            -v time_out="$TIME_OUT" '
         {
             # 替换CUDA_UUT
             if ($0 ~ /^CUDA_UUT=/) {
@@ -376,9 +388,9 @@ main() {
                 print "MAX_REGISTERS_USED=" global_max_registers
                 next
             }
-            # 替换SHADER_USED
+            # 替换SHADER_USED（用双引号括住）
             if ($0 ~ /^SHADER_USED=/) {
-                print "SHADER_USED=" global_shader
+                print "SHADER_USED=\"" global_shader "\""
                 next
             }
             # 替换DATATYPE_SIZE
@@ -401,18 +413,30 @@ main() {
                 print "components_to_flip=" components_to_flip
                 next
             }
+            # 替换run_times
+            if ($0 ~ /^RUNS=/) {
+                print "RUNS=" run_times
+                next
+            }
+            # 替换TIMEOUT_VAL
+            if ($0 ~ /^TIMEOUT_VAL=/) {
+                print "TIMEOUT_VAL=" time_out
+                next
+            }
+            # 其他行保持不变
             print $0
         }' "$campaign_file" > "${campaign_file}.tmp" && mv "${campaign_file}.tmp" "$campaign_file"
 
+
         echo "正在执行${TEST_APP_NAME}、${filename}的故障注入实验，注入组件：${COMPONENTS_TO_FLIP}，共50次"
 
-        for i in $(seq 1 100); do
-            echo "  --- Run $i / 100 ---"
+        for i in $(seq 1 200); do
+            echo "  --- Run $i / 200 ---"
             bash campaign_exec.sh > inst_exec.log
             # # 如果$filename以.txt结尾，先去掉再传入
             filename_no_ext="${filename%.txt}"
             python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext -c $COMPONENTS_TO_FLIP
-            python3 split_rank_spearman.py $TEST_APP_NAME $filename_no_ext $COMPONENTS_TO_FLIP $i
+            python3 split_rank_spearman.py $TEST_APP_NAME $filename_no_ext $COMPONENTS_TO_FLIP
             ret=$?
             if [ $ret -eq 99 ]; then
                 echo "Early stopping triggered. Exiting loop."
@@ -428,4 +452,3 @@ for COMPONENTS_TO_FLIP in 0; do
     echo "=== Running main with COMPONENTS_TO_FLIP=${COMPONENTS_TO_FLIP} ==="
     main "$@"
 done
-

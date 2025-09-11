@@ -19,7 +19,7 @@ float init_time = 0, mem_alloc_time = 0, h2d_time = 0, kernel_time = 0,
 #define DEVICE 0
 #define HALO 1 // halo width along one direction when advancing to the next iteration
 
-#define M_SEED 3415
+#define M_SEED 5325
 
 //#define BENCH_PRINT
 
@@ -31,8 +31,8 @@ int** wall;
 int* result;
 int pyramid_height;
 
-// 从pathfinder_gen_input_1.cu集成的输入生成函数
-static void generate_input_1(int argc, char **argv)
+// 从pathfinder_gen_input_2.cu集成的输入生成函数
+static void generate_input_2(int argc, char **argv)
 {
 	if (argc == 4) {
 		cols = atoi(argv[1]);
@@ -62,7 +62,7 @@ void
 init(int argc, char** argv)
 {
 	// 调用集成的输入生成函数
-	generate_input_1(argc, argv);
+	generate_input_2(argc, argv);
 }
 
 void 
