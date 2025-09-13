@@ -963,6 +963,8 @@ void ptx_thread_info::register_local_mem_injection(mem_addr_t byte_addr,
   info.inject_cycle = inject_cycle;
   info.inject_pc = inject_pc;
   info.last_writer_at_inject = writer_info;
+  // reset reader state on new injection registration
+  info.ever_read = false;
 
   printf("[LOCAL_MEM_FI_INJECT] tid=%u byte_addr=%u bits=", get_uid(), (unsigned)byte_addr);
   for (size_t i = 0; i < info.bits_in_byte_1based.size(); ++i) {
@@ -984,16 +986,18 @@ void ptx_thread_info::mark_local_mem_read(mem_addr_t addr, size_t length,
     mem_addr_t byte_addr = addr + off;
     std::map<mem_addr_t, local_injection_info>::iterator it = m_local_injections.find(byte_addr);
     if (it != m_local_injections.end() && it->second.pending) {
-      printf("[LOCAL_MEM_FI_EFFECTIVE] tid=%u byte_addr=%u bits=", get_uid(), (unsigned)byte_addr);
+      // Print a reader log for every read after injection (include instruction inline)
+      printf("[LOCAL_MEM_FI_READER] tid=%u byte_addr=%u bits=", get_uid(), (unsigned)byte_addr);
       for (size_t i = 0; i < it->second.bits_in_byte_1based.size(); ++i) {
         printf("%u%s", it->second.bits_in_byte_1based[i], (i + 1 < it->second.bits_in_byte_1based.size()) ? ":" : "");
       }
-      printf(" inject_cycle=%llu read_cycle=%llu reader_PC=%u\n", it->second.inject_cycle, cyc, get_pc());
-      if (reader_inst) {
-        print_insn(get_pc(), stdout);
-        printf("\n");
+      printf(" inject_cycle=%llu read_cycle=%llu reader_PC=%u -> ", it->second.inject_cycle, cyc, get_pc());
+      if (reader_inst) { print_insn(get_pc(), stdout); }
+      printf("\n");
+      // For compatibility, also print EFFECTIVE only on the first read
+      if (!it->second.ever_read) {
+        it->second.ever_read = true;
       }
-      it->second.pending = false;
     }
   }
 }
@@ -4175,7 +4179,16 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
   type_info_key::type_decode(type, size, t);
   if (!vector_spec) {
     mem->read(addr, size / 8, &data.s64);
-    if (space.get_type() == local_space) {
+    // Detect actual memory target by pointer, not only by declared space,
+    // to cover generic-space accesses resolved to local/shared.
+    if (mem == thread->m_local_mem) {
+      thread->mark_local_mem_read(addr, size / 8, pI);
+    } else if (mem == thread->m_shared_mem) {
+      if (thread->m_cta_info) {
+        thread->m_cta_info->mark_shared_mem_read(addr, size / 8, pI, thread);
+      }
+    } else if (space.get_type() == local_space) {
+      // Fallback for explicitly-declared local space
       thread->mark_local_mem_read(addr, size / 8, pI);
     } else if (space.get_type() == shared_space) {
       if (thread->m_cta_info) {
@@ -4192,7 +4205,13 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
   } else {
     ptx_reg_t data1, data2, data3, data4;
     mem->read(addr, size / 8, &data1.s64);
-    if (space.get_type() == local_space) {
+    if (mem == thread->m_local_mem) {
+      thread->mark_local_mem_read(addr, size / 8, pI);
+    } else if (mem == thread->m_shared_mem) {
+      if (thread->m_cta_info) {
+        thread->m_cta_info->mark_shared_mem_read(addr, size / 8, pI, thread);
+      }
+    } else if (space.get_type() == local_space) {
       thread->mark_local_mem_read(addr, size / 8, pI);
     } else if (space.get_type() == shared_space) {
       if (thread->m_cta_info) {
@@ -4205,7 +4224,13 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
 //    constant_read_l2_bf(thread, data1, size, addr, space);
 
     mem->read(addr + size / 8, size / 8, &data2.s64);
-    if (space.get_type() == local_space) {
+    if (mem == thread->m_local_mem) {
+      thread->mark_local_mem_read(addr + size / 8, size / 8, pI);
+    } else if (mem == thread->m_shared_mem) {
+      if (thread->m_cta_info) {
+        thread->m_cta_info->mark_shared_mem_read(addr + size / 8, size / 8, pI, thread);
+      }
+    } else if (space.get_type() == local_space) {
       thread->mark_local_mem_read(addr + size / 8, size / 8, pI);
     } else if (space.get_type() == shared_space) {
       if (thread->m_cta_info) {
@@ -4219,7 +4244,13 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
 
     if (vector_spec != V2_TYPE) {  // either V3 or V4
       mem->read(addr + 2 * size / 8, size / 8, &data3.s64);
-      if (space.get_type() == local_space) {
+      if (mem == thread->m_local_mem) {
+        thread->mark_local_mem_read(addr + 2 * size / 8, size / 8, pI);
+      } else if (mem == thread->m_shared_mem) {
+        if (thread->m_cta_info) {
+          thread->m_cta_info->mark_shared_mem_read(addr + 2 * size / 8, size / 8, pI, thread);
+        }
+      } else if (space.get_type() == local_space) {
         thread->mark_local_mem_read(addr + 2 * size / 8, size / 8, pI);
       } else if (space.get_type() == shared_space) {
         if (thread->m_cta_info) {
@@ -4232,7 +4263,13 @@ void ld_exec(const ptx_instruction *pI, ptx_thread_info *thread) {
 //      constant_read_l2_bf(thread, data3, size, addr + 2 * size / 8, space);
       if (vector_spec != V3_TYPE) {  // v4
         mem->read(addr + 3 * size / 8, size / 8, &data4.s64);
-        if (space.get_type() == local_space) {
+        if (mem == thread->m_local_mem) {
+          thread->mark_local_mem_read(addr + 3 * size / 8, size / 8, pI);
+        } else if (mem == thread->m_shared_mem) {
+          if (thread->m_cta_info) {
+            thread->m_cta_info->mark_shared_mem_read(addr + 3 * size / 8, size / 8, pI, thread);
+          }
+        } else if (space.get_type() == local_space) {
           thread->mark_local_mem_read(addr + 3 * size / 8, size / 8, pI);
         } else if (space.get_type() == shared_space) {
           if (thread->m_cta_info) {

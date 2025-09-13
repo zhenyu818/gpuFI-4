@@ -152,6 +152,7 @@ void ptx_cta_info::register_shared_mem_injection(
   info.inject_cycle = inject_cycle;
   info.inject_pc = inject_pc;
   info.last_writer_at_inject = writer_info;
+  info.ever_read = false; // reset reader observation for this byte
 
   printf("[SHARED_MEM_FI_INJECT] cta_uid=%llu byte_addr=%u bits=",
          get_uid(), (unsigned)byte_addr);
@@ -182,20 +183,22 @@ void ptx_cta_info::mark_shared_mem_read(mem_addr_t addr, size_t length,
     std::map<mem_addr_t, shared_injection_info>::iterator it =
         m_shared_injections.find(byte_addr);
     if (it != m_shared_injections.end() && it->second.pending) {
-      printf("[SHARED_MEM_FI_EFFECTIVE] tid=%u cta_uid=%llu byte_addr=%u bits=",
+      // Print a READER log for every read after injection (include instruction inline)
+      printf("[SHARED_MEM_FI_READER] tid=%u cta_uid=%llu byte_addr=%u bits=",
              printer ? printer->get_uid() : (unsigned)0, get_uid(),
              (unsigned)byte_addr);
       for (size_t i = 0; i < it->second.bits_in_byte_1based.size(); ++i) {
         printf("%u%s", it->second.bits_in_byte_1based[i],
                (i + 1 < it->second.bits_in_byte_1based.size()) ? ":" : "");
       }
-      printf(" inject_cycle=%llu read_cycle=%llu reader_PC=%u\n",
+      printf(" inject_cycle=%llu read_cycle=%llu reader_PC=%u -> ",
              it->second.inject_cycle, cyc, printer ? printer->get_pc() : 0);
-      if (reader_inst && printer) {
-        printer->print_insn(printer->get_pc(), stdout);
-        printf("\n");
+      if (reader_inst && printer) { printer->print_insn(printer->get_pc(), stdout); }
+      printf("\n");
+      // Also print EFFECTIVE only on the first read after injection for compatibility
+      if (!it->second.ever_read) {
+        it->second.ever_read = true;
       }
-      it->second.pending = false;
     }
   }
 }

@@ -1,0 +1,5 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z10stencil_1dPKiPii' for 'sm_75'
+ptxas info    : Function properties for _Z10stencil_1dPKiPii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers, 1080 bytes smem, 372 bytes cmem[0]

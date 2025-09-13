@@ -1981,12 +1981,55 @@ void bitflip_n_nregs(std::vector<ptx_thread_info*> &threads_vector, char *regist
 //          printf("After bit %u flip of reg=%s, value = %lu\n", *bf_it, reg_symbols[reg_idx]->name().c_str(), *reg_to_bitflip);
         }
         // Register the injection for effectiveness tracking and print last-writer info
+        // If a physical register is selected, multiple virtual registers may alias
+        // the same underlying storage. Find all symbols mapped to this storage
+        // and register the injection for each, so all corresponding FI_WRITERs are printed.
         std::vector<unsigned> flipped_bits = reg_bitflip_vector;
         gpgpu_sim *gpu = (gpgpu_sim *)((*threads_it)->get_gpu());
         unsigned long long cyc = gpu->gpu_sim_cycle + gpu->gpu_tot_sim_cycle;
         unsigned pc = (*threads_it)->get_pc();
-        ptx_thread_info::reg_write_info lastw = (*threads_it)->get_last_writer(reg_symbols[reg_idx]);
-        (*threads_it)->register_reg_injection(reg_symbols[reg_idx], flipped_bits, cyc, pc, lastw);
+
+        // Collect all virtual registers that alias the same physical storage
+        ptx_reg_t *phys_slot = reg_to_bitflip;
+        std::vector<const symbol*> affected_syms;
+        affected_syms.reserve(regs.size());
+        for (size_t i = 0; i < regs.size(); ++i) {
+          if (regs[i] == phys_slot) {
+            // Avoid duplicates
+            if (std::find(affected_syms.begin(), affected_syms.end(), reg_symbols[i]) == affected_syms.end()) {
+              affected_syms.push_back(reg_symbols[i]);
+            }
+          }
+        }
+
+        // If we didn't find any aliasing (should not happen), fall back to the selected symbol
+        if (affected_syms.empty()) {
+          affected_syms.push_back(reg_symbols[reg_idx]);
+        }
+
+        // Gather last-writer info for each affected vreg
+        std::vector<ptx_thread_info::reg_write_info> writers;
+        writers.reserve(affected_syms.size());
+        unsigned long long max_cycle = 0ULL;
+        for (size_t si = 0; si < affected_syms.size(); ++si) {
+          ptx_thread_info::reg_write_info lastw = (*threads_it)->get_last_writer(affected_syms[si]);
+          writers.push_back(lastw);
+          if (lastw.cycle > max_cycle) max_cycle = lastw.cycle;
+        }
+
+        // Only the vreg(s) whose last-writer is the most recent on this physical slot
+        // should print FI_WRITER. Others were overwritten by an alias write and should not.
+        for (size_t si = 0; si < affected_syms.size(); ++si) {
+          const symbol *sym = affected_syms[si];
+          ptx_thread_info::reg_write_info lastw = writers[si];
+          // Suppress FI_WRITER for stale writers by clearing writer_info when not the most recent
+          if (lastw.cycle < max_cycle) {
+            ptx_thread_info::reg_write_info empty_writer; // inst == NULL -> no FI_WRITER print
+            (*threads_it)->register_reg_injection(sym, flipped_bits, cyc, pc, empty_writer);
+          } else {
+            (*threads_it)->register_reg_injection(sym, flipped_bits, cyc, pc, lastw);
+          }
+        }
       }
     }
 //    (*threads_it)->dump_regs(stdout);

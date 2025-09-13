@@ -7,9 +7,9 @@ CONFIG_FILE=./gpgpusim.config
 TMP_DIR=./logs
 CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
-RUNS=1000
+RUNS=10
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
-DELETE_LOGS=1 # if 1 then all logs will be deleted at the end of the script
+DELETE_LOGS=0 # if 1 then all logs will be deleted at the end of the script
 # ---------------------------------------------- END ONE-TIME PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER GPGPU CARD PARAMETERS ----------------------------------------------
@@ -22,9 +22,9 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./stencil1d 256"
+CUDA_UUT="./stencil1d 4096"
 # total cycles for all kernels
-CYCLES=2269
+CYCLES=2340
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
 # fix cycles.txt with kernel execution cycles
 # (e.g. seq 1 10 >> cycles.txt, or multiple seq commands if a kernel has multiple executions)
@@ -32,7 +32,7 @@ CYCLES=2269
 # e.g. grep "_Z12lud_diagonalPfii" cycles.in | awk  '{ system("seq " $12 " " $18 ">> cycles.txt")}'
 CYCLES_FILE=./cycles.txt
 MAX_REGISTERS_USED=24
-SHADER_USED="0"
+SHADER_USED="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"
 SUCCESS_MSG='Success'
 FAILED_MSG='Failed'
 TIMEOUT_VAL=6s
@@ -57,7 +57,7 @@ crashes=0
 # 3: single fault-free execution
 profile=0
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache (e.g. components_to_flip=0:1 for both RF and local_mem)
-components_to_flip=0
+components_to_flip=2
 # 1: per warp bit flip, 0: per thread bit flip
 per_warp=0
 # in which kernels to inject the fault. e.g. 0: for all running kernels, 1: for kernel 1, 1:2 for kernel 1 & 2 
@@ -130,9 +130,9 @@ gather_results() {
         grep -iq "${SUCCESS_MSG}" $file; success_msg_grep=$(echo $?)
 	grep -i "${CYCLES_MSG}" $file | tail -1 | grep -q "${CYCLES}"; cycles_grep=$(echo $?)
         grep -iq "${FAILED_MSG}" $file; failed_msg_grep=$(echo $?)
-        if grep -qE "FI_INJECT|FI_WRITER|FI_EFFECTIVE|FI_OVERWRITTEN" "$file"; then
+        if grep -qE "FI_INJECT|FI_WRITER|FI_READER" "$file"; then
             echo "[Run ${1}] Effects from ${file}:"
-            grep -hE "FI_INJECT|FI_WRITER|FI_EFFECTIVE|FI_OVERWRITTEN" "$file"
+            grep -hE "FI_INJECT|FI_WRITER|FI_READER" "$file"
         fi
         result=${success_msg_grep}${cycles_grep}${failed_msg_grep}
         

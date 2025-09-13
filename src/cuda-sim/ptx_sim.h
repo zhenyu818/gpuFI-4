@@ -209,7 +209,9 @@ class ptx_cta_info {
     unsigned long long inject_cycle;
     unsigned inject_pc;
     smem_write_info last_writer_at_inject;
-    shared_injection_info() : pending(false), inject_cycle(0), inject_pc(0) {}
+    // Track whether at least one read has observed this injection
+    bool ever_read;
+    shared_injection_info() : pending(false), inject_cycle(0), inject_pc(0), ever_read(false) {}
   };
   // key: shared memory byte address within CTA's shared memory space
   std::map<mem_addr_t, shared_injection_info> m_shared_injections;
@@ -609,8 +611,10 @@ class ptx_thread_info {
     unsigned long long inject_cycle;
     unsigned inject_pc;
     reg_write_info last_writer_at_inject;
+    // Track whether at least one read has observed this injection
+    bool ever_read;
     local_injection_info()
-        : pending(false), inject_cycle(0), inject_pc(0) {}
+        : pending(false), inject_cycle(0), inject_pc(0), ever_read(false) {}
   };
   // key: local memory byte address within the thread's local memory space
   std::map<mem_addr_t, local_injection_info> m_local_injections;
