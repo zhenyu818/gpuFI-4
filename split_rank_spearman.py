@@ -42,13 +42,14 @@ def spearman_rho_from_vectors(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def main():
-    if len(sys.argv) < 4:
-        print("Usage: python3 split_rank_spearman.py <app> <test> <comp>")
+    if len(sys.argv) < 3:
+        print("Usage: python3 split_rank_spearman.py <app> <test>")
         sys.exit(1)
 
-    app, test, comp = sys.argv[1], sys.argv[2], sys.argv[3]
+    app, test = sys.argv[1], sys.argv[2]
 
-    csv_name = f"test_result_{app}_{test}_{comp}.csv"
+    # 输入 CSV 文件名不再包含 comp
+    csv_name = f"test_result_{app}_{test}.csv"
     csv_path = Path("test_result") / csv_name
     if not csv_path.exists():
         print(f"Input file not found: {csv_path}")
@@ -57,7 +58,7 @@ def main():
     # 输出文件路径
     out_dir = Path("order_result")
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"order_result_{app}_{test}_{comp}.txt"
+    out_path = out_dir / f"order_result_{app}_{test}.txt"
 
     # ---------------- 读取历史结果 ----------------
     history = []

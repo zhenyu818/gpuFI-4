@@ -7,9 +7,10 @@ CONFIG_FILE=./gpgpusim.config
 TMP_DIR=./logs
 CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
-RUNS=10
+RUNS=1
+COMPONENT_SET="0 2"
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
-DELETE_LOGS=0 # if 1 then all logs will be deleted at the end of the script
+DELETE_LOGS=1 # if 1 then all logs will be deleted at the end of the script
 # ---------------------------------------------- END ONE-TIME PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER GPGPU CARD PARAMETERS ----------------------------------------------
@@ -22,9 +23,9 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./stencil1d 4096"
+CUDA_UUT="./stencil1d 256"
 # total cycles for all kernels
-CYCLES=2340
+CYCLES=2269
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
 # fix cycles.txt with kernel execution cycles
 # (e.g. seq 1 10 >> cycles.txt, or multiple seq commands if a kernel has multiple executions)
@@ -32,10 +33,10 @@ CYCLES=2340
 # e.g. grep "_Z12lud_diagonalPfii" cycles.in | awk  '{ system("seq " $12 " " $18 ">> cycles.txt")}'
 CYCLES_FILE=./cycles.txt
 MAX_REGISTERS_USED=24
-SHADER_USED="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"
+SHADER_USED="0"
 SUCCESS_MSG='Success'
 FAILED_MSG='Failed'
-TIMEOUT_VAL=6s
+TIMEOUT_VAL=10s
 DATATYPE_SIZE=32
 # lmem and smem values are taken from gpgpu-sim ptx output per kernel
 # e.g. GPGPU-Sim PTX: Kernel '_Z9vectorAddPKdS0_Pdi' : regs=8, lmem=0, smem=0, cmem=380
@@ -56,8 +57,7 @@ crashes=0
 # 0: perform injection campaign, 1: get cycles of each kernel, 2: get mean value of active threads, during all cycles in CYCLES_FILE, per SM,
 # 3: single fault-free execution
 profile=0
-# 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache (e.g. components_to_flip=0:1 for both RF and local_mem)
-components_to_flip=2
+
 # 1: per warp bit flip, 0: per thread bit flip
 per_warp=0
 # in which kernels to inject the fault. e.g. 0: for all running kernels, 1: for kernel 1, 1:2 for kernel 1 & 2 
@@ -66,6 +66,9 @@ kernel_n=0
 blocks=1
 
 initialize_config() {
+    # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache (e.g. components_to_flip=0:1 for both RF and local_mem)
+    # random component to flip from COMPONENT_SET
+    components_to_flip=$(shuf -e ${COMPONENT_SET} -n 1)
     # random number for choosing a random thread after thread_rand % #threads operation in gpgpu-sim
     thread_rand=$(shuf -i 0-6000 -n 1)
     # random number for choosing a random warp after warp_rand % #warp operation in gpgpu-sim
@@ -75,30 +78,31 @@ initialize_config() {
     if [[ "$profile" -eq 3 ]]; then
         total_cycle_rand=-1
     fi
+    count=$(shuf -i 1-2 -n 1)
     # in which registers to inject the bit flip
     register_rand_n="$(shuf -i 1-${MAX_REGISTERS_USED} -n 1)"; register_rand_n="${register_rand_n//$'\n'/:}"
     # example: if -i 1-32 -n 2 then the two commands below will create a value with 2 random numbers, between [1,32] like 3:21. Meaning it will flip 3 and 21 bits.
-    reg_bitflip_rand_n="$(shuf -i 1-${DATATYPE_SIZE} -n 1)"; reg_bitflip_rand_n="${reg_bitflip_rand_n//$'\n'/:}"
+    reg_bitflip_rand_n=$(shuf -i 1-${DATATYPE_SIZE} -n ${count} | paste -sd:)
     # same format like reg_bitflip_rand_n but for local memory bit flips
-    local_mem_bitflip_rand_n="$(shuf -i 1-${LMEM_SIZE_BITS} -n 3)"; local_mem_bitflip_rand_n="${local_mem_bitflip_rand_n//$'\n'/:}"
+    local_mem_bitflip_rand_n=$(shuf -i 1-${LMEM_SIZE_BITS} -n 1 | paste -sd:)
     # random number for choosing a random block after block_rand % #smems operation in gpgpu-sim
     block_rand=$(shuf -i 0-6000 -n 1)
     # same format like reg_bitflip_rand_n but for shared memory bit flips
-    shared_mem_bitflip_rand_n="$(shuf -i 1-${SMEM_SIZE_BITS} -n 1)"; shared_mem_bitflip_rand_n="${shared_mem_bitflip_rand_n//$'\n'/:}"
+    shared_mem_bitflip_rand_n=$(shuf -i 1-${SMEM_SIZE_BITS} -n 1 | paste -sd:)
     # randomly select one or more shaders for L1 data cache fault injections 
     l1d_shader_rand_n="$(shuf -e ${SHADER_USED} -n 1)"; l1d_shader_rand_n="${l1d_shader_rand_n//$'\n'/:}"
     # same format like reg_bitflip_rand_n but for L1 data cache bit flips
-    l1d_cache_bitflip_rand_n="$(shuf -i 1-${L1D_SIZE_BITS} -n 1)"; l1d_cache_bitflip_rand_n="${l1d_cache_bitflip_rand_n//$'\n'/:}"
+    l1d_cache_bitflip_rand_n=$(shuf -i 1-${L1D_SIZE_BITS} -n 1 | paste -sd:)
     # randomly select one or more shaders for L1 constant cache fault injections 
     l1c_shader_rand_n="$(shuf -e ${SHADER_USED} -n 1)"; l1c_shader_rand_n="${l1c_shader_rand_n//$'\n'/:}"
     # same format like reg_bitflip_rand_n but for L1 constant cache bit flips
-    l1c_cache_bitflip_rand_n="$(shuf -i 1-${L1C_SIZE_BITS} -n 1)"; l1c_cache_bitflip_rand_n="${l1c_cache_bitflip_rand_n//$'\n'/:}"
+    l1c_cache_bitflip_rand_n=$(shuf -i 1-${L1C_SIZE_BITS} -n 1 | paste -sd:)
     # randomly select one or more shaders for L1 texture cache fault injections 
     l1t_shader_rand_n="$(shuf -e ${SHADER_USED} -n 1)"; l1t_shader_rand_n="${l1t_shader_rand_n//$'\n'/:}"
     # same format like reg_bitflip_rand_n but for L1 texture cache bit flips
-    l1t_cache_bitflip_rand_n="$(shuf -i 1-${L1T_SIZE_BITS} -n 1)"; l1t_cache_bitflip_rand_n="${l1t_cache_bitflip_rand_n//$'\n'/:}"
+    l1t_cache_bitflip_rand_n=$(shuf -i 1-${L1T_SIZE_BITS} -n 1 | paste -sd:)
     # same format like reg_bitflip_rand_n but for L2 cache bit flips
-    l2_cache_bitflip_rand_n="$(shuf -i 1-${L2_SIZE_BITS} -n 1)"; l2_cache_bitflip_rand_n="${l2_cache_bitflip_rand_n//$'\n'/:}"
+    l2_cache_bitflip_rand_n=$(shuf -i 1-${L2_SIZE_BITS} -n 1 | paste -sd:)
 # ---------------------------------------------- END PER INJECTION CAMPAIGN PARAMETERS (profile=0) ------------------------------------------------
 
     sed -i -e "s/^-components_to_flip.*$/-components_to_flip ${components_to_flip}/" ${CONFIG_FILE}

@@ -1,10 +1,17 @@
 #!/bin/bash
 
 TEST_APP_NAME="stencil1d"
-COMPONENTS_TO_FLIP=1
-RUN_TIMES=10
-TIME_OUT=6s
-# 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache (e.g. components_to_flip=0:1 for both RF and local_mem)
+COMPONENT_SET="0 2"
+# 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
+RUN_PER_EPOCH=1
+EPOCH=1
+
+TIME_OUT=10s
+
+DO_BUILD=0 # 1: build before run, 0: skip build
+DO_RESULT_GEN=0 # 1: generate result files, 0: skip result generation
+
+
 
 # set cuda installation path
 export CUDA_INSTALL_PATH=/usr/local/cuda
@@ -43,6 +50,7 @@ get_kernel_triplet() {
 
 # -------- MULTI-KERNEL: collect per-kernel info and global maxima --------
 collect_kernels_info() {
+    echo "=== Collecting kernel information ==="
     # Output two sections via stdout separated by a blank line:
     # 1) Per-kernel lines: KERNEL\t<idx>\t<name>\t<regs>\t<lmem_bytes>\t<smem_bytes>\t<shader_ids_space_separated>
     # 2) One summary line: SUMMARY\t<max_regs>\t<max_lmem_bytes>\t<max_smem_bytes>\t<all_shader_ids_union>
@@ -180,6 +188,7 @@ get_datatype_bits() {
 }
 
 get_metrics() {
+    echo "=== Extracting metrics from logs ==="
     local cycles regs lmem smem lmem_bits smem_bits shader_used_list dtype_bits
     local max_regs max_lmem max_smem all_shaders
 
@@ -260,63 +269,84 @@ main() {
     # load environment variables
     source setup_environment
 
-    make clean
+    if [[ $DO_BUILD -eq 1 ]]; then
+        echo "=== Start compiling ==="
 
-    # compile project
-    make -j$(nproc)
+        # 执行 make clean，静默模式
+        make clean >/dev/null 2>&1
 
-    # # 删除test_apps/${TEST_APP_NAME}/result下的所有文件
-    # rm -rf test_apps/${TEST_APP_NAME}/result/*
+        # 执行 make，输出保存到 log，不直接打印
+        if make -j"$(nproc)" >build.log 2>&1; then
+            echo "=== Make success ==="
+        else
+            echo "=== Build failed, showing errors ==="
+            # 只显示包含 error 的行
+            grep -i "error" build.log
+            exit 1
+        fi
+    else
+        echo "=== Build skipped ==="
+    fi
 
 
-    # # 生成result
-    # idx=0
-    # while IFS= read -r line || [[ -n "$line" ]]; do
-    #     echo "$idx: $line"
-    # if [[ "$idx" == "1" || "$idx" == "3" || "$idx" == "5" ]]; then
-    #     cu_file="test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_0.cu"
-    #     if [[ -f "$cu_file" ]]; then
-    #         filename=$(basename "$cu_file")
-    #         x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
-    #         if [[ -n "$x_val" ]]; then
-    #             cp "$cu_file" "${cu_file}.bak"
-    #             /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
-    #             # 将输出重定向到目录下的txt文件
-    #             ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-    #             rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
-    #             mv "${cu_file}.bak" "$cu_file"
-    #         fi
-    #     fi
-    # else
-    #     for cu_file in test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_*.cu; do
-    #         filename=$(basename "$cu_file")
-    #         x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
-    #         if [[ -z "$x_val" ]]; then
-    #             continue
-    #         fi
+    if [[ $DO_RESULT_GEN -eq 1 ]]; then
+        echo "=== Start result generation ==="
 
-    #         cp "$cu_file" "${cu_file}.bak"
-    #         /usr/local/cuda/bin/nvcc "$cu_file" -o test_apps/${TEST_APP_NAME}/result_gen/gen
-    #         # 将输出重定向到目录下的txt文件
-    #         ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-    #         rm -rf test_apps/${TEST_APP_NAME}/result_gen/gen
-    #         mv "${cu_file}.bak" "$cu_file"
-    #     done
-    # fi
-    #     idx=$((idx+1))
-    # done < test_apps/${TEST_APP_NAME}/size_list.txt
+        # 删除旧的 result 文件
+        rm -rf "test_apps/${TEST_APP_NAME}/result/*"
+
+        # 生成 result
+        idx=0
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            echo "$idx: $line"
+            if [[ "$idx" == "1" || "$idx" == "3" || "$idx" == "5" ]]; then
+                cu_file="test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_0.cu"
+                if [[ -f "$cu_file" ]]; then
+                    filename=$(basename "$cu_file")
+                    x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
+                    if [[ -n "$x_val" ]]; then
+                        cp "$cu_file" "${cu_file}.bak"
+                        /usr/local/cuda/bin/nvcc "$cu_file" -o "test_apps/${TEST_APP_NAME}/result_gen/gen"
+                        ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                        rm -rf "test_apps/${TEST_APP_NAME}/result_gen/gen"
+                        mv "${cu_file}.bak" "$cu_file"
+                    fi
+                fi
+            else
+                for cu_file in test_apps/${TEST_APP_NAME}/result_gen/${TEST_APP_NAME}_*.cu; do
+                    filename=$(basename "$cu_file")
+                    x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
+                    if [[ -z "$x_val" ]]; then
+                        continue
+                    fi
+                    cp "$cu_file" "${cu_file}.bak"
+                    /usr/local/cuda/bin/nvcc "$cu_file" -o "test_apps/${TEST_APP_NAME}/result_gen/gen"
+                    ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                    rm -rf "test_apps/${TEST_APP_NAME}/result_gen/gen"
+                    mv "${cu_file}.bak" "$cu_file"
+                done
+            fi
+            idx=$((idx+1))
+        done < "test_apps/${TEST_APP_NAME}/size_list.txt"
+
+        echo "=== Result generation finished ==="
+    else
+        echo "=== Result generation skipped ==="
+    fi
 
 
 
     FILE_PATH="${1:-./logs1/tmp.out1}"
 
     for result_file in test_apps/${TEST_APP_NAME}/result/*; do
+        echo "=== Preparing injection for file: $result_file ==="
         filename=$(basename "$result_file")
         # 提取a和b
         a=$(echo "$filename" | cut -d'-' -f1)
         b_with_ext=$(echo "$filename" | cut -d'-' -f2)
         b=$(echo "$b_with_ext" | cut -d'.' -f1)
 
+        echo "=== Copying result and source files ==="
         # 复制result文件到根目录并重命名为result.txt
         cp "$result_file" ./result.txt
 
@@ -326,31 +356,32 @@ main() {
             cp "$cu_file" "./${TEST_APP_NAME}.cu"
         fi
 
-        echo "正在进行输入规模${a}、输入内容${b}的故障注入"
+        echo "=== Compiling CUDA application for injection ==="
         nvcc ${TEST_APP_NAME}.cu -o ${TEST_APP_NAME} -g -lcudart -arch=sm_75
 
         # 读取size_list.txt的第a行（a从0开始）
         size_list_file="test_apps/${TEST_APP_NAME}/size_list.txt"
         if [[ ! -f "$size_list_file" ]]; then
-            echo "Error: 未找到size_list.txt: $size_list_file" >&2
+            echo "=== Error: size_list.txt not found: $size_list_file ===" >&2
             exit 1
         fi
 
         # a变量已由上文提取
         size_line=$(awk "NR==$((a+1))" "$size_list_file")
-        echo "第${a}行内容: $size_line"
 
+        echo "=== Updating campaign_profile.sh ==="
         FILE="campaign_profile.sh"
-
         # 使用 sed 替换 CUDA_UUT 开头的行
         sed -i "s|^CUDA_UUT.*|CUDA_UUT=\"./${TEST_APP_NAME} ${size_line}\"|" "$FILE"
 
+        echo "=== Running campaign_profile.sh ==="
         bash campaign_profile.sh
 
         if [ ! -f "$FILE_PATH" ]; then
             echo "Error: file not found: $FILE_PATH" >&2
         exit 1
         fi
+        echo "=== Collecting metrics ==="
         get_metrics
 
         # 读取campaign.sh内容到变量
@@ -361,6 +392,7 @@ main() {
         fi
         bash generate_cycles.sh $GLOBAL_CYCLES $GLOBAL_CYCLES
 
+        echo "=== Updating campaign_exec.sh with metrics ==="
         # 生成新的内容
         awk -v test_app_name="$TEST_APP_NAME" -v size_line="$size_line" \
             -v global_cycles="$GLOBAL_CYCLES" \
@@ -369,9 +401,9 @@ main() {
             -v global_datatype_size="$GLOBAL_DATATYPE_SIZE" \
             -v global_lmem_size_bits="$GLOBAL_LMEM_SIZE_BITS" \
             -v global_smem_size_bits="$GLOBAL_SMEM_SIZE_BITS" \
-            -v components_to_flip="$COMPONENTS_TO_FLIP" \
-            -v run_times="$RUN_TIMES" \
-            -v time_out="$TIME_OUT" '
+            -v run_times="$RUN_PER_EPOCH" \
+            -v time_out="$TIME_OUT" \
+            -v component_set="$COMPONENT_SET" '
         {
             # 替换CUDA_UUT
             if ($0 ~ /^CUDA_UUT=/) {
@@ -408,11 +440,6 @@ main() {
                 print "SMEM_SIZE_BITS=" global_smem_size_bits
                 next
             }
-            # 替换components_to_flip
-            if ($0 ~ /^components_to_flip=/) {
-                print "components_to_flip=" components_to_flip
-                next
-            }
             # 替换run_times
             if ($0 ~ /^RUNS=/) {
                 print "RUNS=" run_times
@@ -423,32 +450,34 @@ main() {
                 print "TIMEOUT_VAL=" time_out
                 next
             }
+            # 替换COMPONENT_SET
+            if ($0 ~ /^COMPONENT_SET=/) {
+                print "COMPONENT_SET=\"" component_set "\""
+                next
+            }
             # 其他行保持不变
             print $0
         }' "$campaign_file" > "${campaign_file}.tmp" && mv "${campaign_file}.tmp" "$campaign_file"
 
 
-        echo "正在执行${TEST_APP_NAME}、${filename}的故障注入实验，注入组件：${COMPONENTS_TO_FLIP}，共50次"
-
-        # for i in $(seq 1 200); do
-        #     echo "  --- Run $i / 200 ---"
+        echo "=== Starting fault injection experiment: ${TEST_APP_NAME}, file ${filename} ==="
+        for i in $(seq 1 $EPOCH); do
+            echo "  --- Injection run $i / $EPOCH ---"
             bash campaign_exec.sh > inst_exec.log
-            # # 如果$filename以.txt结尾，先去掉再传入
-        #     filename_no_ext="${filename%.txt}"
-        #     python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext -c $COMPONENTS_TO_FLIP
-        #     python3 split_rank_spearman.py $TEST_APP_NAME $filename_no_ext $COMPONENTS_TO_FLIP
-        #     ret=$?
-        #     if [ $ret -eq 99 ]; then
-        #         echo "Early stopping triggered. Exiting loop."
-        #         break
-        #     fi
-        # done
-        
+            filename_no_ext="${filename%.txt}"
+            python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext
+            python3 split_rank_spearman.py $TEST_APP_NAME $filename_no_ext
+            ret=$?
+            if [ $ret -eq 99 ]; then
+                echo "=== Early stopping triggered. Exiting loop ==="
+                break
+            fi
+        done
+        echo "=== Fault injection for ${filename} finished ==="
+        break
     done
 }
 
-# Run main 7 times with COMPONENTS_TO_FLIP = 0..6
-for COMPONENTS_TO_FLIP in 2; do
-    echo "=== Running main with COMPONENTS_TO_FLIP=${COMPONENTS_TO_FLIP} ==="
-    main "$@"
-done
+echo "=== Running main with COMPONENT_SET=${COMPONENT_SET} ==="
+echo "=== Component mapping: 0=RF, 1=local_mem, 2=shared_mem, 3=L1D_cache, 4=L1C_cache, 5=L1T_cache, 6=L2_cache ==="
+main "$@"

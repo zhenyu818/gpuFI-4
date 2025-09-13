@@ -174,25 +174,6 @@ void check_and_apply_l2_bf(ptx_thread_info *thread, addr_t addr, ptx_reg_t &data
       }
 
       if (is_store && gpu_sim->l2_tag[j] == tag && probe_status_hit) {
-        // record last writer for this L2 line
-        gpgpu_sim::cache_writer_info w;
-        w.inst = thread->get_inst(thread->get_pc());
-        w.pc = thread->get_pc();
-        w.cycle = gpu_sim->gpu_sim_cycle + gpu_sim->gpu_tot_sim_cycle;
-        gpu_sim->l2_last_writers[addrdec.sub_partition][std::make_pair(index, tag)] = w;
-
-        // Overwrite detection and logging
-        if (j < gpu_sim->l2_inject_info.size()) {
-          gpgpu_sim::cache_injection_info &inj = gpu_sim->l2_inject_info[j];
-          if (inj.pending) {
-            printf("[L2_cache_FI_OVERWRITTEN] tid=%u bank=%u line_idx=%u tag=%u at cycle=%llu by PC=%u\n",
-                   thread->get_uid(), addrdec.sub_partition, index, (unsigned)tag, (unsigned long long)w.cycle, w.pc);
-            thread->print_insn(thread->get_pc(), stdout);
-            printf("\n");
-            inj.pending = false;
-          }
-        }
-
         printf("DEACTIVATING L2 BIT FLIP ON LOAD GLOBAL/LOCAL\n");
         gpu_sim->l2_bf_enabled[j] = false;
         continue;
@@ -200,6 +181,20 @@ void check_and_apply_l2_bf(ptx_thread_info *thread, addr_t addr, ptx_reg_t &data
       if (gpu_sim->l2_tag[j] == tag && probe_status_hit) { // hit
         // Inject the error to the specific value of a thread that the bit flip belongs to
         if (gpu_sim->l2_line_bitflip_bits_idx[j]>=bit_start && gpu_sim->l2_line_bitflip_bits_idx[j]<=bit_end) {
+          // Log when L2 FI actually affects the load value
+          {
+            // Use the current GPU simulator cycles for timestamping this read
+            unsigned long long cyc = gpu_sim->gpu_sim_cycle + gpu_sim->gpu_tot_sim_cycle;
+            unsigned line_bit_0based = gpu_sim->l2_line_bitflip_bits_idx[j];
+            unsigned bit_off_in_access = line_bit_0based - bit_start; // 0-based within this access
+            mem_addr_t byte_addr = addr + (bit_off_in_access / 8);
+            unsigned bit_in_byte_1based = (bit_off_in_access % 8) + 1;
+            printf("[L2_CACHE_FI_READER] tid=%u addr=%u byte_addr=%u bit=%u bank=%u set=%u line_idx=%u tag=%u read_cycle=%llu reader_PC=%u -> ",
+                   thread->get_uid(), (unsigned)addr, (unsigned)byte_addr, bit_in_byte_1based,
+                   addrdec.sub_partition, set_index, index, (unsigned)tag, cyc, thread->get_pc());
+            thread->print_insn(thread->get_pc(), stdout);
+            printf("\n");
+          }
           unsigned long long *reg_bf;
           unsigned bf_size_bits_idx;
 
@@ -223,19 +218,6 @@ void check_and_apply_l2_bf(ptx_thread_info *thread, addr_t addr, ptx_reg_t &data
 //            printf("bit_start=%u, bit_end=%u, bf_line_sz_bits_idx=%u, bf_size_bits_idx=%u\n", bit_start, bit_end, gpu_sim->l2_line_bitflip_bits_idx[j]+1, bf_size_bits_idx+1);
 //            printf("Before bit flip of thread=%u, value = %llu, reg_bf=%u\n", thread->get_uid(), data.u64, bf_size_bits_idx+1);
           *reg_bf ^= 1UL << bf_size_bits_idx;
-          if (j < gpu_sim->l2_inject_info.size()) {
-            gpgpu_sim::cache_injection_info &inj = gpu_sim->l2_inject_info[j];
-            if (inj.pending) {
-              unsigned long long cyc2 = gpu_sim->gpu_sim_cycle + gpu_sim->gpu_tot_sim_cycle;
-              printf("[L2_cache_FI_EFFECTIVE] tid=%u bank=%u addr=%u line_idx=%u tag=%u bit_idx=%u inject_cycle=%llu read_cycle=%llu reader_PC=%u\n",
-                     thread->get_uid(), addrdec.sub_partition, (unsigned)addr, index, (unsigned)tag,
-                     (size==128? (unsigned)(gpu_sim->l2_line_bitflip_bits_idx[j]%128 + 1) : (unsigned)(gpu_sim->l2_line_bitflip_bits_idx[j]%size + 1)),
-                     inj.inject_cycle, cyc2, thread->get_pc());
-              thread->print_insn(thread->get_pc(), stdout);
-              printf("\n");
-              inj.pending = false;
-            }
-          }
 //            printf("After bit flip value = %llu\n", data.u64);
 //            printf("DATA INSIDE= %llu\n", data.u64);
         }
@@ -301,21 +283,6 @@ void l1t_bit_flip(ptx_thread_info *thread, unsigned data_tex_array_index, unsign
 //          printf("bit_start=%u, bit_end=%u, bf_line_sz_bits_idx=%u, bf_size_bits_idx=%u\n", bit_start, bit_end, l1t_line_bitflip_bits_idx_vector[j]+1, bf_size_bits_idx+1);
 //          printf("Before bit flip value = %llu, reg_bf=%u\n", data_bf.u64, bf_size_bits_idx+1);
           *reg_bf ^= 1UL << bf_size_bits_idx;
-          if (l1t_used_index >= 0 && l1t_used_index < (int)gpu_sim->l1t_inject_info.size()) {
-            if (j < gpu_sim->l1t_inject_info[l1t_used_index].size()) {
-              gpgpu_sim::cache_injection_info &inj = gpu_sim->l1t_inject_info[l1t_used_index][j];
-              if (inj.pending) {
-                unsigned long long cyc = gpu_sim->gpu_sim_cycle + gpu_sim->gpu_tot_sim_cycle;
-                printf("[L1T_cache_FI_EFFECTIVE] tid=%u addr=%u line_idx=%u tag=%u bit_idx=%u inject_cycle=%llu read_cycle=%llu reader_PC=%u\n",
-                       thread->get_uid(), (unsigned)data_tex_array_index, index, (unsigned)tag,
-                       (unsigned)(l1t_line_bitflip_bits_idx_vector[j] % (L1T->m_config.get_line_sz()*8) + 1),
-                       inj.inject_cycle, cyc, thread->get_pc());
-                thread->print_insn(thread->get_pc(), stdout);
-                printf("\n");
-                inj.pending = false;
-              }
-            }
-          }
 //          printf("After bit flip value = %llu\n", data_bf.u64);
         }
       } else if (l1t_tag_vector[j] == tag && probe_status == MISS) { // miss
@@ -392,6 +359,19 @@ void local_global_read_l1D_bf(ptx_thread_info *thread, ptx_reg_t &data, size_t s
           if (l1d_tag_vector[j] == tag && (probe_status == HIT || probe_status == HIT_RESERVED)) { // hit
             // Inject the error to the specific value of a thread that the bit flip belongs to
             if (l1d_line_bitflip_bits_idx_vector[j]>=bit_start && l1d_line_bitflip_bits_idx_vector[j]<=bit_end) {
+              // Print an FI reader log similar to other components
+              {
+                unsigned long long cyc = thread->m_gpu->gpu_sim_cycle + thread->m_gpu->gpu_tot_sim_cycle;
+                unsigned line_bit_0based = l1d_line_bitflip_bits_idx_vector[j];
+                unsigned bit_off_in_access = line_bit_0based - bit_start; // 0-based within this access
+                mem_addr_t byte_addr = addr + (bit_off_in_access / 8);
+                unsigned bit_in_byte_1based = (bit_off_in_access % 8) + 1;
+                printf("[L1D_CACHE_FI_READER] tid=%u addr=%u byte_addr=%u bit=%u set=%u line_idx=%u tag=%u chunk=%u read_cycle=%llu reader_PC=%u -> ",
+                       thread->get_uid(), (unsigned)addr, (unsigned)byte_addr, bit_in_byte_1based,
+                       set_index, index, (unsigned)tag, chunk_idx, cyc, thread->get_pc());
+                thread->print_insn(thread->get_pc(), stdout);
+                printf("\n");
+              }
               unsigned long long *reg_bf;
               unsigned bf_size_bits_idx;
 
@@ -488,19 +468,6 @@ void constant_read_l1C_bf (ptx_thread_info *thread, ptx_reg_t &data, size_t size
 //            printf("bit_start=%u, bit_end=%u, bf_line_sz_bits_idx=%u, bf_size_bits_idx=%u\n", bit_start, bit_end, l1c_line_bitflip_bits_idx_vector[j]+1, bf_size_bits_idx+1);
 //            printf("Before bit flip of thread=%u, value = %llu, reg_bf=%u\n", thread->get_uid(), data.u64, bf_size_bits_idx+1);
             *reg_bf ^= 1UL << bf_size_bits_idx;
-            if (j < gpu_sim->l1c_inject_info[l1c_used_index].size()) {
-              gpgpu_sim::cache_injection_info &inj = gpu_sim->l1c_inject_info[l1c_used_index][j];
-              if (inj.pending) {
-                unsigned long long cyc = gpu_sim->gpu_sim_cycle + gpu_sim->gpu_tot_sim_cycle;
-                printf("[L1C_cache_FI_EFFECTIVE] tid=%u addr=%u line_idx=%u tag=%u bit_idx=%u inject_cycle=%llu read_cycle=%llu reader_PC=%u\n",
-                       thread->get_uid(), (unsigned)addr, index, (unsigned)tag,
-                       (unsigned)(gpu_sim->l1c_line_bitflip_bits_idx[l1c_used_index][j] % (L1C->m_config.get_line_sz()*8) + 1),
-                       inj.inject_cycle, cyc, thread->get_pc());
-                thread->print_insn(thread->get_pc(), stdout);
-                printf("\n");
-                inj.pending = false;
-              }
-            }
 //            printf("After bit flip value = %llu\n", data.u64);
 //            printf("DATA INSIDE= %f\n", data.f64);
           }
@@ -610,27 +577,6 @@ void local_global_write_l1D_bf (ptx_thread_info *thread, ptx_reg_t &data, size_t
 //            printf("l1d_line_bitflip_bits_idx=%u, bit_start=%u, bit_end=%u\n", l1d_line_bitflip_bits_idx_vector[j], bit_start, bit_end);
           // Write no-allocate policy so we don't care about miss or reservation fail statuses
           if (l1d_tag_vector[j] == tag && (probe_status == HIT || probe_status == HIT_RESERVED)) { // hit
-            // record last writer for this line
-            gpgpu_sim::cache_writer_info w;
-            w.inst = thread->get_inst(thread->get_pc());
-            w.pc = thread->get_pc();
-            w.cycle = gpu_sim->gpu_sim_cycle + gpu_sim->gpu_tot_sim_cycle;
-            gpu_sim->l1d_last_writers[L1D][std::make_pair(index, tag)] = w;
-
-            // Overwrite detection: log and mark pending=false
-            if (l1d_used_index < (int)gpu_sim->l1d_inject_info.size()) {
-              if (j < gpu_sim->l1d_inject_info[l1d_used_index].size()) {
-                gpgpu_sim::cache_injection_info &inj = gpu_sim->l1d_inject_info[l1d_used_index][j];
-                if (inj.pending) {
-                  printf("[L1D_cache_FI_OVERWRITTEN] tid=%u addr=%u line_idx=%u tag=%u at cycle=%llu by PC=%u\n",
-                         thread->get_uid(), (unsigned)addr, index, (unsigned)tag, (unsigned long long)w.cycle, w.pc);
-                  thread->print_insn(thread->get_pc(), stdout);
-                  printf("\n");
-                  inj.pending = false;
-                }
-              }
-            }
-
             printf("DEACTIVATING L1D BIT FLIP ON WRITE\n");
             l1d_bf_enabled_vector[j] = false;
           }
@@ -794,13 +740,6 @@ void ptx_thread_info::set_reg(const symbol *reg, const ptx_reg_t &value) {
 
   std::map<const symbol *, reg_injection_info>::iterator it = m_reg_injections.find(reg);
   if (it != m_reg_injections.end() && it->second.pending) {
-    // Injection was pending, but a write occurs before any read -> ineffective (overwritten)
-    printf("[REG_FI_OVERWRITTEN] tid=%u reg=%s at cycle=%llu by PC=%u\n",
-           get_uid(), reg->name().c_str(), cyc, get_pc());
-    if (curr_inst) {
-      print_insn(get_pc(), stdout);
-      printf("\n");
-    }
     it->second.pending = false;
   }
 }
@@ -889,15 +828,6 @@ ptx_reg_t ptx_thread_info::get_reg(const symbol *reg) {
   unsigned long long cyc = m_gpu->gpu_sim_cycle + m_gpu->gpu_tot_sim_cycle;
   std::map<const symbol *, reg_injection_info>::iterator it = m_reg_injections.find(reg);
   if (it != m_reg_injections.end() && it->second.pending) {
-    printf("[REG_FI_EFFECTIVE] tid=%u reg=%s bits=", get_uid(), reg->name().c_str());
-    for (size_t bi = 0; bi < it->second.bits.size(); ++bi) {
-      printf("%u%s", it->second.bits[bi], (bi + 1 < it->second.bits.size()) ? ":" : "");
-    }
-    printf(" inject_cycle=%llu read_cycle=%llu reader_PC=%u\n", it->second.inject_cycle, cyc, get_pc());
-    if (curr_inst) {
-      print_insn(get_pc(), stdout);
-      printf("\n");
-    }
     it->second.pending = false; // consume
   }
   return regs_iter->second;

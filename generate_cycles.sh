@@ -1,40 +1,40 @@
 #!/bin/bash
 
-# 检查参数数量
+# Check number of arguments
 if [ $# -ne 2 ]; then
-    echo "用法: $0 <m> <n>"
-    echo "  m: 最大值（范围0到m）"
-    echo "  n: 要生成的数字数量"
+    echo "=== INFO: Usage: $0 <m> <n>"
+    echo "=== INFO:   m: maximum value (range 0 to m)"
+    echo "=== INFO:   n: number of values to generate"
     exit 1
 fi
 
 m=$1
 n=$2
 
-# 检查参数是否为正整数
+# Check if arguments are valid integers
 if ! [[ "$m" =~ ^[0-9]+$ ]] || [ "$m" -lt 0 ]; then
-    echo "错误: m 必须是非负整数"
+    echo "=== INFO: Error: m must be a non-negative integer"
     exit 1
 fi
 
 if ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -le 0 ]; then
-    echo "错误: n 必须是正整数"
+    echo "=== INFO: Error: n must be a positive integer"
     exit 1
 fi
 
-# 检查cycles.txt是否存在
+# Check if cycles.txt exists
 if [ -f "cycles.txt" ]; then
-    echo "检测到 cycles.txt 文件，正在清空..."
+    echo "=== INFO: Found cycles.txt, clearing file..."
     > cycles.txt
 else
-    echo "cycles.txt 文件不存在，正在创建..."
+    echo "=== INFO: cycles.txt not found, creating file..."
     touch cycles.txt
 fi
 
-# 生成从0到m均匀分布的n个数
-echo "正在生成 $n 个从0到 $m 的均匀分布数字..."
+# Generate n uniformly distributed values between 0 and m
+echo "=== INFO: Generating $n uniformly distributed values between 0 and $m..."
 
-# 使用awk生成均匀分布的数字
+# Use awk to generate evenly spaced values
 awk -v m="$m" -v n="$n" 'BEGIN {
     if (n == 1) {
         print int(m/2)
@@ -46,4 +46,4 @@ awk -v m="$m" -v n="$n" 'BEGIN {
     }
 }' > cycles.txt
 
-echo "完成！已在 cycles.txt 中生成 $n 个数字"
+echo "=== INFO: Done! $n values have been generated in cycles.txt"
