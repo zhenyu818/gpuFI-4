@@ -1,15 +1,15 @@
 #!/bin/bash
 
-TEST_APP_NAME="stencil1d"
+TEST_APP_NAME="pathfinder"
 COMPONENT_SET="0 2"
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
-RUN_PER_EPOCH=1
-EPOCH=1
+RUN_PER_EPOCH=1000
+EPOCH=300
 
 TIME_OUT=10s
 
 DO_BUILD=0 # 1: build before run, 0: skip build
-DO_RESULT_GEN=0 # 1: generate result files, 0: skip result generation
+DO_RESULT_GEN=1 # 1: generate result files, 0: skip result generation
 
 
 
@@ -474,7 +474,6 @@ main() {
             fi
         done
         echo "=== Fault injection for ${filename} finished ==="
-        break
     done
 }
 
