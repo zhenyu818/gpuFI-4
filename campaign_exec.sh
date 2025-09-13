@@ -7,7 +7,7 @@ CONFIG_FILE=./gpgpusim.config
 TMP_DIR=./logs
 CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
-RUNS=1000
+RUNS=1
 COMPONENT_SET="0 2"
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
 DELETE_LOGS=1 # if 1 then all logs will be deleted at the end of the script
@@ -23,9 +23,9 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./pathfinder 4 4 3"
+CUDA_UUT="./pathfinder 640 24 23"
 # total cycles for all kernels
-CYCLES=4040
+CYCLES=14715
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
 # fix cycles.txt with kernel execution cycles
 # (e.g. seq 1 10 >> cycles.txt, or multiple seq commands if a kernel has multiple executions)
@@ -33,7 +33,7 @@ CYCLES=4040
 # e.g. grep "_Z12lud_diagonalPfii" cycles.in | awk  '{ system("seq " $12 " " $18 ">> cycles.txt")}'
 CYCLES_FILE=./cycles.txt
 MAX_REGISTERS_USED=15
-SHADER_USED="0"
+SHADER_USED="0 1 2 3"
 SUCCESS_MSG='Success'
 FAILED_MSG='Failed'
 TIMEOUT_VAL=10s

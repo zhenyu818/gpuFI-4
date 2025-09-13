@@ -3,13 +3,13 @@
 TEST_APP_NAME="pathfinder"
 COMPONENT_SET="0 2"
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
-RUN_PER_EPOCH=1000
-EPOCH=300
+RUN_PER_EPOCH=1
+EPOCH=1
 
 TIME_OUT=10s
 
-DO_BUILD=0 # 1: build before run, 0: skip build
-DO_RESULT_GEN=1 # 1: generate result files, 0: skip result generation
+DO_BUILD=1 # 1: build before run, 0: skip build
+DO_RESULT_GEN=0 # 1: generate result files, 0: skip result generation
 
 
 
@@ -23,6 +23,12 @@ GLOBAL_SHADER_USED=""
 GLOBAL_DATATYPE_SIZE=""
 GLOBAL_LMEM_SIZE_BITS=""
 GLOBAL_SMEM_SIZE_BITS=""
+
+cleanup() {
+    echo -e "\nInterrupted. Killing campaign_exec.sh (PID=$CMD_PID)..."
+    kill $CMD_PID 2>/dev/null
+    exit 1
+}
 
 # -------- CYCLES --------
 get_cycles() {
@@ -463,7 +469,49 @@ main() {
         echo "=== Starting fault injection experiment: ${TEST_APP_NAME}, file ${filename} ==="
         for i in $(seq 1 $EPOCH); do
             echo "  --- Injection run $i / $EPOCH ---"
-            bash campaign_exec.sh > inst_exec.log
+            PARALLEL_TASKS=$(( $(grep -c ^processor /proc/cpuinfo) - 1 ))
+            # 实际任务总数
+            TOTAL_TASKS="$RUN_PER_EPOCH"   # 总任务数由脚本前面定义的 RUN_PER_EPOCH 决定
+
+            # 后台执行，不在控制台输出日志
+            bash campaign_exec.sh > inst_exec.log 2>&1 &
+            CMD_PID=$!
+
+        trap cleanup INT
+
+        last_run=0
+
+        # 监控日志，实时更新进度条
+        tail -n0 -F inst_exec.log 2>/dev/null | while read -r line; do
+            if [[ "$line" =~ ^\[Run[[:space:]]+([0-9]+)\] ]]; then
+                current_run=${BASH_REMATCH[1]}
+                if (( current_run != last_run )); then
+                    last_run=$current_run
+                    done_tasks=$(( last_run * PARALLEL_TASKS ))
+                    (( done_tasks > TOTAL_TASKS )) && done_tasks=$TOTAL_TASKS
+
+                    left=$(( TOTAL_TASKS - done_tasks ))
+                    percent=$(( done_tasks * 100 / TOTAL_TASKS ))
+
+                    # 绘制进度条
+                    bar_len=50
+                    filled=$(( percent * bar_len / 100 ))
+                    bar=$(printf "%${filled}s" | tr " " "#")
+                    empty=$(printf "%$(( bar_len - filled ))s")
+
+                    printf "\rProgress: [%-50s] %3d%%  runs left %d" "$bar$empty" "$percent" "$left"
+
+                    if (( done_tasks >= TOTAL_TASKS )); then
+                        echo
+                        break
+                    fi
+                fi
+            fi
+        done
+
+            # 等待主进程结束
+            wait $CMD_PID
+            echo "=== Fault injection for ${filename} finished ==="
             filename_no_ext="${filename%.txt}"
             python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext
             python3 split_rank_spearman.py $TEST_APP_NAME $filename_no_ext
@@ -473,7 +521,6 @@ main() {
                 break
             fi
         done
-        echo "=== Fault injection for ${filename} finished ==="
     done
 }
 
