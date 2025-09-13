@@ -36,7 +36,7 @@ MAX_REGISTERS_USED=15
 SHADER_USED="0 1 2 3"
 SUCCESS_MSG='Success'
 FAILED_MSG='Failed'
-TIMEOUT_VAL=10s
+TIMEOUT_VAL=6s
 DATATYPE_SIZE=32
 # lmem and smem values are taken from gpgpu-sim ptx output per kernel
 # e.g. GPGPU-Sim PTX: Kernel '_Z9vectorAddPKdS0_Pdi' : regs=8, lmem=0, smem=0, cmem=380

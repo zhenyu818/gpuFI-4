@@ -6,9 +6,9 @@ COMPONENT_SET="0 2"
 RUN_PER_EPOCH=1
 EPOCH=1
 
-TIME_OUT=10s
+TIME_OUT=6s
 
-DO_BUILD=1 # 1: build before run, 0: skip build
+DO_BUILD=0 # 1: build before run, 0: skip build
 DO_RESULT_GEN=0 # 1: generate result files, 0: skip result generation
 
 
