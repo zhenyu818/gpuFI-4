@@ -400,6 +400,9 @@ class gpgpu_sim_config : public power_config,
   unsigned warp_rand;
   unsigned total_cycle_rand;
   char *register_rand_n;
+  // Optional: specify target PTX virtual register name(s) (colon-delimited)
+  // When set (non-empty), overrides register_rand_n selection logic
+  char *register_name;
   char *reg_bitflip_rand_n;
   bool per_warp;
   char *kernel_n;

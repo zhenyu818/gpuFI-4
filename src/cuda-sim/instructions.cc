@@ -738,6 +738,19 @@ void ptx_thread_info::set_reg(const symbol *reg, const ptx_reg_t &value) {
   winfo.cycle = cyc;
   m_last_reg_writer[reg] = winfo;
 
+  // Track last writer by physical storage slot
+  ptx_reg_t *phys_slot = &m_regs.back()[reg];
+  m_last_physreg_writer[phys_slot] = winfo;
+  // If there is a pending phys-slot injection and we overwrite before any read,
+  // consume it (masked by overwrite-before-read)
+  {
+    std::map<ptx_reg_t *, reg_injection_info>::iterator itp =
+        m_physreg_injections.find(phys_slot);
+    if (itp != m_physreg_injections.end() && itp->second.pending) {
+      itp->second.pending = false;
+    }
+  }
+
   std::map<const symbol *, reg_injection_info>::iterator it = m_reg_injections.find(reg);
   if (it != m_reg_injections.end() && it->second.pending) {
     it->second.pending = false;
@@ -826,9 +839,30 @@ ptx_reg_t ptx_thread_info::get_reg(const symbol *reg) {
   // FI: detect effective read of an injected register
   const ptx_instruction *curr_inst = get_inst(get_pc());
   unsigned long long cyc = m_gpu->gpu_sim_cycle + m_gpu->gpu_tot_sim_cycle;
-  std::map<const symbol *, reg_injection_info>::iterator it = m_reg_injections.find(reg);
-  if (it != m_reg_injections.end() && it->second.pending) {
-    it->second.pending = false; // consume
+  // Prefer physical-slot based injection tracking
+  ptx_reg_t *phys_slot = &regs_iter->second;
+  std::map<ptx_reg_t *, reg_injection_info>::iterator itp =
+      m_physreg_injections.find(phys_slot);
+  if (itp != m_physreg_injections.end() && itp->second.pending) {
+    if (itp->second.last_writer_at_inject.inst == NULL) {
+      // Attribute to reader when no writer existed at injection time
+      printf("[REG_FI_READER] tid=%u reg=%s bits=", get_uid(), reg->name().c_str());
+      for (size_t bi = 0; bi < itp->second.bits.size(); ++bi) {
+        printf("%u%s", itp->second.bits[bi], (bi + 1 < itp->second.bits.size()) ? ":" : "");
+      }
+      printf(" read_cycle=%llu reader_PC=%u -> ", cyc, get_pc());
+      print_insn(get_pc(), stdout);
+      printf("\n");
+    }
+    itp->second.pending = false;  // consume
+  }
+  // Back-compat: symbol-based tracking
+  {
+    std::map<const symbol *, reg_injection_info>::iterator it =
+        m_reg_injections.find(reg);
+    if (it != m_reg_injections.end() && it->second.pending) {
+      it->second.pending = false;
+    }
   }
   return regs_iter->second;
 }
@@ -855,6 +889,38 @@ void ptx_thread_info::register_reg_injection(const symbol *reg,
   if (writer_info.inst) {
     unsigned writer_uid = writer_info.inst->uid();
     printf("[REG_FI_WRITER] last_writer uid=%u at cycle=%llu PC=%u -> ", writer_uid, writer_info.cycle, writer_info.pc);
+    print_insn(writer_info.pc, stdout);
+    printf("\n");
+  }
+}
+
+void ptx_thread_info::register_physreg_injection(
+    ptx_reg_t *phys, const std::vector<unsigned> &bits,
+    unsigned long long inject_cycle, unsigned inject_pc,
+    const reg_write_info &writer_info, const symbol *primary_symbol,
+    size_t alias_count) {
+  reg_injection_info info;
+  info.pending = true;
+  info.bits = bits;
+  info.inject_cycle = inject_cycle;
+  info.inject_pc = inject_pc;
+  info.last_writer_at_inject = writer_info;
+  m_physreg_injections[phys] = info;
+
+  const char *rname = primary_symbol ? primary_symbol->name().c_str() : "<phys>";
+  printf("[REG_FI_INJECT] tid=%u reg=%s bits=", get_uid(), rname);
+  for (size_t bi = 0; bi < bits.size(); ++bi) {
+    printf("%u%s", bits[bi], (bi + 1 < bits.size()) ? ":" : "");
+  }
+  printf(" at cycle=%llu inj_PC=%u", inject_cycle, inject_pc);
+  if (alias_count > 1) {
+    printf(" aliases=%zu", alias_count);
+  }
+  printf("\n");
+  if (writer_info.inst) {
+    unsigned writer_uid = writer_info.inst->uid();
+    printf("[REG_FI_WRITER] last_writer uid=%u at cycle=%llu PC=%u -> ",
+           writer_uid, writer_info.cycle, writer_info.pc);
     print_insn(writer_info.pc, stdout);
     printf("\n");
   }
@@ -4788,8 +4854,14 @@ void mad_def(const ptx_instruction *pI, ptx_thread_info *thread,
         case RZ_OPTION:
           fesetround(FE_TOWARDZERO);
           break;
+        case RM_OPTION:
+          fesetround(FE_DOWNWARD);
+          break;
+        case RP_OPTION:
+          fesetround(FE_UPWARD);
+          break;
         default:
-          assert(0);
+          // Treat unspecified or unsupported as round-to-nearest
           break;
       }
       d.f16 = a.f16 * b.f16 + c.f16;
@@ -4811,8 +4883,14 @@ void mad_def(const ptx_instruction *pI, ptx_thread_info *thread,
         case RZ_OPTION:
           fesetround(FE_TOWARDZERO);
           break;
+        case RM_OPTION:
+          fesetround(FE_DOWNWARD);
+          break;
+        case RP_OPTION:
+          fesetround(FE_UPWARD);
+          break;
         default:
-          assert(0);
+          // Treat unspecified or unsupported as round-to-nearest
           break;
       }
       d.f32 = a.f32 * b.f32 + c.f32;
@@ -4835,8 +4913,14 @@ void mad_def(const ptx_instruction *pI, ptx_thread_info *thread,
         case RZ_OPTION:
           fesetround(FE_TOWARDZERO);
           break;
+        case RM_OPTION:
+          fesetround(FE_DOWNWARD);
+          break;
+        case RP_OPTION:
+          fesetround(FE_UPWARD);
+          break;
         default:
-          assert(0);
+          // Treat unspecified or unsupported as round-to-nearest
           break;
       }
       d.f64 = a.f64 * b.f64 + c.f64;

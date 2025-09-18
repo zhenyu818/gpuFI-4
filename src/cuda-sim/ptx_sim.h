@@ -605,6 +605,30 @@ class ptx_thread_info {
   std::map<const symbol *, reg_write_info> m_last_reg_writer;
   std::map<const symbol *, reg_injection_info> m_reg_injections;
 
+  // Track last writer by physical register slot (address of ptx_reg_t in map)
+  std::map<ptx_reg_t *, reg_write_info> m_last_physreg_writer;
+  // Track injections by physical register slot
+  std::map<ptx_reg_t *, reg_injection_info> m_physreg_injections;
+
+ public:
+  // Register a physical-register injection and print logs
+  void register_physreg_injection(ptx_reg_t *phys,
+                                  const std::vector<unsigned> &bits,
+                                  unsigned long long inject_cycle,
+                                  unsigned inject_pc,
+                                  const reg_write_info &writer_info,
+                                  const symbol *primary_symbol,
+                                  size_t alias_count = 0);
+
+  // Query last writer for a physical register slot
+  reg_write_info get_last_phys_writer(ptx_reg_t *phys) const {
+    std::map<ptx_reg_t *, reg_write_info>::const_iterator it =
+        m_last_physreg_writer.find(phys);
+    if (it != m_last_physreg_writer.end()) return it->second;
+    return reg_write_info();
+  }
+
+ private:
   struct local_injection_info {
     bool pending;
     std::vector<unsigned> bits_in_byte_1based; // 1..8

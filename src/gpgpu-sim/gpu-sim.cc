@@ -571,6 +571,8 @@ void gpgpu_sim_config::reg_options(option_parser_t opp) {
                          "TODO", "0");
   option_parser_register(opp, "-register_rand_n", OPT_CSTR, &register_rand_n,
                          "TODO", "0");
+  option_parser_register(opp, "-register_name", OPT_CSTR, &register_name,
+                         "Optional: specify PTX virtual register name(s) to inject (colon-delimited). Overrides -register_rand_n when set.", "");
   option_parser_register(opp, "-reg_bitflip_rand_n", OPT_CSTR, &reg_bitflip_rand_n,
                          "TODO", "0");
   option_parser_register(opp, "-per_warp", OPT_BOOL, &per_warp,
@@ -1954,12 +1956,12 @@ void find_active_shared_memories(std::vector<memory_space*> &shared_memories, tr
   }
 }
 
-void bitflip_n_nregs(std::vector<ptx_thread_info*> &threads_vector, char *register_rand_n, char *reg_bitflip_rand_n) {
+void bitflip_n_nregs(std::vector<ptx_thread_info*> &threads_vector, char *register_rand_n, char *reg_bitflip_rand_n, const char *register_name) {
   std::vector<unsigned> reg_bitflip_vector, register_rand_n_vector;
   read_colon_option(reg_bitflip_vector, reg_bitflip_rand_n);
   read_colon_option(register_rand_n_vector, register_rand_n);
   for(std::vector<ptx_thread_info*>::iterator threads_it = threads_vector.begin(); threads_it != threads_vector.end(); ++threads_it) {
-    std::vector<const symbol*> reg_symbols;
+    std::vector<const symbol*> reg_symbols; // aligned with regs
     std::vector<ptx_reg_t*> regs;
     std::list<tr1_hash_map<const symbol *, ptx_reg_t>> &regs_list = (*threads_it)->get_regs();
     for(std::list<tr1_hash_map<const symbol *, ptx_reg_t>>::iterator regs_map_it = regs_list.begin(); regs_map_it != regs_list.end(); ++regs_map_it) {
@@ -1970,66 +1972,86 @@ void bitflip_n_nregs(std::vector<ptx_thread_info*> &threads_vector, char *regist
         regs.push_back(&(regs_it->second));
       }
     }
-    for(std::vector<unsigned>::iterator reg_num_it = register_rand_n_vector.begin(); reg_num_it != register_rand_n_vector.end(); ++reg_num_it) {
+    // Build a stable ordering by register name to make register_rand_n deterministic
+    std::vector<size_t> order(regs.size());
+    for (size_t i = 0; i < order.size(); ++i) order[i] = i;
+    std::sort(order.begin(), order.end(), [&](size_t a, size_t b){
+      const std::string &na = reg_symbols[a]->name();
+      const std::string &nb = reg_symbols[b]->name();
+      if (na != nb) return na < nb;
+      return regs[a] < regs[b];
+    });
+    // If a register_name is specified, override index-based selection
+    std::vector<size_t> target_indices;
+    if (register_name && register_name[0] != '\0') {
+      // Support colon-delimited list of names
+      std::string names(register_name);
+      std::vector<std::string> target_names;
+      size_t start = 0;
+      while (true) {
+        size_t pos = names.find(':', start);
+        std::string token = names.substr(start, pos == std::string::npos ? std::string::npos : pos - start);
+        if (!token.empty()) target_names.push_back(token);
+        if (pos == std::string::npos) break;
+        start = pos + 1;
+      }
+      for (size_t i = 0; i < order.size(); ++i) {
+        size_t idx = order[i];
+        const std::string &nm = reg_symbols[idx]->name();
+        for (size_t tn = 0; tn < target_names.size(); ++tn) {
+          if (nm == target_names[tn]) { target_indices.push_back(idx); break; }
+        }
+      }
+      // If nothing found, skip this thread
+    }
+    for(std::vector<unsigned>::iterator reg_num_it = register_rand_n_vector.begin();
+        (register_name==NULL || register_name[0]=='\0') && reg_num_it != register_rand_n_vector.end(); ++reg_num_it) {
       int reg_idx = (*reg_num_it) - 1;
-      if (reg_idx < regs.size()) {
-        ptx_reg_t *reg_to_bitflip = regs[reg_idx];
+      if (reg_idx < (int)order.size()) {
+        size_t chosen = order[reg_idx];
+        ptx_reg_t *reg_to_bitflip = regs[chosen];
         unsigned long* reg_64b = (unsigned long*) reg_to_bitflip; // 8 bytes
         for(std::vector<unsigned>::iterator bf_it = reg_bitflip_vector.begin(); bf_it != reg_bitflip_vector.end(); ++bf_it) {
-//          printf("Before bit flip of reg=%s, value = %lu\n", reg_symbols[reg_idx]->name().c_str(), *reg_to_bitflip);
+//          printf("Before bit flip of reg=%s, value = %lu\n", reg_symbols[chosen]->name().c_str(), *reg_to_bitflip);
           *reg_64b ^= 1UL << (*bf_it-1);
-//          printf("After bit %u flip of reg=%s, value = %lu\n", *bf_it, reg_symbols[reg_idx]->name().c_str(), *reg_to_bitflip);
+//          printf("After bit %u flip of reg=%s, value = %lu\n", *bf_it, reg_symbols[chosen]->name().c_str(), *reg_to_bitflip);
         }
-        // Register the injection for effectiveness tracking and print last-writer info
-        // If a physical register is selected, multiple virtual registers may alias
-        // the same underlying storage. Find all symbols mapped to this storage
-        // and register the injection for each, so all corresponding FI_WRITERs are printed.
+        // Register the injection per physical slot and attribute to last-writer if available
         std::vector<unsigned> flipped_bits = reg_bitflip_vector;
         gpgpu_sim *gpu = (gpgpu_sim *)((*threads_it)->get_gpu());
         unsigned long long cyc = gpu->gpu_sim_cycle + gpu->gpu_tot_sim_cycle;
         unsigned pc = (*threads_it)->get_pc();
-
-        // Collect all virtual registers that alias the same physical storage
+        // Determine alias count for logging
         ptx_reg_t *phys_slot = reg_to_bitflip;
-        std::vector<const symbol*> affected_syms;
-        affected_syms.reserve(regs.size());
+        size_t alias_count = 0;
         for (size_t i = 0; i < regs.size(); ++i) {
-          if (regs[i] == phys_slot) {
-            // Avoid duplicates
-            if (std::find(affected_syms.begin(), affected_syms.end(), reg_symbols[i]) == affected_syms.end()) {
-              affected_syms.push_back(reg_symbols[i]);
-            }
-          }
+          if (regs[i] == phys_slot) alias_count++;
         }
-
-        // If we didn't find any aliasing (should not happen), fall back to the selected symbol
-        if (affected_syms.empty()) {
-          affected_syms.push_back(reg_symbols[reg_idx]);
+        // Attribute writer based on the physical slot bookkeeping
+        ptx_thread_info::reg_write_info lastw_phys = (*threads_it)->get_last_phys_writer(phys_slot);
+        (*threads_it)->register_physreg_injection(phys_slot, flipped_bits, cyc, pc,
+                                                  lastw_phys, reg_symbols[chosen], alias_count);
+      }
+    }
+    // If selection by name produced targets, inject each
+    if (register_name && register_name[0] != '\0' && !target_indices.empty()) {
+      for (size_t ti = 0; ti < target_indices.size(); ++ti) {
+        size_t chosen = target_indices[ti];
+        ptx_reg_t *reg_to_bitflip = regs[chosen];
+        unsigned long* reg_64b = (unsigned long*) reg_to_bitflip; // 8 bytes
+        for(std::vector<unsigned>::iterator bf_it = reg_bitflip_vector.begin(); bf_it != reg_bitflip_vector.end(); ++bf_it) {
+          *reg_64b ^= 1UL << (*bf_it-1);
         }
-
-        // Gather last-writer info for each affected vreg
-        std::vector<ptx_thread_info::reg_write_info> writers;
-        writers.reserve(affected_syms.size());
-        unsigned long long max_cycle = 0ULL;
-        for (size_t si = 0; si < affected_syms.size(); ++si) {
-          ptx_thread_info::reg_write_info lastw = (*threads_it)->get_last_writer(affected_syms[si]);
-          writers.push_back(lastw);
-          if (lastw.cycle > max_cycle) max_cycle = lastw.cycle;
-        }
-
-        // Only the vreg(s) whose last-writer is the most recent on this physical slot
-        // should print FI_WRITER. Others were overwritten by an alias write and should not.
-        for (size_t si = 0; si < affected_syms.size(); ++si) {
-          const symbol *sym = affected_syms[si];
-          ptx_thread_info::reg_write_info lastw = writers[si];
-          // Suppress FI_WRITER for stale writers by clearing writer_info when not the most recent
-          if (lastw.cycle < max_cycle) {
-            ptx_thread_info::reg_write_info empty_writer; // inst == NULL -> no FI_WRITER print
-            (*threads_it)->register_reg_injection(sym, flipped_bits, cyc, pc, empty_writer);
-          } else {
-            (*threads_it)->register_reg_injection(sym, flipped_bits, cyc, pc, lastw);
-          }
-        }
+        std::vector<unsigned> flipped_bits = reg_bitflip_vector;
+        gpgpu_sim *gpu = (gpgpu_sim *)((*threads_it)->get_gpu());
+        unsigned long long cyc = gpu->gpu_sim_cycle + gpu->gpu_tot_sim_cycle;
+        unsigned pc = (*threads_it)->get_pc();
+        ptx_reg_t *phys_slot = reg_to_bitflip;
+        size_t alias_count = 0;
+        for (size_t i = 0; i < regs.size(); ++i) if (regs[i] == phys_slot) alias_count++;
+        ptx_thread_info::reg_write_info lastw_phys = (*threads_it)->get_last_phys_writer(phys_slot);
+        (*threads_it)->register_physreg_injection(phys_slot, flipped_bits, cyc, pc,
+                                                  lastw_phys, reg_symbols[chosen], alias_count);
       }
     }
 //    (*threads_it)->dump_regs(stdout);
@@ -2505,7 +2527,7 @@ void gpgpu_sim::cycle() {
         }
 
         if (register_file) {
-          bitflip_n_nregs(threads_bitflip, m_config.register_rand_n, m_config.reg_bitflip_rand_n);
+          bitflip_n_nregs(threads_bitflip, m_config.register_rand_n, m_config.reg_bitflip_rand_n, m_config.register_name);
         }
         if (local_memory) {
           bitflip_n_local_mem(threads_bitflip, m_config.local_mem_bitflip_rand_n);

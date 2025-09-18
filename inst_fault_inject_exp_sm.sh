@@ -1,12 +1,12 @@
 #!/bin/bash
 
-TEST_APP_NAME="pathfinder"
-COMPONENT_SET="0 2"
+TEST_APP_NAME="softmaxfloat"
+COMPONENT_SET="0"
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
-RUN_PER_EPOCH=1
+RUN_PER_EPOCH=100
 EPOCH=1
 
-TIME_OUT=6s
+TIME_OUT=10s
 
 DO_BUILD=0 # 1: build before run, 0: skip build
 DO_RESULT_GEN=0 # 1: generate result files, 0: skip result generation
@@ -477,37 +477,37 @@ main() {
             bash campaign_exec.sh > inst_exec.log 2>&1 &
             CMD_PID=$!
 
-        trap cleanup INT
+            trap cleanup INT
 
-        last_run=0
+            last_run=0
 
-        # 监控日志，实时更新进度条
-        tail -n0 -F inst_exec.log 2>/dev/null | while read -r line; do
-            if [[ "$line" =~ ^\[Run[[:space:]]+([0-9]+)\] ]]; then
-                current_run=${BASH_REMATCH[1]}
-                if (( current_run != last_run )); then
-                    last_run=$current_run
-                    done_tasks=$(( last_run * PARALLEL_TASKS ))
-                    (( done_tasks > TOTAL_TASKS )) && done_tasks=$TOTAL_TASKS
+            # 监控日志，实时更新进度条
+            tail -n0 -F inst_exec.log 2>/dev/null | while read -r line; do
+                if [[ "$line" =~ ^\[Run[[:space:]]+([0-9]+)\] ]]; then
+                    current_run=${BASH_REMATCH[1]}
+                    if (( current_run != last_run )); then
+                        last_run=$current_run
+                        done_tasks=$(( last_run * PARALLEL_TASKS ))
+                        (( done_tasks > TOTAL_TASKS )) && done_tasks=$TOTAL_TASKS
 
-                    left=$(( TOTAL_TASKS - done_tasks ))
-                    percent=$(( done_tasks * 100 / TOTAL_TASKS ))
+                        left=$(( TOTAL_TASKS - done_tasks ))
+                        percent=$(( done_tasks * 100 / TOTAL_TASKS ))
 
-                    # 绘制进度条
-                    bar_len=50
-                    filled=$(( percent * bar_len / 100 ))
-                    bar=$(printf "%${filled}s" | tr " " "#")
-                    empty=$(printf "%$(( bar_len - filled ))s")
+                        # 绘制进度条
+                        bar_len=50
+                        filled=$(( percent * bar_len / 100 ))
+                        bar=$(printf "%${filled}s" | tr " " "#")
+                        empty=$(printf "%$(( bar_len - filled ))s")
 
-                    printf "\rProgress: [%-50s] %3d%%  runs left %d" "$bar$empty" "$percent" "$left"
+                        printf "\rProgress: [%-50s] %3d%%  runs left %d" "$bar$empty" "$percent" "$left"
 
-                    if (( done_tasks >= TOTAL_TASKS )); then
-                        echo
-                        break
+                        if (( done_tasks >= TOTAL_TASKS )); then
+                            echo
+                            break
+                        fi
                     fi
                 fi
-            fi
-        done
+            done
 
             # 等待主进程结束
             wait $CMD_PID

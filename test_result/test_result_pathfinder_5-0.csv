@@ -1,0 +1,85 @@
+kernel,inst_line,inst_text,REG_Masked,REG_SDC,REG_DUE,REG_Others,SHARED_MEM_Masked,SHARED_MEM_SDC,SHARED_MEM_DUE,SHARED_MEM_Others,Masked,SDC,DUE,Others,tot_inj
+dynproc_kernel,37,"ld.param.u32 %r11, [_Z14dynproc_kerneliPiS_S_iiii_param_0];",4,4,42,0,0,0,0,0,4,4,42,0,50
+dynproc_kernel,38,"ld.param.u64 %rd1, [_Z14dynproc_kerneliPiS_S_iiii_param_1];",199,14,38,0,0,0,0,0,199,14,38,0,251
+dynproc_kernel,39,"ld.param.u64 %rd2, [_Z14dynproc_kerneliPiS_S_iiii_param_2];",47,7,5,0,0,0,0,0,47,7,5,0,59
+dynproc_kernel,40,"ld.param.u64 %rd3, [_Z14dynproc_kerneliPiS_S_iiii_param_3];",22,44,16,0,0,0,0,0,22,44,16,0,82
+dynproc_kernel,41,"ld.param.u32 %r12, [_Z14dynproc_kerneliPiS_S_iiii_param_4];",11,14,17,0,0,0,0,0,11,14,17,0,42
+dynproc_kernel,42,"ld.param.u32 %r13, [_Z14dynproc_kerneliPiS_S_iiii_param_6];",13,17,15,0,0,0,0,0,13,17,15,0,45
+dynproc_kernel,43,"ld.param.u32 %r14, [_Z14dynproc_kerneliPiS_S_iiii_param_7];",20,25,14,0,0,0,0,0,20,25,14,0,59
+dynproc_kernel,44,"mov.u32 %r15, %ctaid.x;",5,24,12,0,0,0,0,0,5,24,12,0,41
+dynproc_kernel,45,"shl.b32 %r16, %r11, 1;",17,0,6,0,0,0,0,0,17,0,6,0,23
+dynproc_kernel,46,"mov.u32 %r17, 256;",500,0,64,0,0,0,0,0,500,0,64,0,564
+dynproc_kernel,47,"sub.s32 %r18, %r17, %r16;",48,7,12,0,0,0,0,0,48,7,12,0,67
+dynproc_kernel,48,"mul.lo.s32 %r19, %r15, %r18;",61,0,12,0,0,0,0,0,61,0,12,0,73
+dynproc_kernel,49,"sub.s32 %r20, %r19, %r14;",167,19,40,0,0,0,0,0,167,19,40,0,226
+dynproc_kernel,50,"shr.s32 %r21, %r20, 31;",188,8,38,0,0,0,0,0,188,8,38,0,234
+dynproc_kernel,51,"mov.u32 %r22, %tid.x;",10,25,10,0,0,0,0,0,10,25,10,0,45
+dynproc_kernel,52,"add.s32 %r23, %r20, %r22;",13,16,8,0,0,0,0,0,13,16,8,0,37
+dynproc_kernel,53,"neg.s32 %r24, %r20;",21,0,5,0,0,0,0,0,21,0,5,0,26
+dynproc_kernel,54,"and.b32 %r25, %r21, %r24;",9,11,4,0,0,0,0,0,9,11,4,0,24
+dynproc_kernel,55,"add.s32 %r26, %r12, -1;",21,0,4,0,0,0,0,0,21,0,4,0,25
+dynproc_kernel,56,"add.s32 %r27, %r22, -1;",32,0,4,0,0,0,0,0,32,0,4,0,36
+dynproc_kernel,57,"max.s32 %r1, %r25, %r27;",7,9,2,0,0,0,0,0,7,9,2,0,18
+dynproc_kernel,58,"setp.gt.s32%p1, %r23, -1;",20,0,2,0,0,0,0,0,20,0,2,0,22
+dynproc_kernel,59,"setp.le.s32%p2, %r23, %r26;",25,0,4,0,0,0,0,0,25,0,4,0,29
+dynproc_kernel,60,"and.pred %p3, %p1, %p2;",20,0,3,0,0,0,0,0,20,0,3,0,23
+dynproc_kernel,65,"cvta.to.global.u64 %rd4, %rd2;",5,0,2,0,0,0,0,0,5,0,2,0,7
+dynproc_kernel,66,"mul.wide.s32 %rd5, %r23, 4;",10,0,3,0,0,0,0,0,10,0,3,0,13
+dynproc_kernel,67,"add.s64 %rd6, %rd4, %rd5;",23,0,3,0,0,0,0,0,23,0,3,0,26
+dynproc_kernel,68,"ld.global.u32 %r36, [%rd6];",30,1,3,0,0,0,0,0,30,1,3,0,34
+dynproc_kernel,69,"shl.b32 %r37, %r22, 2;",483,2,78,0,0,0,0,0,483,2,78,0,563
+dynproc_kernel,70,"mov.u32 %r38, _ZZ14dynproc_kerneliPiS_S_iiiiE4prev;",11,4,0,0,0,0,0,0,11,4,0,0,15
+dynproc_kernel,71,"add.s32 %r39, %r38, %r37;",479,0,81,0,0,0,0,0,479,0,81,0,560
+dynproc_kernel,72,"st.shared.u32 [%r39], %r36;",0,0,0,0,480,24,109,0,480,24,109,0,613
+dynproc_kernel,76,"setp.lt.s32%p4, %r11, 1;",505,0,93,0,0,0,0,0,505,0,93,0,598
+dynproc_kernel,79,"shl.b32 %r41, %r1, 2;",488,1,67,0,0,0,0,0,488,1,67,0,556
+dynproc_kernel,80,"mov.u32 %r42, _ZZ14dynproc_kerneliPiS_S_iiiiE4prev;",90,422,76,0,0,0,0,0,90,422,76,0,588
+dynproc_kernel,81,"add.s32 %r2, %r42, %r41;",105,400,83,0,0,0,0,0,105,400,83,0,588
+dynproc_kernel,82,"mov.u32 %r45, 1;",5,0,1,0,0,0,0,0,5,0,1,0,6
+dynproc_kernel,83,"sub.s32 %r120, %r45, %r11;",26,0,3,0,0,0,0,0,26,0,3,0,29
+dynproc_kernel,84,"mad.lo.s32 %r46, %r13, %r12, %r22;",61,0,10,0,0,0,0,0,61,0,10,0,71
+dynproc_kernel,85,"mad.lo.s32 %r50, %r15, %r18, %r46;",46,0,14,0,0,0,0,0,46,0,14,0,60
+dynproc_kernel,86,"sub.s32 %r119, %r50, %r14;",7,32,22,0,0,0,0,0,7,32,22,0,61
+dynproc_kernel,87,"mov.u32 %r121, 0;",5,0,2,0,0,0,0,0,5,0,2,0,7
+dynproc_kernel,88,"cvta.to.global.u64 %rd7, %rd1;",14,43,15,0,0,0,0,0,14,43,15,0,72
+dynproc_kernel,91,"mov.u32 %r52, 254;",55,0,12,0,0,0,0,0,55,0,12,0,67
+dynproc_kernel,92,"sub.s32 %r53, %r52, %r121;",207,0,31,0,0,0,0,0,207,0,31,0,238
+dynproc_kernel,93,"setp.le.s32%p5, %r22, %r53;",5,0,3,0,0,0,0,0,5,0,3,0,8
+dynproc_kernel,94,"add.s32 %r121, %r121, 1;",96,361,71,0,0,0,0,0,96,361,71,0,528
+dynproc_kernel,95,"setp.ge.s32%p6, %r22, %r121;",174,0,28,0,0,0,0,0,174,0,28,0,202
+dynproc_kernel,96,"and.pred %p7, %p5, %p6;",171,0,18,0,0,0,0,0,171,0,18,0,189
+dynproc_kernel,97,"add.s32 %r61, %r20, 255;",172,0,26,0,0,0,0,0,172,0,26,0,198
+dynproc_kernel,98,"setp.gt.s32%p8, %r61, %r26;",185,0,31,0,0,0,0,0,185,0,31,0,216
+dynproc_kernel,99,"mov.u32 %r63, -255;",175,0,40,0,0,0,0,0,175,0,40,0,215
+dynproc_kernel,102,"add.s32 %r66, %r65, 254;",164,0,28,0,0,0,0,0,164,0,28,0,192
+dynproc_kernel,103,"selp.b32%r67, %r66, 255, %p8;",153,0,28,0,0,0,0,0,153,0,28,0,181
+dynproc_kernel,108,"mov.u16 %rs8, 0;",190,0,38,0,0,0,0,0,190,0,38,0,228
+dynproc_kernel,113,"ld.shared.u32 %r70, [%r2];",31,0,6,0,0,0,0,0,31,0,6,0,37
+dynproc_kernel,114,"shl.b32 %r72, %r22, 2;",15,11,3,0,0,0,0,0,15,11,3,0,29
+dynproc_kernel,115,"add.s32 %r74, %r42, %r72;",19,0,1,0,0,0,0,0,19,0,1,0,20
+dynproc_kernel,117,"add.s32 %r88, %r22, 1;",27,0,5,0,0,0,0,0,27,0,5,0,32
+dynproc_kernel,118,"selp.b32%r89, %r88, %r67, %p14;",23,0,2,0,0,0,0,0,23,0,2,0,25
+dynproc_kernel,125,"mul.wide.s32 %rd8, %r119, 4;",12,2,3,0,0,0,0,0,12,2,3,0,17
+dynproc_kernel,126,"add.s64 %rd9, %rd7, %rd8;",13,0,0,0,0,0,0,0,13,0,0,0,13
+dynproc_kernel,127,"ld.global.u32 %r96, [%rd9];",431,41,77,0,0,0,0,0,431,41,77,0,549
+dynproc_kernel,131,"st.shared.u32 [%r99], %r97;",0,0,0,0,3430,103,622,0,3430,103,622,0,4155
+dynproc_kernel,136,"setp.eq.s32%p15, %r120, 0;",152,0,31,0,0,0,0,0,152,0,31,0,183
+dynproc_kernel,139,"setp.eq.s16%p16, %rs8, 0;",152,0,21,0,0,0,0,0,152,0,21,0,173
+dynproc_kernel,142,"shl.b32 %r101, %r22, 2;",458,1,85,0,0,0,0,0,458,1,85,0,544
+dynproc_kernel,143,"mov.u32 %r102, _ZZ14dynproc_kerneliPiS_S_iiiiE6result;",514,7,79,0,0,0,0,0,514,7,79,0,600
+dynproc_kernel,144,"add.s32 %r103, %r102, %r101;",524,8,79,0,0,0,0,0,524,8,79,0,611
+dynproc_kernel,145,"ld.shared.u32 %r104, [%r103];",479,5,81,0,0,0,0,0,479,5,81,0,565
+dynproc_kernel,146,"add.s32 %r106, %r42, %r101;",502,6,72,0,0,0,0,0,502,6,72,0,580
+dynproc_kernel,147,"st.shared.u32 [%r106], %r104;",0,0,0,0,3389,200,661,0,3389,200,661,0,4250
+dynproc_kernel,151,"add.s32 %r120, %r120, 1;",488,15,82,0,0,0,0,0,488,15,82,0,585
+dynproc_kernel,152,"add.s32 %r119, %r119, %r12;",4,0,0,0,0,0,0,0,4,0,0,0,4
+dynproc_kernel,153,"setp.lt.s32%p17, %r121, %r11;",152,0,24,0,0,0,0,0,152,0,24,0,176
+dynproc_kernel,157,"and.b16 %rs6, %rs8, 255;",17,0,2,0,0,0,0,0,17,0,2,0,19
+dynproc_kernel,158,"setp.eq.s16%p18, %rs6, 0;",4,0,0,0,0,0,0,0,4,0,0,0,4
+dynproc_kernel,161,"shl.b32 %r108, %r22, 2;",12,1,0,0,0,0,0,0,12,1,0,0,13
+dynproc_kernel,162,"mov.u32 %r109, _ZZ14dynproc_kerneliPiS_S_iiiiE6result;",8,0,0,0,0,0,0,0,8,0,0,0,8
+dynproc_kernel,163,"add.s32 %r110, %r109, %r108;",9,1,0,0,0,0,0,0,9,1,0,0,10
+dynproc_kernel,164,"ld.shared.u32 %r111, [%r110];",0,7,0,0,0,0,0,0,0,7,0,0,7
+dynproc_kernel,165,"cvta.to.global.u64 %rd10, %rd3;",5,2,0,0,0,0,0,0,5,2,0,0,7
+dynproc_kernel,166,"mul.wide.s32 %rd11, %r23, 4;",7,1,0,0,0,0,0,0,7,1,0,0,8
+dynproc_kernel,167,"add.s64 %rd12, %rd10, %rd11;",0,10,0,0,0,0,0,0,0,10,0,0,10

@@ -7,10 +7,13 @@ CONFIG_FILE=./gpgpusim.config
 TMP_DIR=./logs
 CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
-RUNS=1
-COMPONENT_SET="0 2"
+RUNS=100
+COMPONENT_SET="0"
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
 DELETE_LOGS=1 # if 1 then all logs will be deleted at the end of the script
+# Optional: specify PTX virtual register name(s) to inject (overrides index-based selection)
+# Examples: %f1, %r36, %rd7, %p2; multiple names can be colon-delimited like "%f1:%r36".
+REGISTER_NAME="%r32"
 # ---------------------------------------------- END ONE-TIME PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER GPGPU CARD PARAMETERS ----------------------------------------------
@@ -23,26 +26,26 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./pathfinder 640 24 23"
+CUDA_UUT="./softmaxfloat 110 11"
 # total cycles for all kernels
-CYCLES=14715
+CYCLES=15995
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
 # fix cycles.txt with kernel execution cycles
 # (e.g. seq 1 10 >> cycles.txt, or multiple seq commands if a kernel has multiple executions)
 # use the following command from profiling execution for easier creation of cycles.txt file
 # e.g. grep "_Z12lud_diagonalPfii" cycles.in | awk  '{ system("seq " $12 " " $18 ">> cycles.txt")}'
 CYCLES_FILE=./cycles.txt
-MAX_REGISTERS_USED=15
-SHADER_USED="0 1 2 3"
+MAX_REGISTERS_USED=40
+SHADER_USED="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29"
 SUCCESS_MSG='Success'
 FAILED_MSG='Failed'
-TIMEOUT_VAL=6s
+TIMEOUT_VAL=10s
 DATATYPE_SIZE=32
 # lmem and smem values are taken from gpgpu-sim ptx output per kernel
 # e.g. GPGPU-Sim PTX: Kernel '_Z9vectorAddPKdS0_Pdi' : regs=8, lmem=0, smem=0, cmem=380
 # if 0 put a random value > 0
 LMEM_SIZE_BITS=1
-SMEM_SIZE_BITS=16384
+SMEM_SIZE_BITS=1
 # ---------------------------------------------- END PER KERNEL/APPLICATION PARAMETERS (+profile=1) ------------------------------------------------
 
 FAULT_INJECTION_OCCURRED="Fault injection"
@@ -80,7 +83,8 @@ initialize_config() {
     fi
     count=$(shuf -i 1-2 -n 1)
     # in which registers to inject the bit flip
-    register_rand_n="$(shuf -i 1-${MAX_REGISTERS_USED} -n 1)"; register_rand_n="${register_rand_n//$'\n'/:}"
+    # register_rand_n="$(shuf -i 1-${MAX_REGISTERS_USED} -n 1)"; register_rand_n="${register_rand_n//$'\n'/:}"
+    register_rand_n=1
     # example: if -i 1-32 -n 2 then the two commands below will create a value with 2 random numbers, between [1,32] like 3:21. Meaning it will flip 3 and 21 bits.
     reg_bitflip_rand_n=$(shuf -i 1-${DATATYPE_SIZE} -n ${count} | paste -sd:)
     # same format like reg_bitflip_rand_n but for local memory bit flips
@@ -112,6 +116,14 @@ initialize_config() {
     sed -i -e "s/^-warp_rand.*$/-warp_rand ${warp_rand}/" ${CONFIG_FILE}
     sed -i -e "s/^-total_cycle_rand.*$/-total_cycle_rand ${total_cycle_rand}/" ${CONFIG_FILE}
     sed -i -e "s/^-register_rand_n.*$/-register_rand_n ${register_rand_n}/" ${CONFIG_FILE}
+    # If a specific register name is provided, override index-based selection; otherwise reset to empty
+    if [[ -n "${REGISTER_NAME}" ]]; then
+        # Escape chars that sed replacement cares about
+        RN_ESC=${REGISTER_NAME//&/\\&}
+        sed -i -e "s|^-register_name[[:space:]].*$|-register_name ${RN_ESC}|" "${CONFIG_FILE}"
+    else
+        sed -i -e 's|^-register_name[[:space:]].*$|-register_name ""|' "${CONFIG_FILE}"
+    fi
     sed -i -e "s/^-reg_bitflip_rand_n.*$/-reg_bitflip_rand_n ${reg_bitflip_rand_n}/" ${CONFIG_FILE}
     sed -i -e "s/^-per_warp.*$/-per_warp ${per_warp}/" ${CONFIG_FILE}
     sed -i -e "s/^-kernel_n.*$/-kernel_n ${kernel_n}/" ${CONFIG_FILE}
@@ -246,4 +258,3 @@ main() {
 
 main "$@"
 exit 0
-
