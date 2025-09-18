@@ -16,7 +16,8 @@ DELETE_LOGS=1 # if 1 then all logs will be deleted at the end of the script
 # Optional: specify PTX virtual register name(s) to inject (overrides index-based selection)
 # Examples: %f1, %r36, %rd7, %p2; multiple names can be colon-delimited like "%f1:%r36".
 
-REGISTER_NAME="%f75"
+# Default register name; overridden per-injection if register_used.txt exists
+REGISTER_NAME="%r90"
 
 # ---------------------------------------------- END ONE-TIME PARAMETERS ------------------------------------------------
 
@@ -75,14 +76,10 @@ blocks=1
 build_combo_key_from_vars() {
     # Build a canonical key string from currently selected variables
     # Keep ordering stable for matching with analysis_fault.py
+    # Exclude reg_bits/local_bits/shared_bits/l1*_shader,l1*_bits/l2_bits from the filter key
     echo -n "comp=${components_to_flip};per_warp=${per_warp};kernel=${kernel_n};"
     echo -n "thread=${thread_rand};warp=${warp_rand};block=${block_rand};cycle=${total_cycle_rand};"
-    echo -n "reg_name=${REGISTER_NAME};reg_rand_n=${register_rand_n};reg_bits=${reg_bitflip_rand_n};"
-    echo -n "local_bits=${local_mem_bitflip_rand_n};shared_bits=${shared_mem_bitflip_rand_n};"
-    echo -n "l1d_shader=${l1d_shader_rand_n};l1d_bits=${l1d_cache_bitflip_rand_n};"
-    echo -n "l1c_shader=${l1c_shader_rand_n};l1c_bits=${l1c_cache_bitflip_rand_n};"
-    echo -n "l1t_shader=${l1t_shader_rand_n};l1t_bits=${l1t_cache_bitflip_rand_n};"
-    echo -n "l2_bits=${l2_cache_bitflip_rand_n}"
+    echo -n "reg_name=${REGISTER_NAME};reg_rand_n=${register_rand_n}"
 }
 
 initialize_config() {
@@ -100,6 +97,10 @@ initialize_config() {
             total_cycle_rand=-1
         fi
         count=$(shuf -i 1-2 -n 1)
+        # Randomize REGISTER_NAME per injection if register list is available
+        if [[ -f "register_used.txt" && -s "register_used.txt" ]]; then
+            REGISTER_NAME=$(shuf -n 1 register_used.txt | tr -d '\r')
+        fi
         # in which registers to inject the bit flip
         # register_rand_n="$(shuf -i 1-${MAX_REGISTERS_USED} -n 1)"; register_rand_n="${register_rand_n//$'\n'/:}"
         register_rand_n=1
@@ -269,6 +270,30 @@ parallel_execution() {
 }
 
 main() {
+    # Normalize existing invalid combos to reduced keys (idempotent)
+    if [[ -f "${INVALID_COMBOS_FILE}" ]]; then
+        tmp_reduced=$(mktemp)
+        awk -F';' '
+        function getv(kv, k) { return (k in kv)?kv[k]:"" }
+        {
+            delete kv
+            for (i=1; i<=NF; ++i) {
+                split($i, a, "=")
+                k=a[1]; sub(/^\s+|\s+$/,"",k)
+                v=a[2]; sub(/^\s+|\s+$/,"",v)
+                kv[k]=v
+            }
+            key = "comp=" getv(kv,"comp") ";per_warp=" getv(kv,"per_warp") ";kernel=" getv(kv,"kernel") ";"
+            key = key "thread=" getv(kv,"thread") ";warp=" getv(kv,"warp") ";block=" getv(kv,"block") ";cycle=" getv(kv,"cycle") ";"
+            key = key "reg_name=" getv(kv,"reg_name") ";reg_rand_n=" getv(kv,"reg_rand_n")
+            if (!(key in seen)) { print key; seen[key]=1 }
+        }' "${INVALID_COMBOS_FILE}" > "$tmp_reduced" 2>/dev/null || true
+        if [[ -s "$tmp_reduced" ]]; then
+            mv "$tmp_reduced" "${INVALID_COMBOS_FILE}"
+        else
+            rm -f "$tmp_reduced"
+        fi
+    fi
     # 删除所有以logs开头的文件夹
     find . -type d -name "logs*" -exec rm -rf {} + 2>/dev/null || true
     

@@ -3,13 +3,13 @@
 TEST_APP_NAME="softmaxfloat"
 COMPONENT_SET="0"
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
-RUN_PER_EPOCH=100
-EPOCH=1
+RUN_PER_EPOCH=500
+EPOCH=100
 
 TIME_OUT=10s
 
 DO_BUILD=0 # 1: build before run, 0: skip build
-DO_RESULT_GEN=0 # 1: generate result files, 0: skip result generation
+DO_RESULT_GEN=1 # 1: generate result files, 0: skip result generation
 
 
 
@@ -346,15 +346,7 @@ main() {
 
     python3 extract_registers.py $TEST_APP_NAME
 
-    if [ ! -f register_used.txt ]; then
-        echo "Error: register_used.txt not found!"
-        exit 1
-    fi
-
-    REGISTER_NAME="$(shuf -n 1 register_used.txt)"
-
-
-    echo "Randomly selected REGISTER_NAME=$REGISTER_NAME"
+    # register_used.txt will be consumed by campaign_exec.sh per-injection
 
     FILE_PATH="${1:-./logs1/tmp.out1}"
 
@@ -423,8 +415,7 @@ main() {
             -v global_smem_size_bits="$GLOBAL_SMEM_SIZE_BITS" \
             -v run_times="$RUN_PER_EPOCH" \
             -v time_out="$TIME_OUT" \
-            -v component_set="$COMPONENT_SET" \
-            -v register_name="$REGISTER_NAME" '
+            -v component_set="$COMPONENT_SET" '
         {
             # 替换CUDA_UUT
             if ($0 ~ /^CUDA_UUT=/) {
@@ -474,13 +465,6 @@ main() {
             # 替换COMPONENT_SET
             if ($0 ~ /^COMPONENT_SET=/) {
                 print "COMPONENT_SET=\"" component_set "\""
-                next
-            }
-            # 替换REGISTER_NAME
-            if ($0 ~ /^REGISTER_NAME=/) {
-                # Escape chars that sed replacement cares about
-                gsub(/&/, "\\&", register_name)
-                print "REGISTER_NAME=\"" register_name "\""
                 next
             }
             # 其他行保持不变
@@ -536,13 +520,13 @@ main() {
             echo "=== Fault injection for ${filename} finished ==="
             filename_no_ext="${filename%.txt}"
             python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext
-            python3 split_rank_spearman.py $TEST_APP_NAME $filename_no_ext
             ret=$?
             if [ $ret -eq 99 ]; then
                 echo "=== Early stopping triggered. Exiting loop ==="
                 break
             fi
         done
+        rm invalid_param_combos.txt
     done
 }
 
