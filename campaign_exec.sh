@@ -7,13 +7,17 @@ CONFIG_FILE=./gpgpusim.config
 TMP_DIR=./logs
 CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
+# persistent list of invalid parameter combinations to skip
+INVALID_COMBOS_FILE=./invalid_param_combos.txt
 RUNS=100
 COMPONENT_SET="0"
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
 DELETE_LOGS=1 # if 1 then all logs will be deleted at the end of the script
 # Optional: specify PTX virtual register name(s) to inject (overrides index-based selection)
 # Examples: %f1, %r36, %rd7, %p2; multiple names can be colon-delimited like "%f1:%r36".
-REGISTER_NAME="%r32"
+
+REGISTER_NAME="%f75"
+
 # ---------------------------------------------- END ONE-TIME PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER GPGPU CARD PARAMETERS ----------------------------------------------
@@ -68,45 +72,68 @@ kernel_n=0
 # in how many blocks (smems) to inject the bit flip
 blocks=1
 
+build_combo_key_from_vars() {
+    # Build a canonical key string from currently selected variables
+    # Keep ordering stable for matching with analysis_fault.py
+    echo -n "comp=${components_to_flip};per_warp=${per_warp};kernel=${kernel_n};"
+    echo -n "thread=${thread_rand};warp=${warp_rand};block=${block_rand};cycle=${total_cycle_rand};"
+    echo -n "reg_name=${REGISTER_NAME};reg_rand_n=${register_rand_n};reg_bits=${reg_bitflip_rand_n};"
+    echo -n "local_bits=${local_mem_bitflip_rand_n};shared_bits=${shared_mem_bitflip_rand_n};"
+    echo -n "l1d_shader=${l1d_shader_rand_n};l1d_bits=${l1d_cache_bitflip_rand_n};"
+    echo -n "l1c_shader=${l1c_shader_rand_n};l1c_bits=${l1c_cache_bitflip_rand_n};"
+    echo -n "l1t_shader=${l1t_shader_rand_n};l1t_bits=${l1t_cache_bitflip_rand_n};"
+    echo -n "l2_bits=${l2_cache_bitflip_rand_n}"
+}
+
 initialize_config() {
     # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache (e.g. components_to_flip=0:1 for both RF and local_mem)
     # random component to flip from COMPONENT_SET
-    components_to_flip=$(shuf -e ${COMPONENT_SET} -n 1)
-    # random number for choosing a random thread after thread_rand % #threads operation in gpgpu-sim
-    thread_rand=$(shuf -i 0-6000 -n 1)
-    # random number for choosing a random warp after warp_rand % #warp operation in gpgpu-sim
-    warp_rand=$(shuf -i 0-6000 -n 1)
-    # random cycle for fault injection
-    total_cycle_rand="$(shuf ${CYCLES_FILE} -n 1)"
-    if [[ "$profile" -eq 3 ]]; then
-        total_cycle_rand=-1
-    fi
-    count=$(shuf -i 1-2 -n 1)
-    # in which registers to inject the bit flip
-    # register_rand_n="$(shuf -i 1-${MAX_REGISTERS_USED} -n 1)"; register_rand_n="${register_rand_n//$'\n'/:}"
-    register_rand_n=1
-    # example: if -i 1-32 -n 2 then the two commands below will create a value with 2 random numbers, between [1,32] like 3:21. Meaning it will flip 3 and 21 bits.
-    reg_bitflip_rand_n=$(shuf -i 1-${DATATYPE_SIZE} -n ${count} | paste -sd:)
-    # same format like reg_bitflip_rand_n but for local memory bit flips
-    local_mem_bitflip_rand_n=$(shuf -i 1-${LMEM_SIZE_BITS} -n 1 | paste -sd:)
-    # random number for choosing a random block after block_rand % #smems operation in gpgpu-sim
-    block_rand=$(shuf -i 0-6000 -n 1)
-    # same format like reg_bitflip_rand_n but for shared memory bit flips
-    shared_mem_bitflip_rand_n=$(shuf -i 1-${SMEM_SIZE_BITS} -n 1 | paste -sd:)
-    # randomly select one or more shaders for L1 data cache fault injections 
-    l1d_shader_rand_n="$(shuf -e ${SHADER_USED} -n 1)"; l1d_shader_rand_n="${l1d_shader_rand_n//$'\n'/:}"
-    # same format like reg_bitflip_rand_n but for L1 data cache bit flips
-    l1d_cache_bitflip_rand_n=$(shuf -i 1-${L1D_SIZE_BITS} -n 1 | paste -sd:)
-    # randomly select one or more shaders for L1 constant cache fault injections 
-    l1c_shader_rand_n="$(shuf -e ${SHADER_USED} -n 1)"; l1c_shader_rand_n="${l1c_shader_rand_n//$'\n'/:}"
-    # same format like reg_bitflip_rand_n but for L1 constant cache bit flips
-    l1c_cache_bitflip_rand_n=$(shuf -i 1-${L1C_SIZE_BITS} -n 1 | paste -sd:)
-    # randomly select one or more shaders for L1 texture cache fault injections 
-    l1t_shader_rand_n="$(shuf -e ${SHADER_USED} -n 1)"; l1t_shader_rand_n="${l1t_shader_rand_n//$'\n'/:}"
-    # same format like reg_bitflip_rand_n but for L1 texture cache bit flips
-    l1t_cache_bitflip_rand_n=$(shuf -i 1-${L1T_SIZE_BITS} -n 1 | paste -sd:)
-    # same format like reg_bitflip_rand_n but for L2 cache bit flips
-    l2_cache_bitflip_rand_n=$(shuf -i 1-${L2_SIZE_BITS} -n 1 | paste -sd:)
+    while true; do
+        components_to_flip=$(shuf -e ${COMPONENT_SET} -n 1)
+        # random number for choosing a random thread after thread_rand % #threads operation in gpgpu-sim
+        thread_rand=$(shuf -i 0-6000 -n 1)
+        # random number for choosing a random warp after warp_rand % #warp operation in gpgpu-sim
+        warp_rand=$(shuf -i 0-6000 -n 1)
+        # random cycle for fault injection
+        total_cycle_rand="$(shuf ${CYCLES_FILE} -n 1)"
+        if [[ "$profile" -eq 3 ]]; then
+            total_cycle_rand=-1
+        fi
+        count=$(shuf -i 1-2 -n 1)
+        # in which registers to inject the bit flip
+        # register_rand_n="$(shuf -i 1-${MAX_REGISTERS_USED} -n 1)"; register_rand_n="${register_rand_n//$'\n'/:}"
+        register_rand_n=1
+        # example: if -i 1-32 -n 2 then the two commands below will create a value with 2 random numbers, between [1,32] like 3:21. Meaning it will flip 3 and 21 bits.
+        reg_bitflip_rand_n=$(shuf -i 1-${DATATYPE_SIZE} -n ${count} | paste -sd:)
+        # same format like reg_bitflip_rand_n but for local memory bit flips
+        local_mem_bitflip_rand_n=$(shuf -i 1-${LMEM_SIZE_BITS} -n 1 | paste -sd:)
+        # random number for choosing a random block after block_rand % #smems operation in gpgpu-sim
+        block_rand=$(shuf -i 0-6000 -n 1)
+        # same format like reg_bitflip_rand_n but for shared memory bit flips
+        shared_mem_bitflip_rand_n=$(shuf -i 1-${SMEM_SIZE_BITS} -n 1 | paste -sd:)
+        # randomly select one or more shaders for L1 data cache fault injections 
+        l1d_shader_rand_n="$(shuf -e ${SHADER_USED} -n 1)"; l1d_shader_rand_n="${l1d_shader_rand_n//$'\n'/:}"
+        # same format like reg_bitflip_rand_n but for L1 data cache bit flips
+        l1d_cache_bitflip_rand_n=$(shuf -i 1-${L1D_SIZE_BITS} -n 1 | paste -sd:)
+        # randomly select one or more shaders for L1 constant cache fault injections 
+        l1c_shader_rand_n="$(shuf -e ${SHADER_USED} -n 1)"; l1c_shader_rand_n="${l1c_shader_rand_n//$'\n'/:}"
+        # same format like reg_bitflip_rand_n but for L1 constant cache bit flips
+        l1c_cache_bitflip_rand_n=$(shuf -i 1-${L1C_SIZE_BITS} -n 1 | paste -sd:)
+        # randomly select one or more shaders for L1 texture cache fault injections 
+        l1t_shader_rand_n="$(shuf -e ${SHADER_USED} -n 1)"; l1t_shader_rand_n="${l1t_shader_rand_n//$'\n'/:}"
+        # same format like reg_bitflip_rand_n but for L1 texture cache bit flips
+        l1t_cache_bitflip_rand_n=$(shuf -i 1-${L1T_SIZE_BITS} -n 1 | paste -sd:)
+        # same format like reg_bitflip_rand_n but for L2 cache bit flips
+        l2_cache_bitflip_rand_n=$(shuf -i 1-${L2_SIZE_BITS} -n 1 | paste -sd:)
+
+        # Build combo key and check against invalid list
+        combo_key=$(build_combo_key_from_vars)
+        if [[ -f "${INVALID_COMBOS_FILE}" ]] && grep -Fxq "${combo_key}" "${INVALID_COMBOS_FILE}"; then
+            # invalid combo previously observed; re-sample
+            continue
+        fi
+        break
+    done
 # ---------------------------------------------- END PER INJECTION CAMPAIGN PARAMETERS (profile=0) ------------------------------------------------
 
     sed -i -e "s/^-components_to_flip.*$/-components_to_flip ${components_to_flip}/" ${CONFIG_FILE}
@@ -143,6 +170,43 @@ initialize_config() {
 
 gather_results() {
     for file in ${TMP_DIR}${1}/${TMP_FILE}*; do
+        # Derive index for matching saved config
+        idx=${file##*${TMP_FILE}}
+        cfg_path="${TMP_DIR}${1}/${CONFIG_FILE}${idx}"
+        if [[ -f "${cfg_path}" ]]; then
+            # Extract parameters from saved config to emit a canonical key line
+            # Helper to read value after a flag from the config
+            get_val() { grep -E "^$1\b" "${cfg_path}" | awk '{print $2}' | tail -n1; }
+            components_to_flip_cfg=$(get_val "-components_to_flip")
+            thread_rand_cfg=$(get_val "-thread_rand")
+            warp_rand_cfg=$(get_val "-warp_rand")
+            total_cycle_rand_cfg=$(get_val "-total_cycle_rand")
+            register_rand_n_cfg=$(get_val "-register_rand_n")
+            register_name_cfg=$(get_val "-register_name")
+            reg_bitflip_rand_n_cfg=$(get_val "-reg_bitflip_rand_n")
+            local_mem_bitflip_rand_n_cfg=$(get_val "-local_mem_bitflip_rand_n")
+            block_rand_cfg=$(get_val "-block_rand")
+            shared_mem_bitflip_rand_n_cfg=$(get_val "-shared_mem_bitflip_rand_n")
+            l1d_shader_rand_n_cfg=$(get_val "-l1d_shader_rand_n")
+            l1d_cache_bitflip_rand_n_cfg=$(get_val "-l1d_cache_bitflip_rand_n")
+            l1c_shader_rand_n_cfg=$(get_val "-l1c_shader_rand_n")
+            l1c_cache_bitflip_rand_n_cfg=$(get_val "-l1c_cache_bitflip_rand_n")
+            l1t_shader_rand_n_cfg=$(get_val "-l1t_shader_rand_n")
+            l1t_cache_bitflip_rand_n_cfg=$(get_val "-l1t_cache_bitflip_rand_n")
+            l2_cache_bitflip_rand_n_cfg=$(get_val "-l2_cache_bitflip_rand_n")
+            kernel_n_cfg=$(get_val "-kernel_n")
+
+            combo_line="comp=${components_to_flip_cfg};per_warp=${per_warp};kernel=${kernel_n_cfg};"
+            combo_line+="thread=${thread_rand_cfg};warp=${warp_rand_cfg};block=${block_rand_cfg};cycle=${total_cycle_rand_cfg};"
+            combo_line+="reg_name=${register_name_cfg};reg_rand_n=${register_rand_n_cfg};reg_bits=${reg_bitflip_rand_n_cfg};"
+            combo_line+="local_bits=${local_mem_bitflip_rand_n_cfg};shared_bits=${shared_mem_bitflip_rand_n_cfg};"
+            combo_line+="l1d_shader=${l1d_shader_rand_n_cfg};l1d_bits=${l1d_cache_bitflip_rand_n_cfg};"
+            combo_line+="l1c_shader=${l1c_shader_rand_n_cfg};l1c_bits=${l1c_cache_bitflip_rand_n_cfg};"
+            combo_line+="l1t_shader=${l1t_shader_rand_n_cfg};l1t_bits=${l1t_cache_bitflip_rand_n_cfg};"
+            combo_line+="l2_bits=${l2_cache_bitflip_rand_n_cfg}"
+
+            echo "[INJ_PARAMS] [Run ${1}] ${TMP_FILE}${idx} ${combo_line}"
+        fi
         grep -iq "${SUCCESS_MSG}" $file; success_msg_grep=$(echo $?)
 	grep -i "${CYCLES_MSG}" $file | tail -1 | grep -q "${CYCLES}"; cycles_grep=$(echo $?)
         grep -iq "${FAILED_MSG}" $file; failed_msg_grep=$(echo $?)

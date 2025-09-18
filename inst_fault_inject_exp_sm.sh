@@ -340,7 +340,21 @@ main() {
         echo "=== Result generation skipped ==="
     fi
 
+    echo "=== Extracting register information ==="
 
+    nvcc -arch=sm_75 -ptx -g -lineinfo $TEST_APP_NAME.cu -o $TEST_APP_NAME.ptx
+
+    python3 extract_registers.py $TEST_APP_NAME
+
+    if [ ! -f register_used.txt ]; then
+        echo "Error: register_used.txt not found!"
+        exit 1
+    fi
+
+    REGISTER_NAME="$(shuf -n 1 register_used.txt)"
+
+
+    echo "Randomly selected REGISTER_NAME=$REGISTER_NAME"
 
     FILE_PATH="${1:-./logs1/tmp.out1}"
 
@@ -409,7 +423,8 @@ main() {
             -v global_smem_size_bits="$GLOBAL_SMEM_SIZE_BITS" \
             -v run_times="$RUN_PER_EPOCH" \
             -v time_out="$TIME_OUT" \
-            -v component_set="$COMPONENT_SET" '
+            -v component_set="$COMPONENT_SET" \
+            -v register_name="$REGISTER_NAME" '
         {
             # 替换CUDA_UUT
             if ($0 ~ /^CUDA_UUT=/) {
@@ -459,6 +474,13 @@ main() {
             # 替换COMPONENT_SET
             if ($0 ~ /^COMPONENT_SET=/) {
                 print "COMPONENT_SET=\"" component_set "\""
+                next
+            }
+            # 替换REGISTER_NAME
+            if ($0 ~ /^REGISTER_NAME=/) {
+                # Escape chars that sed replacement cares about
+                gsub(/&/, "\\&", register_name)
+                print "REGISTER_NAME=\"" register_name "\""
                 next
             }
             # 其他行保持不变

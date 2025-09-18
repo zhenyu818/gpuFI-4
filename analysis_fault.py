@@ -32,8 +32,11 @@ def parse_log(log_path: str):
         r"^\[(?P<src>[A-Za-z0-9_]+)_FI_READER\].*?->\s*(\S+)\s+PC=.*\(([^:()]+):(\d+)\)\s*(.*)$"
     )
     re_result = re.compile(r"^\[Run\s+(\d+)\]\s+(tmp\.out\d+):\s*(.*?)\s*$")
+    # [INJ_PARAMS] [Run <id>] tmp.outN key-vals
+    re_params = re.compile(r"^\[INJ_PARAMS\]\s+\[Run\s+(\d+)\]\s+(tmp\.out\d+)\s+(.*)$")
 
     latest_effects_by_pair = {}
+    params_by_pair = {}
     cur_key = None
     cur_writers, cur_readers = [], []
 
@@ -93,6 +96,13 @@ def parse_log(log_path: str):
                         })
                         continue
 
+                m = re_params.match(line)
+                if m:
+                    run_id = int(m.group(1))
+                    name = m.group(2)
+                    params_by_pair[(run_id, name)] = m.group(3).strip()
+                    continue
+
                 m = re_result.match(line)
                 if m:
                     run_id = int(m.group(1))
@@ -125,7 +135,7 @@ def parse_log(log_path: str):
         print(f"Error: log file not found: {log_path}", file=sys.stderr)
         sys.exit(1)
 
-    return effects_occ, results_occ
+    return effects_occ, results_occ, params_by_pair
 
 
 def write_csv(app: str, test: str, effects_occ, results_occ):
@@ -225,11 +235,38 @@ def main():
     args = parser.parse_args()
 
     log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inst_exec.log")
-    effects_occ, results_occ = parse_log(log_path)
+    effects_occ, results_occ, params_by_pair = parse_log(log_path)
 
     out_path, total_masked, total_sdc, total_due, total_others, total_inj = write_csv(
         args.app, args.test, effects_occ, results_occ
     )
+
+    # Persist invalid parameter combinations to skip in future rounds
+    # Criterion: no valid writer/reader resolved -> recs contain a single record with src == 'invalid'
+    invalid_keys = set()
+    for inj_key, recs in effects_occ.items():
+        # Pair key without the occurrence index
+        run_id, name, _ = inj_key
+        if len(recs) == 1 and (recs[0].get("src") == "invalid"):
+            combo = params_by_pair.get((run_id, name))
+            if combo:
+                invalid_keys.add(combo)
+
+    if invalid_keys:
+        store_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "invalid_param_combos.txt")
+        existing = set()
+        if os.path.exists(store_path):
+            with open(store_path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        existing.add(line)
+        new_items = sorted(k for k in invalid_keys if k not in existing)
+        if new_items:
+            with open(store_path, "a", encoding="utf-8") as f:
+                for k in new_items:
+                    f.write(k + "\n")
+            print(f"Appended {len(new_items)} invalid parameter combinations to {store_path}")
 
     print(f"CSV written: {out_path}")
     print("========== Overall Summary (previous + this log) ==========")

@@ -1,3 +1,3 @@
 kernel,inst_line,inst_text,REG_Masked,REG_SDC,REG_DUE,REG_Others,invalid_Masked,invalid_SDC,invalid_DUE,invalid_Others,Masked,SDC,DUE,Others,tot_inj
-invalid_summary,,unknown,0,0,0,0,1,0,0,0,1,0,0,0,1
-softMax,28,"ld.param.u32 %r32, [_Z7softMaxiiPKfPf_param_0];",99,0,0,0,0,0,0,0,99,0,0,0,99
+invalid_summary,,unknown,0,0,0,0,43,0,0,0,43,0,0,0,43
+softMax,197,"add.f32 %f75, %f74, 0fCB40007F;",57,0,0,0,0,0,0,0,57,0,0,0,57
