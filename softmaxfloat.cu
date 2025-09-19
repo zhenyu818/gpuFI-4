@@ -5,7 +5,7 @@
 #include <cmath>
 
 #define BLOCK_SIZE 256
-#define M_SEED 9927
+#define M_SEED 3608
 
 __global__
 void softMax(const int numSlice, const int sliceSize,
@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
   srand(M_SEED);
   for (int i = 0; i < numSlice; i++)
     for (int j = 0; j < sliceSize; j++)
-      input[i*sliceSize+j] = rand() % 13; 
+      input[i*sliceSize+j] = 1; 
 
   float *d_input, *d_output;
   cudaMalloc((void**)&d_input, sizeof(float) * numElem);

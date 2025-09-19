@@ -1,14 +1,14 @@
 #!/bin/bash
 
-TEST_APP_NAME="softmaxfloat"
-COMPONENT_SET="0"
+TEST_APP_NAME="pathfinder"
+COMPONENT_SET="0 2"
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
-RUN_PER_EPOCH=500
+RUN_PER_EPOCH=100
 EPOCH=100
 
 TIME_OUT=10s
 
-DO_BUILD=0 # 1: build before run, 0: skip build
+DO_BUILD=1 # 1: build before run, 0: skip build
 DO_RESULT_GEN=1 # 1: generate result files, 0: skip result generation
 
 
@@ -351,6 +351,7 @@ main() {
     FILE_PATH="${1:-./logs1/tmp.out1}"
 
     for result_file in test_apps/${TEST_APP_NAME}/result/*; do
+        rm -f invalid_param_combos.txt
         echo "=== Preparing injection for file: $result_file ==="
         filename=$(basename "$result_file")
         # 提取a和b
@@ -473,6 +474,15 @@ main() {
 
 
         echo "=== Starting fault injection experiment: ${TEST_APP_NAME}, file ${filename} ==="
+        filename_no_ext="${filename%.txt}"
+
+        python3 pre_check.py -a $TEST_APP_NAME -t $filename_no_ext
+        ret=$?
+        if [ $ret -eq 99 ]; then
+            echo "=== Early stopping triggered. Skipping this file ==="
+            continue
+        fi
+
         for i in $(seq 1 $EPOCH); do
             echo "  --- Injection run $i / $EPOCH ---"
             PARALLEL_TASKS=$(( $(grep -c ^processor /proc/cpuinfo) - 1 ))
@@ -518,7 +528,6 @@ main() {
             # 等待主进程结束
             wait $CMD_PID
             echo "=== Fault injection for ${filename} finished ==="
-            filename_no_ext="${filename%.txt}"
             python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext
             ret=$?
             if [ $ret -eq 99 ]; then
@@ -526,8 +535,8 @@ main() {
                 break
             fi
         done
-        rm invalid_param_combos.txt
     done
+    rm -f register_used.txt
 }
 
 echo "=== Running main with COMPONENT_SET=${COMPONENT_SET} ==="

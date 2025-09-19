@@ -5,6 +5,7 @@ import argparse
 import csv
 import os
 import re
+import shutil
 import sys
 import math
 from collections import defaultdict, Counter
@@ -25,7 +26,9 @@ def normalize_result(s: str) -> str:
 
 def parse_log(log_path: str):
     """逐条解析日志"""
-    re_effects_start = re.compile(r"^\[Run\s+(\d+)\]\s+Effects from\s+(?:.+/)?(tmp\.out\d+):\s*$")
+    re_effects_start = re.compile(
+        r"^\[Run\s+(\d+)\]\s+Effects from\s+(?:.+/)?(tmp\.out\d+):\s*$"
+    )
     re_writer = re.compile(
         r"^\[(?P<src>[A-Za-z0-9_]+)_FI_WRITER\].*?->\s*(\S+)\s+PC=.*\(([^:()]+):(\d+)\)\s*(.*)$"
     )
@@ -49,12 +52,14 @@ def parse_log(log_path: str):
             return deepcopy(cur_writers)
         if cur_readers:
             return deepcopy(cur_readers)
-        return [{
-            "kernel": "invalid_summary",
-            "inst_line": -1,
-            "inst_text": "",
-            "src": "invalid",
-        }]
+        return [
+            {
+                "kernel": "invalid_summary",
+                "inst_line": -1,
+                "inst_text": "",
+                "src": "invalid",
+            }
+        ]
 
     def flush_current_effects():
         nonlocal cur_key, cur_writers, cur_readers
@@ -80,21 +85,25 @@ def parse_log(log_path: str):
                 if cur_key is not None:
                     m = re_writer.match(line)
                     if m:
-                        cur_writers = [{
-                            "kernel": m.group(2),
-                            "inst_line": int(m.group(4)),
-                            "inst_text": m.group(5).strip(),
-                            "src": m.group("src"),
-                        }]
+                        cur_writers = [
+                            {
+                                "kernel": m.group(2),
+                                "inst_line": int(m.group(4)),
+                                "inst_text": m.group(5).strip(),
+                                "src": m.group("src"),
+                            }
+                        ]
                         continue
                     m = re_reader.match(line)
                     if m and not cur_writers:
-                        cur_readers.append({
-                            "kernel": m.group(2),
-                            "inst_line": int(m.group(4)),
-                            "inst_text": m.group(5).strip(),
-                            "src": m.group("src"),
-                        })
+                        cur_readers.append(
+                            {
+                                "kernel": m.group(2),
+                                "inst_line": int(m.group(4)),
+                                "inst_text": m.group(5).strip(),
+                                "src": m.group("src"),
+                            }
+                        )
                         continue
 
                 m = re_params.match(line)
@@ -119,12 +128,17 @@ def parse_log(log_path: str):
                         recs = build_recs()
                         latest_effects_by_pair[pair] = deepcopy(recs)
                     else:
-                        recs = latest_effects_by_pair.get(pair, [{
-                            "kernel": "invalid_summary",
-                            "inst_line": -1,
-                            "inst_text": "",
-                            "src": "invalid",
-                        }])
+                        recs = latest_effects_by_pair.get(
+                            pair,
+                            [
+                                {
+                                    "kernel": "invalid_summary",
+                                    "inst_line": -1,
+                                    "inst_text": "",
+                                    "src": "invalid",
+                                }
+                            ],
+                        )
 
                     effects_occ[inj_key] = deepcopy(recs)
                     results_occ[inj_key] = res
@@ -142,16 +156,23 @@ def parse_log(log_path: str):
 def reduce_combo(combo: str) -> str:
     """规约 key=val;key=val;... 至稳定字段序，便于去重存档"""
     keep_order = [
-        "comp", "per_warp", "kernel",
-        "thread", "warp", "block", "cycle",
-        "reg_name", "reg_rand_n",
+        "comp",
+        "per_warp",
+        "kernel",
+        "thread",
+        "warp",
+        "block",
+        "cycle",
+        "reg_name",
+        "reg_rand_n",
     ]
     kv = {}
     for part in combo.split(";"):
         if not part or "=" not in part:
             continue
         k, v = part.split("=", 1)
-        k = k.strip(); v = v.strip()
+        k = k.strip()
+        v = v.strip()
         kv[k] = v
     return ";".join([f"{k}={kv[k]}" for k in keep_order if k in kv])
 
@@ -167,7 +188,9 @@ def write_csv(app: str, test: str, effects_occ, results_occ, params_by_pair):
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"test_result_{app}_{test}.csv")
 
-    inst_counts = defaultdict(lambda: defaultdict(lambda: {"Masked": 0, "SDC": 0, "DUE": 0, "Others": 0}))
+    inst_counts = defaultdict(
+        lambda: defaultdict(lambda: {"Masked": 0, "SDC": 0, "DUE": 0, "Others": 0})
+    )
     all_srcs = set()
     regname_counts = defaultdict(Counter)  # 仅非 invalid 行统计
 
@@ -241,9 +264,11 @@ def write_csv(app: str, test: str, effects_occ, results_occ, params_by_pair):
     for src in sorted(all_srcs):
         src_columns += [f"{src}_Masked", f"{src}_SDC", f"{src}_DUE", f"{src}_Others"]
 
-    fieldnames = ["kernel", "inst_line", "inst_text", "reg_names"] + src_columns + [
-        "Masked", "SDC", "DUE", "Others", "tot_inj"
-    ]
+    fieldnames = (
+        ["kernel", "inst_line", "inst_text", "reg_names"]
+        + src_columns
+        + ["Masked", "SDC", "DUE", "Others", "tot_inj"]
+    )
 
     total_masked = total_sdc = total_due = total_others = 0
     out_path_tmp = out_path + ".tmp"
@@ -251,7 +276,9 @@ def write_csv(app: str, test: str, effects_occ, results_occ, params_by_pair):
     with open(out_path_tmp, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        for (kernel, inst_line, inst_text) in sorted(inst_counts.keys(), key=lambda k: (k[0], k[1], k[2])):
+        for kernel, inst_line, inst_text in sorted(
+            inst_counts.keys(), key=lambda k: (k[0], k[1], k[2])
+        ):
             src_map = inst_counts[(kernel, inst_line, inst_text)]
             row = {
                 "kernel": kernel,
@@ -305,6 +332,7 @@ def write_csv(app: str, test: str, effects_occ, results_occ, params_by_pair):
 
 # ============= 新增：计算“本次新数据”的 Perc_inv（不看合并后） =============
 
+
 def _compute_perc_inv_from_new(effects_occ):
     """
     基于“本次解析得到的新数据”（effects_occ），计算 Perc_inv：
@@ -322,6 +350,7 @@ def _compute_perc_inv_from_new(effects_occ):
 
 
 # ================= 新增：Spearman 及结果记录相关工具 =================
+
 
 def _rankdata_avg(values):
     """平均秩（ties 取平均秩），1-based ranks"""
@@ -433,7 +462,12 @@ def _append_result_info(app, test, sp_tot, sp_sdc, perc_inv):
         last_idx = len(rows) - 1
     next_idx = last_idx + 1
 
-    new_row = [str(next_idx), _format_val(sp_tot), _format_val(sp_sdc), _format_val(perc_inv)]
+    new_row = [
+        str(next_idx),
+        _format_val(sp_tot),
+        _format_val(sp_sdc),
+        _format_val(perc_inv),
+    ]
     rows.append(new_row)
 
     with open(info_path, "w", newline="", encoding="utf-8") as f:
@@ -444,18 +478,18 @@ def _append_result_info(app, test, sp_tot, sp_sdc, perc_inv):
     return rows
 
 
-def _check_consecutive_3(rows, thr=0.9):
+def _check_consecutive_5(rows, thr=0.99):
     """
-    只检查“最近3次”（最后三行数据，不含表头）是否同时满足：
+    只检查“最近5次”（最后5行数据，不含表头）是否同时满足：
       Sp_tot >= thr 且 Sp_SDC >= thr
-    若不足3条数据或存在 NA/解析失败，返回 False
+    若不足5条数据或存在 NA/解析失败，返回 False
     """
     # rows 可能含表头：["index","Sp_tot","Sp_SDC","Perc_inv"]
-    data_rows = rows[1:] if rows and rows[0] and rows[0][0] == "index" else rows
-    if len(data_rows) < 3:
+    data_rows = rows[1:] if rows and rows[0] and rows[0][0] == "" else rows
+    if len(data_rows) < 5:
         return False
 
-    last3 = data_rows[-3:]
+    last5 = data_rows[-5:]
 
     def geq(x):
         try:
@@ -464,14 +498,52 @@ def _check_consecutive_3(rows, thr=0.9):
             return False  # 包含 "NA" 等情况则判为不满足
 
     # 逐行同时满足 Sp_tot 和 Sp_SDC
-    return all(geq(r[1]) and geq(r[2]) for r in last3)
+    return all(geq(r[1]) and geq(r[2]) for r in last5)
 
+
+def _check_consecutive_5_tot_95(rows, thr=0.95):
+    """
+    检查最近 5 次 Sp_tot >= thr
+    """
+    data_rows = rows[1:] if rows and rows[0][0] == "index" else rows
+    if len(data_rows) < 5:
+        return False
+    last5 = data_rows[-5:]
+
+    def geq(x):
+        try:
+            return float(x) >= thr
+        except Exception:
+            return False
+
+    return all(geq(r[1]) for r in last5)  # r[1] 是 Sp_tot
+
+
+def _check_consecutive_5_tot_99(rows, thr=0.99):
+    """
+    检查最近 5 次 Sp_tot >= thr
+    """
+    data_rows = rows[1:] if rows and rows[0][0] == "index" else rows
+    if len(data_rows) < 5:
+        return False
+    last5 = data_rows[-5:]
+
+    def geq(x):
+        try:
+            return float(x) >= thr
+        except Exception:
+            return False
+
+    return all(geq(r[1]) for r in last5)  # r[1] 是 Sp_tot
 
 
 # ================= 主流程 =================
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Analyze inst_exec.log and merge results with previous CSV.")
+    parser = argparse.ArgumentParser(
+        description="Analyze inst_exec.log and merge results with previous CSV."
+    )
     parser.add_argument("--app", "-a", required=True, help="Application name")
     parser.add_argument("--test", "-t", required=True, help="Test identifier", type=str)
     args = parser.parse_args()
@@ -533,7 +605,9 @@ def main():
                 invalid_keys.add(reduce_combo(combo))
 
     if invalid_keys:
-        store_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "invalid_param_combos.txt")
+        store_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "invalid_param_combos.txt"
+        )
         existing = set()
         if os.path.exists(store_path):
             with open(store_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -546,14 +620,32 @@ def main():
             with open(store_path, "a", encoding="utf-8") as f:
                 for k in new_items:
                     f.write(k + "\n")
-            print(f"Appended {len(new_items)} invalid parameter combinations to {store_path}")
+            print(
+                f"Appended {len(new_items)} invalid parameter combinations to {store_path}"
+            )
 
     # 记录三项指标：Sp_tot、Sp_SDC、Perc_inv(本次新数据)
     rows_all = _append_result_info(args.app, args.test, sp_tot, sp_sdc, perc_inv_new)
 
-    # 检查是否已连续 3 次 > 0.9（如满足则退出 99）
-    if _check_consecutive_3(rows_all):
-        print("满足条件：Sp_tot 与 Sp_SDC 已连续 3 次 > 0.9，停止新增注入。")
+    # 新增：检查 Sp_tot 连续 5 次 >= 0.95（只保存一次）
+    if _check_consecutive_5_tot_95(rows_all, thr=0.95):
+        backup_path = out_path.replace(".csv", "_95.csv")
+        if not os.path.exists(backup_path):  # 避免重复保存
+            shutil.copyfile(out_path, backup_path)
+            print(
+                f"Sp_tot has been >= 0.95 for 5 consecutive runs. Backup created: {backup_path}"
+            )
+    if _check_consecutive_5_tot_99(rows_all, thr=0.99):
+        backup_path = out_path.replace(".csv", "_99.csv")
+        if not os.path.exists(backup_path):  # 避免重复保存
+            shutil.copyfile(out_path, backup_path)
+            print(
+                f"Sp_tot has been >= 0.99 for 5 consecutive runs. Backup created: {backup_path}"
+            )
+
+    # 检查是否已连续 5 次 > 0.99（如满足则退出 99）
+    if _check_consecutive_5(rows_all):
+        print("Sp_SDC have been >= 0.99 for 5 consecutive runs.")
         sys.exit(99)
 
     # 保持原有控制台输出
