@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
   srand(M_SEED);
   for (int i = 0; i < numSlice; i++)
     for (int j = 0; j < sliceSize; j++)
-      input[i*sliceSize+j] = 1; 
+      input[i*sliceSize+j] = rand() % 13; 
 
   float *d_input, *d_output;
   cudaMalloc((void**)&d_input, sizeof(float) * numElem);
@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
 
   // ===== 逐项比对结果 =====
   bool match = true;
-  const float eps = 1e-4; // 允许的浮点误差
+  const float eps = 1e-6; // 允许的浮点误差
   for (int i = 0; i < numElem; i++) {
     if (fabs(output_gpu[i] - expected[i]) > eps) {
       match = false;

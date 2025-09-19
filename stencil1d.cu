@@ -6,7 +6,7 @@
 
 #define RADIUS 7
 #define BLOCK_SIZE 256
-#define M_SEED 3031
+#define M_SEED 9409
 
 __global__
 void stencil_1d(const int *__restrict__ in, int *__restrict__ out, int length)

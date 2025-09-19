@@ -118,7 +118,7 @@ int main(int argc, char* argv[]) {
 
   // ===== 逐项比对结果 =====
   bool match = true;
-  const float eps = 1e-4;
+  const float eps = 1e-6;
   for (int i = 0; i < numElem; i++) {
     if (fabs(output_gpu[i] - expected[i]) > eps) {
       match = false;

@@ -1,14 +1,13 @@
 #!/bin/bash
 
-TEST_APP_NAME="pathfinder"
-COMPONENT_SET="0 2"
+TEST_APP_NAME="softmaxfloat"
+COMPONENT_SET="0"
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
 RUN_PER_EPOCH=100
-EPOCH=100
+EPOCH=1
 
-TIME_OUT=10s
 
-DO_BUILD=1 # 1: build before run, 0: skip build
+DO_BUILD=0 # 1: build before run, 0: skip build
 DO_RESULT_GEN=1 # 1: generate result files, 0: skip result generation
 
 
@@ -23,6 +22,7 @@ GLOBAL_SHADER_USED=""
 GLOBAL_DATATYPE_SIZE=""
 GLOBAL_LMEM_SIZE_BITS=""
 GLOBAL_SMEM_SIZE_BITS=""
+GLOBAL_EXEC_TIME=""
 
 cleanup() {
     echo -e "\nInterrupted. Killing campaign_exec.sh (PID=$CMD_PID)..."
@@ -195,7 +195,7 @@ get_datatype_bits() {
 
 get_metrics() {
     echo "=== Extracting metrics from logs ==="
-    local cycles regs lmem smem lmem_bits smem_bits shader_used_list dtype_bits
+    local cycles regs lmem smem lmem_bits smem_bits shader_used_list dtype_bits exec_time
     local max_regs max_lmem max_smem all_shaders
 
     cycles=$(get_cycles)
@@ -203,6 +203,25 @@ get_metrics() {
 
     # Multi-kernel aware collection
     mapfile -t kernel_lines < <(collect_kernels_info)
+
+    exec_time=$(grep -E "^gpgpu_simulation_time" "$FILE_PATH" | tail -n1)
+
+    if [[ -n "$exec_time" ]]; then
+        days=$(echo "$exec_time" | sed -E 's/.*=\s*([0-9]+)\s+days.*/\1/')
+        hrs=$(echo "$exec_time"  | sed -E 's/.*days,\s*([0-9]+)\s+hrs.*/\1/')
+        mins=$(echo "$exec_time" | sed -E 's/.*hrs,\s*([0-9]+)\s+min.*/\1/')
+        secs=$(echo "$exec_time" | sed -E 's/.*min,\s*([0-9]+)\s+sec.*/\1/')
+
+        days=${days:-0}
+        hrs=${hrs:-0}
+        mins=${mins:-0}
+        secs=${secs:-0}
+
+        exec_time=$(( days*86400 + hrs*3600 + mins*60 + secs ))
+    else
+        exec_time=0
+    fi
+
 
     # Defaults in case nothing is found
     max_regs=0; max_lmem=0; max_smem=0; all_shaders=""
@@ -245,6 +264,7 @@ get_metrics() {
     GLOBAL_MAX_REGISTERS_USED="${max_regs}"
     GLOBAL_SHADER_USED="${all_shaders}"
     GLOBAL_DATATYPE_SIZE="${dtype_bits}"
+    GLOBAL_EXEC_TIME="${exec_time}"
     
     if [[ "${lmem_bits}" -eq 0 ]]; then
         GLOBAL_LMEM_SIZE_BITS="1"
@@ -263,6 +283,7 @@ get_metrics() {
     echo "DATATYPE_SIZE: ${dtype_bits}"
     echo "LMEM_SIZE_BITS: ${lmem_bits}"
     echo "SMEM_SIZE_BITS: ${smem_bits}"
+    echo "EXEC_TIME: ${exec_time}s"
 
 }
 
@@ -415,7 +436,7 @@ main() {
             -v global_lmem_size_bits="$GLOBAL_LMEM_SIZE_BITS" \
             -v global_smem_size_bits="$GLOBAL_SMEM_SIZE_BITS" \
             -v run_times="$RUN_PER_EPOCH" \
-            -v time_out="$TIME_OUT" \
+            -v exec_time="$GLOBAL_EXEC_TIME" \
             -v component_set="$COMPONENT_SET" '
         {
             # 替换CUDA_UUT
@@ -460,7 +481,8 @@ main() {
             }
             # 替换TIMEOUT_VAL
             if ($0 ~ /^TIMEOUT_VAL=/) {
-                print "TIMEOUT_VAL=" time_out
+                et = exec_time + 5
+                print "TIMEOUT_VAL=" et "s"
                 next
             }
             # 替换COMPONENT_SET

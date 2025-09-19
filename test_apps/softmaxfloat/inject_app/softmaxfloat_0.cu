@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
 
   // ===== 逐项比对结果 =====
   bool match = true;
-  const float eps = 1e-4; // 允许的浮点误差
+  const float eps = 1e-6; // 允许的浮点误差
   for (int i = 0; i < numElem; i++) {
     if (fabs(output_gpu[i] - expected[i]) > eps) {
       match = false;
