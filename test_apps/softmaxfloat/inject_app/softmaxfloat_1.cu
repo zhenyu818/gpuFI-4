@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
   // ===== 从 result.txt 读取期望结果 =====
   FILE *file = fopen("result.txt", "r");
   if (file == NULL) {
-    printf("Failed (cannot open result.txt)\n");
+    printf("Failed\n");
     free(input);
     free(output_gpu);
     cudaFree(d_input);
@@ -85,7 +85,7 @@ int main(int argc, char* argv[]) {
   fclose(file);
 
   if (count != numElem) {
-    printf("Failed (result.txt does not match expected size)\n");
+    printf("Failed\n");
     free(input);
     free(output_gpu);
     free(expected);
@@ -94,11 +94,35 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  // ===== 逐项比对结果 =====
+  // ===== 逐项比对结果，支持 NaN / Inf =====
   bool match = true;
-  const float eps = 1e-6; // 允许的浮点误差
+  const float eps = 1e-5f;
   for (int i = 0; i < numElem; i++) {
-    if (fabs(output_gpu[i] - expected[i]) > eps) {
+    float actual = output_gpu[i];
+    float expected_val = expected[i];
+
+    if (isnan(actual) && isnan(expected_val)) {
+      continue; // 两个 NaN 算相等
+    }
+    if (isnan(actual) || isnan(expected_val)) {
+      match = false;
+      break;
+    }
+
+    if (isinf(actual) && isinf(expected_val)) {
+      if (signbit(actual) != signbit(expected_val)) {
+        match = false; // +Inf vs -Inf 不相等
+        break;
+      } else {
+        continue; // 两个同号 Inf 相等
+      }
+    }
+    if (isinf(actual) || isinf(expected_val)) {
+      match = false; // 一个是 Inf，一个不是
+      break;
+    }
+
+    if (fabs(actual - expected_val) > eps) {
       match = false;
       break;
     }

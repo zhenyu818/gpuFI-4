@@ -74,8 +74,6 @@ static void generate_input_6(int argc, char **argv) {
         // 检查列数是否为4的整数倍（确保2:4稀疏分组完整，若不满足则自动补齐）
         if (cols % SPARSE_M != 0) {
             int new_cols = (cols / SPARSE_M + 1) * SPARSE_M;
-            printf("Warning: Column length (%d) is not a multiple of %d. Auto-adjust to %d\n", 
-                   cols, SPARSE_M, new_cols);
             cols = new_cols;
         }
     } else {

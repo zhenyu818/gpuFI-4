@@ -12,7 +12,7 @@
 #include <cuda.h>
 #include <iostream>
 
-#define M_SEED 1
+#define M_SEED 4525
 #define BLOCK_SIZE 256
 #define MAX_MASK_WIDTH 10
 #define TILE_SIZE BLOCK_SIZE
@@ -53,19 +53,6 @@ void conv1d_tiled_caching(const T *__restrict__ in,
 }
 
 template <typename T>
-void reference(const T *h_in,
-               const T *d_out,
-               const T *mask,
-               const int input_width,
-               const int mask_width)
-{
-  printf("Result ");
-  for (int i = 0; i < input_width; i++) {
-    printf("%d ", d_out[i]);
-  }
-}
-
-template <typename T>
 void conv1D(const int input_width, const int mask_width, const int repeat)
 {
   size_t size_bytes = input_width * sizeof(T);
@@ -80,7 +67,7 @@ void conv1D(const int input_width, const int mask_width, const int repeat)
 
   srand(M_SEED);
   for (int i = 0; i < input_width; i++) {
-    a[i] = M_SEED;
+    a[i] = rand() % 256;
   }
 
   T *d_a, *d_b;
@@ -101,8 +88,46 @@ void conv1D(const int input_width, const int mask_width, const int repeat)
   }
   cudaDeviceSynchronize();
   cudaMemcpy(b, d_b, size_bytes, cudaMemcpyDeviceToHost);
-  reference(a, b, h_mask, input_width, mask_width);
+  // ===== 从 result.txt 读取参考结果 =====
+  FILE *file = fopen("result.txt", "r");
+  if (file == NULL) {
+    printf("Failed\n");
+    free(a); free(b);
+    cudaFree(d_a); cudaFree(d_b);
+    return;
+  }
 
+  T *expected = (T*) malloc(size_bytes);
+  int count = 0;
+  while (fscanf(file, "%hd", &expected[count]) == 1 && count < input_width) {
+    count++;
+  }
+  fclose(file);
+
+  if (count != input_width) {
+    printf("Failed\n");
+    free(expected);
+    free(a); free(b);
+    cudaFree(d_a); cudaFree(d_b);
+    return;
+  }
+
+  // ===== 逐项比较结果 =====
+  bool match = true;
+  for (int i = 0; i < input_width; i++) {
+    if (b[i] != expected[i]) {
+      match = false;
+      break;
+    }
+  }
+
+  if (match) {
+    printf("Success\n");
+  } else {
+    printf("Failed\n");
+  }
+
+  free(expected);
   free(a);
   free(b);
   cudaFree(d_a);

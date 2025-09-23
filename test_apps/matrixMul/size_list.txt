@@ -1,0 +1,6 @@
+wA 16 hA 16 wB 16 hB 16
+wA 32 hA 16 wB 16 hB 32
+wA 48 hA 16 wB 16 hB 48
+wA 64 hA 32 wB 32 hB 64
+wA 80 hA 32 wB 32 hB 80
+wA 96 hA 32 wB 32 hB 96

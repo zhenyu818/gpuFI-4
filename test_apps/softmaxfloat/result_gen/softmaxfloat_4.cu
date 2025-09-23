@@ -70,8 +70,6 @@ int main(int argc, char* argv[]) {
   // ---- 确保 sliceSize 为 4 的倍数 ----
   if (sliceSize % SPARSE_M != 0) {
     int new_size = (sliceSize / SPARSE_M + 1) * SPARSE_M;
-    printf("Warning: sliceSize (%d) not multiple of %d, auto-adjust to %d\n",
-           sliceSize, SPARSE_M, new_size);
     sliceSize = new_size;
     numElem = numSlice * sliceSize;
   }

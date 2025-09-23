@@ -5,7 +5,7 @@
 #include <cmath>
 
 #define BLOCK_SIZE 256
-#define M_SEED 3608
+#define M_SEED 9927
 
 __global__
 void softMax(const int numSlice, const int sliceSize,

@@ -4,6 +4,7 @@
 #include <cuda.h>
 #include <cmath>
 #include <climits>   // for INT_MAX, INT_MIN
+#include <math.h>    // for NAN, isnan
 
 #define BLOCK_SIZE 256
 #define M_SEED 3608
@@ -30,23 +31,16 @@ void softMax(const int numSlice, const int sliceSize,
   }
 }
 
-// ---- 输入生成函数：包含特殊值 ----
-static void generate_input_with_special(float* input, int numSlice, int sliceSize) {
+// ---- 输入生成函数：包含 NaN ----
+static void generate_input_with_nan(float* input, int numSlice, int sliceSize) {
   srand(M_SEED);
   for (int i = 0; i < numSlice; i++) {
     for (int j = 0; j < sliceSize; j++) {
-      int rand_val = rand() % 100;
-      if (rand_val < 20) {
-        // 20% 概率 INT_MAX
-        input[i * sliceSize + j] = static_cast<float>(INT_MAX);
-      } else if (rand_val < 40) {
-        // 20% 概率 INT_MIN
-        input[i * sliceSize + j] = static_cast<float>(INT_MIN);
-      } else if (rand_val < 60) {
-        // 20% 概率 随机负数
-        input[i * sliceSize + j] = static_cast<float>(-(rand() % 100));
+      if (rand() % 2 == 0) {
+        // 50% 概率 NaN
+        input[i * sliceSize + j] = NAN;
       } else {
-        // 40% 概率 0–9 普通数
+        // 50% 概率 0~9 普通数
         input[i * sliceSize + j] = static_cast<float>(rand() % 10);
       }
     }
@@ -67,8 +61,8 @@ int main(int argc, char* argv[]) {
   float* input = (float*) aligned_alloc(1024, sizeof(float) * numElem);
   float* output_gpu = (float*) aligned_alloc(1024, sizeof(float) * numElem);
 
-  // ---- 使用特殊输入生成 ----
-  generate_input_with_special(input, numSlice, sliceSize);
+  // ---- 使用包含 NaN 的输入生成 ----
+  generate_input_with_nan(input, numSlice, sliceSize);
 
   float *d_input, *d_output;
   cudaMalloc((void**)&d_input, sizeof(float) * numElem);

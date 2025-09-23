@@ -342,6 +342,8 @@ breakaddr  TC; yylval->int_value = BREAKADDR_OP; return OPCODE;
 \.arrive TC; return ARRIVE_OPTION;
 \.red TC; return RED_OPTION;
 
+\.aligned TC; return ALIGNED_OPTION;
+
 
 \.approx TC; return APPROX_OPTION;
 \.full  TC; return FULL_OPTION;

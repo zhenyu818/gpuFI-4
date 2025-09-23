@@ -214,6 +214,7 @@ class ptx_recognizer;
 %token	DOWN_OPTION;
 %token	BFLY_OPTION;
 %token	IDX_OPTION;
+%token  ALIGNED_OPTION;
 %token	PRMT_F4E_MODE;
 %token	PRMT_B4E_MODE;
 %token	PRMT_RC8_MODE;
@@ -470,6 +471,7 @@ option: type_spec
 	| rounding_mode
 	| wmma_spec 
 	| prmt_spec 
+    | ALIGNED_OPTION { /* ignore .aligned option */ }
 	| SYNC_OPTION { recognizer->add_option(SYNC_OPTION); }
 	| ARRIVE_OPTION { recognizer->add_option(ARRIVE_OPTION); }
 	| RED_OPTION { recognizer->add_option(RED_OPTION); }
@@ -566,12 +568,16 @@ prmt_spec: PRMT_F4E_MODE { recognizer->add_option( PRMT_F4E_MODE); }
 	|  PRMT_ECR_MODE { recognizer->add_option( PRMT_ECR_MODE); }
 	;
 
-wmma_spec: WMMA_DIRECTIVE LAYOUT CONFIGURATION{recognizer->add_space_spec(global_space,0);recognizer->add_ptr_spec(global_space); recognizer->add_wmma_option($1);recognizer->add_wmma_option($2);recognizer->add_wmma_option($3);}
+wmma_spec: WMMA_DIRECTIVE LAYOUT CONFIGURATION{recognizer->add_wmma_option($1);recognizer->add_wmma_option($2);recognizer->add_wmma_option($3);}
 	| WMMA_DIRECTIVE LAYOUT LAYOUT CONFIGURATION{recognizer->add_wmma_option($1);recognizer->add_wmma_option($2);recognizer->add_wmma_option($3);recognizer->add_wmma_option($4);}
+	| WMMA_DIRECTIVE ALIGNED_OPTION LAYOUT CONFIGURATION{recognizer->add_wmma_option($1);recognizer->add_wmma_option($3);recognizer->add_wmma_option($4);}
+	| WMMA_DIRECTIVE ALIGNED_OPTION LAYOUT LAYOUT CONFIGURATION{recognizer->add_wmma_option($1);recognizer->add_wmma_option($3);recognizer->add_wmma_option($4);recognizer->add_wmma_option($5);}
 	;
 
-vp_spec: WMMA_DIRECTIVE LAYOUT CONFIGURATION{recognizer->add_space_spec(global_space,0);recognizer->add_ptr_spec(global_space);recognizer->add_wmma_option($1);recognizer->add_wmma_option($2);recognizer->add_wmma_option($3);}
+vp_spec: WMMA_DIRECTIVE LAYOUT CONFIGURATION{recognizer->add_wmma_option($1);recognizer->add_wmma_option($2);recognizer->add_wmma_option($3);}
 	| WMMA_DIRECTIVE LAYOUT LAYOUT CONFIGURATION{recognizer->add_wmma_option($1);recognizer->add_wmma_option($2);recognizer->add_wmma_option($3);recognizer->add_wmma_option($4);}
+	| WMMA_DIRECTIVE ALIGNED_OPTION LAYOUT CONFIGURATION{recognizer->add_wmma_option($1);recognizer->add_wmma_option($3);recognizer->add_wmma_option($4);}
+	| WMMA_DIRECTIVE ALIGNED_OPTION LAYOUT LAYOUT CONFIGURATION{recognizer->add_wmma_option($1);recognizer->add_wmma_option($3);recognizer->add_wmma_option($4);recognizer->add_wmma_option($5);}
 	;
 
 

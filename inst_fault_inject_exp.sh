@@ -1,10 +1,10 @@
 #!/bin/bash
 
-TEST_APP_NAME="softmaxfloat"
+TEST_APP_NAME="matrixMul"
 COMPONENT_SET="0"
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
 RUN_PER_EPOCH=100
-EPOCH=1
+EPOCH=100
 
 
 DO_BUILD=0 # 1: build before run, 0: skip build
@@ -333,7 +333,7 @@ main() {
                     x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
                     if [[ -n "$x_val" ]]; then
                         cp "$cu_file" "${cu_file}.bak"
-                        /usr/local/cuda/bin/nvcc "$cu_file" -o "test_apps/${TEST_APP_NAME}/result_gen/gen"
+                        /usr/local/cuda/bin/nvcc "$cu_file" -o "test_apps/${TEST_APP_NAME}/result_gen/gen" -arch=sm_75
                         ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
                         rm -rf "test_apps/${TEST_APP_NAME}/result_gen/gen"
                         mv "${cu_file}.bak" "$cu_file"
@@ -347,7 +347,7 @@ main() {
                         continue
                     fi
                     cp "$cu_file" "${cu_file}.bak"
-                    /usr/local/cuda/bin/nvcc "$cu_file" -o "test_apps/${TEST_APP_NAME}/result_gen/gen"
+                    /usr/local/cuda/bin/nvcc "$cu_file" -o "test_apps/${TEST_APP_NAME}/result_gen/gen" -arch=sm_75
                     ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
                     rm -rf "test_apps/${TEST_APP_NAME}/result_gen/gen"
                     mv "${cu_file}.bak" "$cu_file"
@@ -360,12 +360,6 @@ main() {
     else
         echo "=== Result generation skipped ==="
     fi
-
-    echo "=== Extracting register information ==="
-
-    nvcc -arch=sm_75 -ptx -g -lineinfo $TEST_APP_NAME.cu -o $TEST_APP_NAME.ptx
-
-    python3 extract_registers.py $TEST_APP_NAME
 
     # register_used.txt will be consumed by campaign_exec.sh per-injection
 
@@ -494,6 +488,11 @@ main() {
             print $0
         }' "$campaign_file" > "${campaign_file}.tmp" && mv "${campaign_file}.tmp" "$campaign_file"
 
+        echo "=== Extracting register information ==="
+
+        nvcc -arch=sm_75 -ptx -g -lineinfo $TEST_APP_NAME.cu -o $TEST_APP_NAME.ptx
+
+        python3 extract_registers.py $TEST_APP_NAME
 
         echo "=== Starting fault injection experiment: ${TEST_APP_NAME}, file ${filename} ==="
         filename_no_ext="${filename%.txt}"
