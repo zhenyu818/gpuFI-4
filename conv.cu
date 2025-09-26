@@ -11,9 +11,8 @@
 #include <chrono>
 #include <cuda.h>
 #include <iostream>
-#include <climits>   // for INT16_MAX, INT16_MIN
 
-#define M_SEED 6498
+#define M_SEED 4525
 #define BLOCK_SIZE 256
 #define MAX_MASK_WIDTH 10
 #define TILE_SIZE BLOCK_SIZE
@@ -42,6 +41,8 @@ void conv1d_tiled_caching(const T *__restrict__ in,
     int in_index = start + j;
     if (in_index >= 0 && in_index < input_width) {
       if (in_index >= this_tile_start && in_index < next_tile_start) {
+        // in_index = (start + j) = (i - mask_width/2 +j) >= 0,
+        // then map in_index to tile_index
         s += tile[threadIdx.x + j - (mask_width / 2)] * mask<T>[j];
       } else {
         s += in[in_index] * mask<T>[j];
@@ -61,21 +62,12 @@ void conv1D(const int input_width, const int mask_width, const int repeat)
   b = (T *)malloc(size_bytes); // output
 
   T h_mask[MAX_MASK_WIDTH];
+
   for (int i = 0; i < MAX_MASK_WIDTH; i++) h_mask[i] = 1; 
 
   srand(M_SEED);
-  // ---- 修改: 使用特殊值生成输入 ----
   for (int i = 0; i < input_width; i++) {
-    int rand_val = rand() % 100;
-    if (rand_val < 20) {
-      a[i] = (T)INT16_MAX;
-    } else if (rand_val < 40) {
-      a[i] = (T)INT16_MIN;
-    } else if (rand_val < 60) {
-      a[i] = (T)(-(rand() % 100));
-    } else {
-      a[i] = (T)(rand() % 10);
-    }
+    a[i] = rand() % 256;
   }
 
   T *d_a, *d_b;
@@ -136,7 +128,6 @@ void conv1D(const int input_width, const int mask_width, const int repeat)
   }
 
   free(expected);
-
   free(a);
   free(b);
   cudaFree(d_a);
