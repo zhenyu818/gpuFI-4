@@ -99,7 +99,7 @@ void conv1D(const int input_width, const int mask_width, const int repeat)
   // ===== 从 result.txt 读取参考结果 =====
   FILE *file = fopen("result.txt", "r");
   if (file == NULL) {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
     free(a); free(b);
     cudaFree(d_a); cudaFree(d_b);
     return;
@@ -113,7 +113,7 @@ void conv1D(const int input_width, const int mask_width, const int repeat)
   fclose(file);
 
   if (count != input_width) {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
     free(expected);
     free(a); free(b);
     cudaFree(d_a); cudaFree(d_b);
@@ -130,9 +130,9 @@ void conv1D(const int input_width, const int mask_width, const int repeat)
   }
 
   if (match) {
-    printf("Success\n");
+    printf("Fault Injection Test Success!\n");
   } else {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
   }
 
   free(expected);

@@ -1,14 +1,15 @@
 #!/bin/bash
 
-TEST_APP_NAME="matrixMul"
+TEST_APP_NAME="gemm"
 COMPONENT_SET="0"
+INJECT_BIT_FLIP_COUNT=3 # number of bits to flip per injection (e.g. 2 means flip 2 bits per injection)
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
 RUN_PER_EPOCH=100
 EPOCH=100
 
 
 DO_BUILD=0 # 1: build before run, 0: skip build
-DO_RESULT_GEN=1 # 1: generate result files, 0: skip result generation
+DO_RESULT_GEN=0 # 1: generate result files, 0: skip result generation
 
 
 
@@ -431,7 +432,8 @@ main() {
             -v global_smem_size_bits="$GLOBAL_SMEM_SIZE_BITS" \
             -v run_times="$RUN_PER_EPOCH" \
             -v exec_time="$GLOBAL_EXEC_TIME" \
-            -v component_set="$COMPONENT_SET" '
+            -v component_set="$COMPONENT_SET" \
+            -v inject_bit_flip_count="$INJECT_BIT_FLIP_COUNT" '
         {
             # 替换CUDA_UUT
             if ($0 ~ /^CUDA_UUT=/) {
@@ -482,6 +484,11 @@ main() {
             # 替换COMPONENT_SET
             if ($0 ~ /^COMPONENT_SET=/) {
                 print "COMPONENT_SET=\"" component_set "\""
+                next
+            }
+            # 替换INJECT_BIT_FLIP_COUNT
+            if ($0 ~ /^INJECT_BIT_FLIP_COUNT=/) {
+                print "INJECT_BIT_FLIP_COUNT=" inject_bit_flip_count
                 next
             }
             # 其他行保持不变
@@ -562,4 +569,6 @@ main() {
 
 echo "=== Running main with COMPONENT_SET=${COMPONENT_SET} ==="
 echo "=== Component mapping: 0=RF, 1=local_mem, 2=shared_mem, 3=L1D_cache, 4=L1C_cache, 5=L1T_cache, 6=L2_cache ==="
+echo "=== Test application: ${TEST_APP_NAME} ==="
+echo "=== Injection bit flip count: ${INJECT_BIT_FLIP_COUNT} ==="
 main "$@"

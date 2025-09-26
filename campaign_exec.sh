@@ -13,6 +13,8 @@ RUNS=100
 COMPONENT_SET="0"
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
 DELETE_LOGS=1 # if 1 then all logs will be deleted at the end of the script
+INJECT_BIT_FLIP_COUNT=3
+
 # Optional: specify PTX virtual register name(s) to inject (overrides index-based selection)
 # Examples: %f1, %r36, %rd7, %p2; multiple names can be colon-delimited like "%f1:%r36".
 
@@ -31,26 +33,26 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./matrixMul wA 96 hA 32 wB 32 hB 96"
+CUDA_UUT="./gemm 3"
 # total cycles for all kernels
-CYCLES=8946
+CYCLES=5457
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
 # fix cycles.txt with kernel execution cycles
 # (e.g. seq 1 10 >> cycles.txt, or multiple seq commands if a kernel has multiple executions)
 # use the following command from profiling execution for easier creation of cycles.txt file
 # e.g. grep "_Z12lud_diagonalPfii" cycles.in | awk  '{ system("seq " $12 " " $18 ">> cycles.txt")}'
 CYCLES_FILE=./cycles.txt
-MAX_REGISTERS_USED=42
-SHADER_USED="0 1 2 3"
-SUCCESS_MSG='Success'
-FAILED_MSG='Failed'
-TIMEOUT_VAL=7s
+MAX_REGISTERS_USED=59
+SHADER_USED="0"
+SUCCESS_MSG='Fault Injection Test Success!'
+FAILED_MSG='Fault Injection Test Failed!'
+TIMEOUT_VAL=6s
 DATATYPE_SIZE=32
 # lmem and smem values are taken from gpgpu-sim ptx output per kernel
 # e.g. GPGPU-Sim PTX: Kernel '_Z9vectorAddPKdS0_Pdi' : regs=8, lmem=0, smem=0, cmem=380
 # if 0 put a random value > 0
 LMEM_SIZE_BITS=1
-SMEM_SIZE_BITS=32768
+SMEM_SIZE_BITS=1
 # ---------------------------------------------- END PER KERNEL/APPLICATION PARAMETERS (+profile=1) ------------------------------------------------
 
 FAULT_INJECTION_OCCURRED="Fault injection"
@@ -96,7 +98,6 @@ initialize_config() {
         if [[ "$profile" -eq 3 ]]; then
             total_cycle_rand=-1
         fi
-        count=$(shuf -i 1-2 -n 1)
         # Randomize REGISTER_NAME per injection if register list is available
         if [[ -f "register_used.txt" && -s "register_used.txt" ]]; then
             REGISTER_NAME=$(shuf -n 1 register_used.txt | tr -d '\r')
@@ -105,13 +106,13 @@ initialize_config() {
         # register_rand_n="$(shuf -i 1-${MAX_REGISTERS_USED} -n 1)"; register_rand_n="${register_rand_n//$'\n'/:}"
         register_rand_n=1
         # example: if -i 1-32 -n 2 then the two commands below will create a value with 2 random numbers, between [1,32] like 3:21. Meaning it will flip 3 and 21 bits.
-        reg_bitflip_rand_n=$(shuf -i 1-${DATATYPE_SIZE} -n ${count} | paste -sd:)
+        reg_bitflip_rand_n=$(shuf -i 1-${DATATYPE_SIZE} -n ${INJECT_BIT_FLIP_COUNT} | paste -sd:)
         # same format like reg_bitflip_rand_n but for local memory bit flips
-        local_mem_bitflip_rand_n=$(shuf -i 1-${LMEM_SIZE_BITS} -n 1 | paste -sd:)
+        local_mem_bitflip_rand_n=$(shuf -i 1-${LMEM_SIZE_BITS} -n ${INJECT_BIT_FLIP_COUNT} | paste -sd:)
         # random number for choosing a random block after block_rand % #smems operation in gpgpu-sim
         block_rand=$(shuf -i 0-6000 -n 1)
         # same format like reg_bitflip_rand_n but for shared memory bit flips
-        shared_mem_bitflip_rand_n=$(shuf -i 1-${SMEM_SIZE_BITS} -n 1 | paste -sd:)
+        shared_mem_bitflip_rand_n=$(shuf -i 1-${SMEM_SIZE_BITS} -n ${INJECT_BIT_FLIP_COUNT} | paste -sd:)
         # randomly select one or more shaders for L1 data cache fault injections 
         l1d_shader_rand_n="$(shuf -e ${SHADER_USED} -n 1)"; l1d_shader_rand_n="${l1d_shader_rand_n//$'\n'/:}"
         # same format like reg_bitflip_rand_n but for L1 data cache bit flips

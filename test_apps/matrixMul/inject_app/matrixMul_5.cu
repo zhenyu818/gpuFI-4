@@ -121,7 +121,7 @@ int MatrixMultiply(const dim3 &dimsA, const dim3 &dimsB) {
     // ====== 从 result.txt 读取期望结果 ======
     FILE *file = fopen("result.txt", "r");
     if (file == NULL) {
-        printf("Failed\n");
+        printf("Fault Injection Test Failed!\n");
         checkCudaErrors(cudaFreeHost(h_A));
         checkCudaErrors(cudaFreeHost(h_B));
         checkCudaErrors(cudaFreeHost(h_C));
@@ -139,7 +139,7 @@ int MatrixMultiply(const dim3 &dimsA, const dim3 &dimsB) {
     fclose(file);
 
     if (count != (int)(dimsC.x * dimsC.y)) {
-        printf("Failed\n");
+        printf("Fault Injection Test Failed!\n");
         free(expected);
         checkCudaErrors(cudaFreeHost(h_A));
         checkCudaErrors(cudaFreeHost(h_B));
@@ -169,8 +169,8 @@ int MatrixMultiply(const dim3 &dimsA, const dim3 &dimsB) {
         if (fabs(actual - expected_val) > eps) { match = false; break; }
     }
 
-    if (match) printf("Success\n");
-    else       printf("Failed\n");
+    if (match) printf("Fault Injection Test Success!\n");
+    else       printf("Fault Injection Test Failed!\n");
 
     free(expected);
     checkCudaErrors(cudaFreeHost(h_A));

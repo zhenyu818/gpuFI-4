@@ -239,10 +239,9 @@ int main(int argc, char **argv) {
   // -------- 结果拷回 --------
   checkCudaErrors(cudaMemcpy(result_hD, D, sizeof(float) * M_GLOBAL * N_GLOBAL, cudaMemcpyDeviceToHost));
 
-  // ====== 从 result.txt 读取期望结果 ======
   FILE *file = fopen("result.txt", "r");
   if (file == NULL) {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
     free(A_h); free(B_h); free(C_h); free(result_hD);
     cudaFree(A); cudaFree(B); cudaFree(C); cudaFree(D);
     return 0;
@@ -256,14 +255,14 @@ int main(int argc, char **argv) {
   fclose(file);
 
   if (count != M_GLOBAL * N_GLOBAL) {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
     free(expected);
     free(A_h); free(B_h); free(C_h); free(result_hD);
     cudaFree(A); cudaFree(B); cudaFree(C); cudaFree(D);
     return 0;
   }
 
-  // ====== 逐项比较结果，支持 NaN ======
+  // ===== 显式比较 NaN 和 Inf =====
   bool match = true;
   const float eps = 1e-5f;
   for (int i = 0; i < M_GLOBAL * N_GLOBAL; i++) {
@@ -272,16 +271,22 @@ int main(int argc, char **argv) {
 
     if (isnan(actual) && isnan(expected_val)) continue;
     if (isnan(actual) || isnan(expected_val)) { match = false; break; }
+
+    if (isinf(actual) && isinf(expected_val)) {
+      if (signbit(actual) != signbit(expected_val)) { match = false; break; }
+      else continue;
+    }
+    if (isinf(actual) || isinf(expected_val)) { match = false; break; }
+
     if (fabs(actual - expected_val) > eps) { match = false; break; }
   }
 
   if (match) {
-    printf("Success\n");
+    printf("Fault Injection Test Success!\n");
   } else {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
   }
 
-  // ====== 资源回收 ======
   free(expected);
   free(A_h);
   free(B_h);

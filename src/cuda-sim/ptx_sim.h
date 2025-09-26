@@ -217,6 +217,10 @@ class ptx_cta_info {
   std::map<mem_addr_t, shared_injection_info> m_shared_injections;
   // last writer per shared memory byte
   std::map<mem_addr_t, smem_write_info> m_shared_last_writer_byte;
+
+  // Dedup helpers for shared-memory FI logging (per injection event)
+  // Keyed by "<inject_cycle>:<inject_pc>" -> set of writer PCs already printed
+  std::map<std::string, std::set<unsigned> > m_shared_fi_writer_printed_by_event;
 };
 
 class ptx_warp_info {
@@ -644,6 +648,10 @@ class ptx_thread_info {
   std::map<mem_addr_t, local_injection_info> m_local_injections;
   // last writer per local memory byte
   std::map<mem_addr_t, reg_write_info> m_local_last_writer_byte;
+
+  // Dedup helpers for local-memory FI logging (per injection event)
+  // Keyed by "<inject_cycle>:<inject_pc>" -> set of writer PCs already printed
+  std::map<std::string, std::set<unsigned> > m_local_fi_writer_printed_by_event;
 };
 
 addr_t generic_to_local(unsigned smid, unsigned hwtid, addr_t addr);

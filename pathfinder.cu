@@ -230,7 +230,7 @@ void run(int argc, char** argv)
     // 读取result.txt文件进行比对
     FILE *file = fopen("result.txt", "r");
     if (file == NULL) {
-        printf("Failed\n");
+        printf("Fault Injection Test Failed!\n");
         cudaFree(gpuWall);
         cudaFree(gpuResult[0]);
         cudaFree(gpuResult[1]);
@@ -249,7 +249,7 @@ void run(int argc, char** argv)
     
     // 检查是否读取了足够的元素
     if (i != cols) {
-        printf("Failed\n");
+        printf("Fault Injection Test Failed!\n");
         cudaFree(gpuWall);
         cudaFree(gpuResult[0]);
         cudaFree(gpuResult[1]);
@@ -270,9 +270,9 @@ void run(int argc, char** argv)
     
     
     if (match) {
-        printf("Success\n");
+        printf("Fault Injection Test Success!\n");
     } else {
-        printf("Failed\n");
+        printf("Fault Injection Test Failed!\n");
     }
 
     cudaFree(gpuWall);

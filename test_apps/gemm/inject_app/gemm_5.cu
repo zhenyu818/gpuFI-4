@@ -229,7 +229,7 @@ int main(int argc, char **argv) {
 
   FILE *file = fopen("result.txt", "r");
   if (file == NULL) {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
     free(A_h); free(B_h); free(C_h); free(result_hD);
     cudaFree(A); cudaFree(B); cudaFree(C); cudaFree(D);
     return 0;
@@ -243,7 +243,7 @@ int main(int argc, char **argv) {
   fclose(file);
 
   if (count != M_GLOBAL * N_GLOBAL) {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
     free(expected);
     free(A_h); free(B_h); free(C_h); free(result_hD);
     cudaFree(A); cudaFree(B); cudaFree(C); cudaFree(D);
@@ -270,9 +270,9 @@ int main(int argc, char **argv) {
   }
 
   if (match) {
-    printf("Success\n");
+    printf("Fault Injection Test Success!\n");
   } else {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
   }
 
   free(expected);

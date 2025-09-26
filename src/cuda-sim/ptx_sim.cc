@@ -162,11 +162,17 @@ void ptx_cta_info::register_shared_mem_injection(
   }
   printf(" at cycle=%llu inj_PC=%u\n", inject_cycle, inject_pc);
   if (writer_info.inst && printer) {
-    unsigned writer_uid = writer_info.inst->uid();
-    printf("[SHARED_MEM_FI_WRITER] last_writer uid=%u at cycle=%llu PC=%u -> ",
-           writer_uid, writer_info.cycle, writer_info.pc);
-    printer->print_insn(writer_info.pc, stdout);
-    printf("\n");
+    // Dedup across multiple flipped positions within the same injection event
+    std::string ev_key = std::to_string(inject_cycle) + ":" + std::to_string(inject_pc);
+    std::set<unsigned> &printed_set = m_shared_fi_writer_printed_by_event[ev_key];
+    if (printed_set.find(writer_info.pc) == printed_set.end()) {
+      unsigned writer_uid = writer_info.inst->uid();
+      printf("[SHARED_MEM_FI_WRITER] last_writer uid=%u at cycle=%llu PC=%u -> ",
+             writer_uid, writer_info.cycle, writer_info.pc);
+      printer->print_insn(writer_info.pc, stdout);
+      printf("\n");
+      printed_set.insert(writer_info.pc);
+    }
   }
 }
 
@@ -178,26 +184,33 @@ void ptx_cta_info::mark_shared_mem_read(mem_addr_t addr, size_t length,
     gpgpu_sim *gpu = (gpgpu_sim *)(printer->get_gpu());
     cyc = gpu->gpu_sim_cycle + gpu->gpu_tot_sim_cycle;
   }
+  bool printed_reader_this_inst = false; // dedup READER per instruction invocation across multiple flipped bytes
   for (size_t off = 0; off < length; ++off) {
     mem_addr_t byte_addr = addr + off;
     std::map<mem_addr_t, shared_injection_info>::iterator it =
         m_shared_injections.find(byte_addr);
     if (it != m_shared_injections.end() && it->second.pending) {
-      // Print a READER log for every read after injection (include instruction inline)
-      printf("[SHARED_MEM_FI_READER] tid=%u cta_uid=%llu byte_addr=%u bits=",
-             printer ? printer->get_uid() : (unsigned)0, get_uid(),
-             (unsigned)byte_addr);
-      for (size_t i = 0; i < it->second.bits_in_byte_1based.size(); ++i) {
-        printf("%u%s", it->second.bits_in_byte_1based[i],
-               (i + 1 < it->second.bits_in_byte_1based.size()) ? ":" : "");
-      }
-      printf(" inject_cycle=%llu read_cycle=%llu reader_PC=%u -> ",
-             it->second.inject_cycle, cyc, printer ? printer->get_pc() : 0);
-      if (reader_inst && printer) { printer->print_insn(printer->get_pc(), stdout); }
-      printf("\n");
-      // Also print EFFECTIVE only on the first read after injection for compatibility
-      if (!it->second.ever_read) {
-        it->second.ever_read = true;
+      // Only print READER when no writer was printed for this flipped position
+      if (it->second.last_writer_at_inject.inst == NULL) {
+        if (!printed_reader_this_inst) {
+          // Print a READER log (include instruction inline)
+          printf("[SHARED_MEM_FI_READER] tid=%u cta_uid=%llu byte_addr=%u bits=",
+                 printer ? printer->get_uid() : (unsigned)0, get_uid(),
+                 (unsigned)byte_addr);
+          for (size_t i = 0; i < it->second.bits_in_byte_1based.size(); ++i) {
+            printf("%u%s", it->second.bits_in_byte_1based[i],
+                   (i + 1 < it->second.bits_in_byte_1based.size()) ? ":" : "");
+          }
+          printf(" inject_cycle=%llu read_cycle=%llu reader_PC=%u -> ",
+                 it->second.inject_cycle, cyc, printer ? printer->get_pc() : 0);
+          if (reader_inst && printer) { printer->print_insn(printer->get_pc(), stdout); }
+          printf("\n");
+          printed_reader_this_inst = true;
+        }
+        // Track first-read observation
+        if (!it->second.ever_read) {
+          it->second.ever_read = true;
+        }
       }
     }
   }

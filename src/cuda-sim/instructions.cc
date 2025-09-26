@@ -839,13 +839,14 @@ ptx_reg_t ptx_thread_info::get_reg(const symbol *reg) {
   // FI: detect effective read of an injected register
   const ptx_instruction *curr_inst = get_inst(get_pc());
   unsigned long long cyc = m_gpu->gpu_sim_cycle + m_gpu->gpu_tot_sim_cycle;
+  bool did_print_reader = false;
   // Prefer physical-slot based injection tracking
   ptx_reg_t *phys_slot = &regs_iter->second;
   std::map<ptx_reg_t *, reg_injection_info>::iterator itp =
       m_physreg_injections.find(phys_slot);
   if (itp != m_physreg_injections.end() && itp->second.pending) {
     if (itp->second.last_writer_at_inject.inst == NULL) {
-      // Attribute to reader when no writer existed at injection time
+      // No writer at injection time: print a READER line on every read, do not consume
       printf("[REG_FI_READER] tid=%u reg=%s bits=", get_uid(), reg->name().c_str());
       for (size_t bi = 0; bi < itp->second.bits.size(); ++bi) {
         printf("%u%s", itp->second.bits[bi], (bi + 1 < itp->second.bits.size()) ? ":" : "");
@@ -853,15 +854,33 @@ ptx_reg_t ptx_thread_info::get_reg(const symbol *reg) {
       printf(" read_cycle=%llu reader_PC=%u -> ", cyc, get_pc());
       print_insn(get_pc(), stdout);
       printf("\n");
+      did_print_reader = true;
+      // keep pending=true so subsequent reads continue to log
+    } else {
+      // Writer existed: consume on first read observation
+      itp->second.pending = false;
     }
-    itp->second.pending = false;  // consume
   }
   // Back-compat: symbol-based tracking
   {
     std::map<const symbol *, reg_injection_info>::iterator it =
         m_reg_injections.find(reg);
     if (it != m_reg_injections.end() && it->second.pending) {
-      it->second.pending = false;
+      if (it->second.last_writer_at_inject.inst == NULL) {
+        // Only print here if not already printed via physreg path
+        if (!did_print_reader) {
+          printf("[REG_FI_READER] tid=%u reg=%s bits=", get_uid(), reg->name().c_str());
+          for (size_t bi = 0; bi < it->second.bits.size(); ++bi) {
+            printf("%u%s", it->second.bits[bi], (bi + 1 < it->second.bits.size()) ? ":" : "");
+          }
+          printf(" read_cycle=%llu reader_PC=%u -> ", cyc, get_pc());
+          print_insn(get_pc(), stdout);
+          printf("\n");
+        }
+        // keep pending=true so subsequent reads continue to log
+      } else {
+        it->second.pending = false;
+      }
     }
   }
   return regs_iter->second;
@@ -968,31 +987,44 @@ void ptx_thread_info::register_local_mem_injection(mem_addr_t byte_addr,
   }
   printf(" at cycle=%llu inj_PC=%u\n", inject_cycle, inject_pc);
   if (writer_info.inst) {
-    unsigned writer_uid = writer_info.inst->uid();
-    printf("[LOCAL_MEM_FI_WRITER] last_writer uid=%u at cycle=%llu PC=%u -> ", writer_uid, writer_info.cycle, writer_info.pc);
-    print_insn(writer_info.pc, stdout);
-    printf("\n");
+    // Dedup across multiple flipped positions within the same injection event
+    std::string ev_key = std::to_string(inject_cycle) + ":" + std::to_string(inject_pc);
+    std::set<unsigned> &printed_set = m_local_fi_writer_printed_by_event[ev_key];
+    if (printed_set.find(writer_info.pc) == printed_set.end()) {
+      unsigned writer_uid = writer_info.inst->uid();
+      printf("[LOCAL_MEM_FI_WRITER] last_writer uid=%u at cycle=%llu PC=%u -> ", writer_uid, writer_info.cycle, writer_info.pc);
+      print_insn(writer_info.pc, stdout);
+      printf("\n");
+      printed_set.insert(writer_info.pc);
+    }
   }
 }
 
 void ptx_thread_info::mark_local_mem_read(mem_addr_t addr, size_t length,
                                           const ptx_instruction *reader_inst) {
   unsigned long long cyc = m_gpu->gpu_sim_cycle + m_gpu->gpu_tot_sim_cycle;
+  bool printed_reader_this_inst = false; // dedup READER per instruction invocation across multiple flipped bytes
   for (size_t off = 0; off < length; ++off) {
     mem_addr_t byte_addr = addr + off;
     std::map<mem_addr_t, local_injection_info>::iterator it = m_local_injections.find(byte_addr);
     if (it != m_local_injections.end() && it->second.pending) {
-      // Print a reader log for every read after injection (include instruction inline)
-      printf("[LOCAL_MEM_FI_READER] tid=%u byte_addr=%u bits=", get_uid(), (unsigned)byte_addr);
-      for (size_t i = 0; i < it->second.bits_in_byte_1based.size(); ++i) {
-        printf("%u%s", it->second.bits_in_byte_1based[i], (i + 1 < it->second.bits_in_byte_1based.size()) ? ":" : "");
-      }
-      printf(" inject_cycle=%llu read_cycle=%llu reader_PC=%u -> ", it->second.inject_cycle, cyc, get_pc());
-      if (reader_inst) { print_insn(get_pc(), stdout); }
-      printf("\n");
-      // For compatibility, also print EFFECTIVE only on the first read
-      if (!it->second.ever_read) {
-        it->second.ever_read = true;
+      // Only print READER when no writer was printed for this flipped position
+      if (it->second.last_writer_at_inject.inst == NULL) {
+        if (!printed_reader_this_inst) {
+          // Print a reader log (include instruction inline)
+          printf("[LOCAL_MEM_FI_READER] tid=%u byte_addr=%u bits=", get_uid(), (unsigned)byte_addr);
+          for (size_t i = 0; i < it->second.bits_in_byte_1based.size(); ++i) {
+            printf("%u%s", it->second.bits_in_byte_1based[i], (i + 1 < it->second.bits_in_byte_1based.size()) ? ":" : "");
+          }
+          printf(" inject_cycle=%llu read_cycle=%llu reader_PC=%u -> ", it->second.inject_cycle, cyc, get_pc());
+          if (reader_inst) { print_insn(get_pc(), stdout); }
+          printf("\n");
+          printed_reader_this_inst = true;
+        }
+        // Track that at least one read observed this injection
+        if (!it->second.ever_read) {
+          it->second.ever_read = true;
+        }
       }
     }
   }

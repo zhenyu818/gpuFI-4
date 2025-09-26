@@ -47,24 +47,31 @@ def parse_log(log_path: str):
     occ_counter = defaultdict(int)
     effects_occ, results_occ = {}, {}
 
-    def build_recs():
-        if cur_writers:
-            return deepcopy(cur_writers)
-        if cur_readers:
-            return deepcopy(cur_readers)
-        return [
-            {
-                "kernel": "invalid_summary",
-                "inst_line": -1,
-                "inst_text": "",
-                "src": "invalid",
-            }
-        ]
+    def _merge_unique(writers, readers):
+        # 合并 WRITER 与 READER，并按 (src,kernel,line,text) 去重
+        seen = set()
+        merged = []
+        for rec in writers + readers:
+            key = (rec.get("src"), rec.get("kernel"), rec.get("inst_line"), rec.get("inst_text"))
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(deepcopy(rec))
+        if not merged:
+            merged = [
+                {
+                    "kernel": "invalid_summary",
+                    "inst_line": -1,
+                    "inst_text": "",
+                    "src": "invalid",
+                }
+            ]
+        return merged
 
     def flush_current_effects():
         nonlocal cur_key, cur_writers, cur_readers
         if cur_key is not None:
-            latest_effects_by_pair[cur_key] = build_recs()
+            latest_effects_by_pair[cur_key] = _merge_unique(cur_writers, cur_readers)
             cur_key = None
             cur_writers, cur_readers = [], []
 
@@ -85,17 +92,19 @@ def parse_log(log_path: str):
                 if cur_key is not None:
                     m = re_writer.match(line)
                     if m:
-                        cur_writers = [
+                        # 支持一次注入打印多个 FI_WRITER：累积
+                        cur_writers.append(
                             {
                                 "kernel": m.group(2),
                                 "inst_line": int(m.group(4)),
                                 "inst_text": m.group(5).strip(),
                                 "src": m.group("src"),
                             }
-                        ]
+                        )
                         continue
                     m = re_reader.match(line)
-                    if m and not cur_writers:
+                    if m:
+                        # 累积所有 FI_READER（与 FI_WRITER 并存）
                         cur_readers.append(
                             {
                                 "kernel": m.group(2),
@@ -125,7 +134,7 @@ def parse_log(log_path: str):
                     inj_key = (run_id, name, idx)
 
                     if cur_key == pair:
-                        recs = build_recs()
+                        recs = _merge_unique(cur_writers, cur_readers)
                         latest_effects_by_pair[pair] = deepcopy(recs)
                     else:
                         recs = latest_effects_by_pair.get(

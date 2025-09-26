@@ -164,7 +164,7 @@ int main(int argc, char* argv[]) {
   // ===== 从 result.txt 读取期望结果 =====
   FILE *file = fopen("result.txt", "r");
   if (file == NULL) {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
 
     free(key);
     free(value);
@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
   fclose(file);
 
   if (count != d) {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
     free(expected);
 
     free(key);
@@ -226,9 +226,9 @@ int main(int argc, char* argv[]) {
   }
 
   if (match) {
-    printf("Success\n");
+    printf("Fault Injection Test Success!\n");
   } else {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
   }
 
   free(expected);

@@ -123,7 +123,7 @@ int main(int argc, char* argv[]) {
   // ===== 比对结果 =====
   FILE *file = fopen("result.txt", "r");
   if (file == NULL) {
-      printf("Failed\n");
+      printf("Fault Injection Test Failed!\n");
       free(a);
       free(b); 
       cudaFree(d_a); 
@@ -139,7 +139,7 @@ int main(int argc, char* argv[]) {
   fclose(file);
 
   if (i != length) {
-      printf("Failed\n");
+      printf("Fault Injection Test Failed!\n");
   } else {
       bool match = true;
       for (i = 0; i < length; i++) {
@@ -149,9 +149,9 @@ int main(int argc, char* argv[]) {
           }
       }
       if (match) {
-          printf("Success\n");
+          printf("Fault Injection Test Success!\n");
       } else {
-          printf("Failed\n");
+          printf("Fault Injection Test Failed!\n");
       }
   }
 

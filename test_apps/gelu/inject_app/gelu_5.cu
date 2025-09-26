@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
     // ==== 从 result.txt 读取参考值 ====
     FILE* file = fopen("result.txt", "r");
     if (file == NULL) {
-        printf("Failed: cannot open result.txt\n");
+        printf("Fault Injection Test Failed!: cannot open result.txt\n");
         cudaFree(d_output);
         cudaFree(d_bias);
         free(output);
@@ -104,7 +104,7 @@ int main(int argc, char* argv[])
     fclose(file);
 
     if (count != (int)src_size) {
-        printf("Failed: size mismatch\n");
+        printf("Fault Injection Test Failed!: size mismatch\n");
         free(expected);
         cudaFree(d_output);
         cudaFree(d_bias);
@@ -127,9 +127,9 @@ int main(int argc, char* argv[])
     }
 
     if (match) {
-        printf("Success\n");
+        printf("Fault Injection Test Success!\n");
     } else {
-        printf("Failed\n");
+        printf("Fault Injection Test Failed!\n");
     }
 
     free(expected);

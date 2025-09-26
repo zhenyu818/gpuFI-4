@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
   // ===== 从 result.txt 读取期望结果 =====
   FILE *file = fopen("result.txt", "r");
   if (file == NULL) {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
     free(input);
     free(output_gpu);
     cudaFree(d_input);
@@ -97,7 +97,7 @@ int main(int argc, char* argv[]) {
   fclose(file);
 
   if (count != numElem) {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
     free(input);
     free(output_gpu);
     free(expected);
@@ -141,9 +141,9 @@ int main(int argc, char* argv[]) {
   }
 
   if (match) {
-    printf("Success\n");
+    printf("Fault Injection Test Success!\n");
   } else {
-    printf("Failed\n");
+    printf("Fault Injection Test Failed!\n");
   }
 
   free(input);

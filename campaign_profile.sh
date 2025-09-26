@@ -22,7 +22,7 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./matrixMul wA 16 hA 16 wB 16 hB 16"
+CUDA_UUT="./gemm 3"
 # total cycles for all kernels
 CYCLES=4040
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
@@ -33,8 +33,8 @@ CYCLES=4040
 CYCLES_FILE=./cycles.txt
 MAX_REGISTERS_USED=15
 SHADER_USED=0
-SUCCESS_MSG='Success'
-FAILED_MSG='Failed'
+SUCCESS_MSG='Fault Injection Test Success!'
+FAILED_MSG='Fault Injection Test Failed!'
 TIMEOUT_VAL=400s
 DATATYPE_SIZE=32
 # lmem and smem values are taken from gpgpu-sim ptx output per kernel
