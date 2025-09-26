@@ -39,10 +39,21 @@ def main():
     )
     parser.add_argument("--app", "-a", required=True, help="Application name")
     parser.add_argument("--test", "-t", required=True, help="Test identifier", type=str)
+    parser.add_argument(
+        "--component", "-c", required=False, help="Component set", type=int, default=""
+    )
+    parser.add_argument(
+        "--inject_count",
+        "-i",
+        required=False,
+        help="Inject bit flip count",
+        type=int,
+        default=0,
+    )
     args = parser.parse_args()
 
     info_dir = "result_info"
-    info_path = os.path.join(info_dir, f"result_info_{args.app}_{args.test}.csv")
+    info_path = os.path.join(info_dir, f"result_info_{args.app}_{args.test}_{args.component}_{args.inject_count}.csv")
 
     if os.path.exists(info_path):
         with open(info_path, "r", encoding="utf-8") as f:

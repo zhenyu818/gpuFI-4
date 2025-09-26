@@ -555,6 +555,17 @@ def main():
     )
     parser.add_argument("--app", "-a", required=True, help="Application name")
     parser.add_argument("--test", "-t", required=True, help="Test identifier", type=str)
+    parser.add_argument(
+        "--component", "-c", required=False, help="Component set", type=int, default=""
+    )
+    parser.add_argument(
+        "--inject_count",
+        "-i",
+        required=False,
+        help="Inject bit flip count",
+        type=int,
+        default=0,
+    )
     args = parser.parse_args()
 
     log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inst_exec.log")
@@ -568,7 +579,7 @@ def main():
     # 结果 CSV 路径
     out_dir = os.path.join("test_result")
     os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, f"test_result_{args.app}_{args.test}.csv")
+    out_path = os.path.join(out_dir, f"test_result_{args.app}_{args.test}_{args.component}_{args.inject_count}.csv")
 
     # 读取旧结果（B），若存在
     had_old = os.path.exists(out_path)
