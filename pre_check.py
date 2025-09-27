@@ -38,22 +38,17 @@ def main():
         description="Pre-check exit condition before main program"
     )
     parser.add_argument("--app", "-a", required=True, help="Application name")
-    parser.add_argument("--test", "-t", required=True, help="Test identifier", type=str)
+    parser.add_argument("--test", "-t", required=True, help="Test identifier")
     parser.add_argument(
-        "--component", "-c", required=False, help="Component set", type=int, default=""
+        "--component", "-c", required=True, help="Component set"
     )
     parser.add_argument(
-        "--inject_count",
-        "-i",
-        required=False,
-        help="Inject bit flip count",
-        type=int,
-        default=0,
+        "--bitflip", "-b", required=True, help="Number of bit flips to inject"
     )
     args = parser.parse_args()
 
     info_dir = "result_info"
-    info_path = os.path.join(info_dir, f"result_info_{args.app}_{args.test}_{args.component}_{args.inject_count}.csv")
+    info_path = os.path.join(info_dir, f"result_info_{args.app}_{args.test}_{args.component}_{args.bitflip}.csv")
 
     if os.path.exists(info_path):
         with open(info_path, "r", encoding="utf-8") as f:

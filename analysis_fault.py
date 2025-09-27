@@ -9,6 +9,7 @@ import shutil
 import sys
 import math
 from collections import defaultdict, Counter
+from datetime import datetime
 from copy import deepcopy
 
 
@@ -184,6 +185,92 @@ def reduce_combo(combo: str) -> str:
         v = v.strip()
         kv[k] = v
     return ";".join([f"{k}={kv[k]}" for k in keep_order if k in kv])
+
+
+def _ensure_unique_path(dest_dir: str, base_name: str) -> str:
+    """Return a non-clobbering destination path by appending _N if needed."""
+    candidate = os.path.join(dest_dir, base_name)
+    if not os.path.exists(candidate):
+        return candidate
+    root, ext = os.path.splitext(base_name)
+    n = 1
+    while True:
+        cand = os.path.join(dest_dir, f"{root}_{n}{ext}")
+        if not os.path.exists(cand):
+            return cand
+        n += 1
+
+
+def _collect_invalid_sdc_outputs(effects_occ, results_occ, params_by_pair, app, test, components, bitflip):
+    """
+    For each newly parsed injection: if it's classified as invalid but the result is SDC,
+    copy the corresponding tmp.out file from logs<run_id>/tmp.outN to error_classification,
+    and append a record into error_classification/error_list.txt.
+    """
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    err_dir = os.path.join(base_dir, "error_classification")
+    os.makedirs(err_dir, exist_ok=True)
+    list_path = os.path.join(err_dir, "error_list.txt")
+
+    appended = 0
+    lines_to_append = []
+
+    for inj_key, recs in effects_occ.items():
+        run_id, name, _ = inj_key
+        # invalid if sentinel only
+        is_invalid = (len(recs) == 1 and (recs[0].get("src") == "invalid" or recs[0].get("kernel") == "invalid_summary"))
+        if not is_invalid:
+            continue
+        res = results_occ.get(inj_key, "Others")
+        if res != "SDC":
+            continue
+
+        # source tmp.out path (logs<run_id>/tmp.outN)
+        src_path = os.path.join(base_dir, f"logs{run_id}", name)
+        if not os.path.exists(src_path):
+            # try a conservative fallback without base_dir (shouldn't be needed)
+            alt = os.path.join(f"logs{run_id}", name)
+            if os.path.exists(alt):
+                src_path = alt
+            else:
+                # cannot find the tmp.out; skip but still note it
+                combo_full = params_by_pair.get((run_id, name), "") or ""
+                combo_reduced = reduce_combo(combo_full) if combo_full else ""
+                ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                info_line = (
+                    f"time={ts}\tapp={app}\ttest={test}\tcomponent={components}\tbitflip={bitflip}\t"
+                    f"run={run_id}\ttmp={name}\tresult=SDC\tsrc_path=NOT_FOUND\tsaved_path=SKIPPED\t"
+                    f"params={combo_full}\treduced_params={combo_reduced}"
+                )
+                lines_to_append.append(info_line)
+                continue
+
+        # destination name: include context to avoid collisions
+        dest_name = f"{app}_{test}_{components}_{bitflip}_r{run_id}_{name}"
+        dest_path = _ensure_unique_path(err_dir, dest_name)
+        try:
+            shutil.copyfile(src_path, dest_path)
+            appended += 1
+        except Exception:
+            # fall back to noting copy failure but still append info
+            dest_path = "COPY_FAILED"
+
+        combo_full = params_by_pair.get((run_id, name), "") or ""
+        combo_reduced = reduce_combo(combo_full) if combo_full else ""
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        info_line = (
+            f"time={ts}\tapp={app}\ttest={test}\tcomponent={components}\tbitflip={bitflip}\t"
+            f"run={run_id}\ttmp={name}\tresult=SDC\tsrc_path={src_path}\tsaved_path={dest_path}\t"
+            f"params={combo_full}\treduced_params={combo_reduced}"
+        )
+        lines_to_append.append(info_line)
+
+    if lines_to_append:
+        with open(list_path, "a", encoding="utf-8") as f:
+            for line in lines_to_append:
+                f.write(line + "\n")
+        print(f"Captured {appended} invalid-SDC outputs to {err_dir} and logged {len(lines_to_append)} entries.")
+    return appended, len(lines_to_append)
 
 
 def write_csv(app: str, test: str,components: str, bitflip: str, effects_occ, results_occ, params_by_pair):
@@ -633,6 +720,17 @@ def main():
             print(
                 f"Appended {len(new_items)} invalid parameter combinations to {store_path}"
             )
+
+    # 新增：对“被归为 invalid 但结果为 SDC”的新注入，拷贝 tmp.out 并记录信息
+    _collect_invalid_sdc_outputs(
+        effects_occ,
+        results_occ,
+        params_by_pair,
+        app=args.app,
+        test=args.test,
+        components=args.component,
+        bitflip=args.bitflip,
+    )
 
     # 记录三项指标：Sp_tot、Sp_SDC、Perc_inv(本次新数据)
     rows_all = _append_result_info(args.app, args.test, args.component, args.bitflip, sp_tot, sp_sdc, perc_inv_new)

@@ -297,6 +297,9 @@ main() {
     # load environment variables
     source setup_environment
 
+    # Ensure destination directory for classification artifacts exists
+    mkdir -p error_classification
+
     if [[ $DO_BUILD -eq 1 ]]; then
         echo "=== Start compiling ==="
 

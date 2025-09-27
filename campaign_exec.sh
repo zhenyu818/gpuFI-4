@@ -9,10 +9,10 @@ CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
 # persistent list of invalid parameter combinations to skip
 INVALID_COMBOS_FILE=./invalid_param_combos.txt
-RUNS=1000
+RUNS=100
 COMPONENT_SET="0"
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
-DELETE_LOGS=1 # if 1 then all logs will be deleted at the end of the script
+DELETE_LOGS=0 # if 1 then all logs will be deleted at the end of the script
 INJECT_BIT_FLIP_COUNT=1
 
 # Optional: specify PTX virtual register name(s) to inject (overrides index-based selection)
@@ -33,16 +33,16 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./conv 256 2"
+CUDA_UUT="./pathfinder 128 8 7"
 # total cycles for all kernels
-CYCLES=3751
+CYCLES=6310
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
 # fix cycles.txt with kernel execution cycles
 # (e.g. seq 1 10 >> cycles.txt, or multiple seq commands if a kernel has multiple executions)
 # use the following command from profiling execution for easier creation of cycles.txt file
 # e.g. grep "_Z12lud_diagonalPfii" cycles.in | awk  '{ system("seq " $12 " " $18 ">> cycles.txt")}'
 CYCLES_FILE=./cycles.txt
-MAX_REGISTERS_USED=20
+MAX_REGISTERS_USED=15
 SHADER_USED="0"
 SUCCESS_MSG='Fault Injection Test Success!'
 FAILED_MSG='Fault Injection Test Failed!'
@@ -52,7 +52,7 @@ DATATYPE_SIZE=32
 # e.g. GPGPU-Sim PTX: Kernel '_Z9vectorAddPKdS0_Pdi' : regs=8, lmem=0, smem=0, cmem=380
 # if 0 put a random value > 0
 LMEM_SIZE_BITS=1
-SMEM_SIZE_BITS=4096
+SMEM_SIZE_BITS=16384
 # ---------------------------------------------- END PER KERNEL/APPLICATION PARAMETERS (+profile=1) ------------------------------------------------
 
 FAULT_INJECTION_OCCURRED="Fault injection"
