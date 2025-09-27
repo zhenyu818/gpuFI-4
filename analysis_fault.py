@@ -186,7 +186,7 @@ def reduce_combo(combo: str) -> str:
     return ";".join([f"{k}={kv[k]}" for k in keep_order if k in kv])
 
 
-def write_csv(app: str, test: str, effects_occ, results_occ, params_by_pair):
+def write_csv(app: str, test: str,components: str, bitflip: str, effects_occ, results_occ, params_by_pair):
     """
     生成/合并 CSV，并为每条指令新增 reg_names 列。
     规则：
@@ -195,7 +195,7 @@ def write_csv(app: str, test: str, effects_occ, results_occ, params_by_pair):
     """
     out_dir = os.path.join("test_result")
     os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, f"test_result_{app}_{test}.csv")
+    out_path = os.path.join(out_dir, f"test_result_{app}_{test}_{components}_{bitflip}.csv")
 
     inst_counts = defaultdict(
         lambda: defaultdict(lambda: {"Masked": 0, "SDC": 0, "DUE": 0, "Others": 0})
@@ -447,15 +447,15 @@ def _format_val(v):
         return "NA"
 
 
-def _append_result_info(app, test, sp_tot, sp_sdc, perc_inv):
+def _append_result_info(app, test, components, bitflip, sp_tot, sp_sdc, perc_inv):
     """
-    追加写入 result_info/result_info_{app}_{test}.csv
+    追加写入 result_info/result_info_{app}_{test}_{components}_{bitflip}.csv
     列：index,Sp_tot,Sp_SDC,Perc_inv
     返回：写入后的所有行（含表头）
     """
     info_dir = "result_info"
     os.makedirs(info_dir, exist_ok=True)
-    info_path = os.path.join(info_dir, f"result_info_{app}_{test}.csv")
+    info_path = os.path.join(info_dir, f"result_info_{app}_{test}_{components}_{bitflip}.csv")
 
     rows = []
     if os.path.exists(info_path):
@@ -555,17 +555,8 @@ def main():
     )
     parser.add_argument("--app", "-a", required=True, help="Application name")
     parser.add_argument("--test", "-t", required=True, help="Test identifier", type=str)
-    parser.add_argument(
-        "--component", "-c", required=False, help="Component set", type=int, default=""
-    )
-    parser.add_argument(
-        "--inject_count",
-        "-i",
-        required=False,
-        help="Inject bit flip count",
-        type=int,
-        default=0,
-    )
+    parser.add_argument("--component", "-c", required=True, help="Component set")
+    parser.add_argument("--bitflip", "-b", required=True, help="Number of bit flips to inject")
     args = parser.parse_args()
 
     log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inst_exec.log")
@@ -579,7 +570,7 @@ def main():
     # 结果 CSV 路径
     out_dir = os.path.join("test_result")
     os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, f"test_result_{args.app}_{args.test}_{args.component}_{args.inject_count}.csv")
+    out_path = os.path.join(out_dir, f"test_result_{args.app}_{args.test}_{args.component}_{args.bitflip}.csv")
 
     # 读取旧结果（B），若存在
     had_old = os.path.exists(out_path)
@@ -592,8 +583,7 @@ def main():
 
     # 写入合并后的结果（A）
     out_path, total_masked, total_sdc, total_due, total_others, total_inj = write_csv(
-        args.app, args.test, effects_occ, results_occ, params_by_pair
-    )
+        args.app, args.test, args.component, args.bitflip, effects_occ, results_occ, params_by_pair)
 
     # 读取合并后的 A（仅用于 Sp_* 和其他打印；Perc_inv 用新数据的 perc_inv_new）
     A_noninv, A_inv_tot, A_all_tot = _read_csv_summary(out_path)
@@ -645,7 +635,7 @@ def main():
             )
 
     # 记录三项指标：Sp_tot、Sp_SDC、Perc_inv(本次新数据)
-    rows_all = _append_result_info(args.app, args.test, sp_tot, sp_sdc, perc_inv_new)
+    rows_all = _append_result_info(args.app, args.test, args.component, args.bitflip, sp_tot, sp_sdc, perc_inv_new)
 
     # 新增：检查 Sp_tot 连续 5 次 >= 0.95（只保存一次）
     if _check_consecutive_5_tot_95(rows_all, thr=0.95):

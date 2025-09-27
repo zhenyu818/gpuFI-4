@@ -1,15 +1,15 @@
 #!/bin/bash
 
-TEST_APP_NAME="conv"
+TEST_APP_NAME="pathfinder"
 COMPONENT_SET="0"
 INJECT_BIT_FLIP_COUNT=1 # number of bits to flip per injection (e.g. 2 means flip 2 bits per injection)
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
-RUN_PER_EPOCH=1000
+RUN_PER_EPOCH=100
 EPOCH=100
 
 
 DO_BUILD=0 # 1: build before run, 0: skip build
-DO_RESULT_GEN=1 # 1: generate result files, 0: skip result generation
+DO_RESULT_GEN=0 # 1: generate result files, 0: skip result generation
 
 
 
@@ -501,10 +501,10 @@ main() {
 
         python3 extract_registers.py $TEST_APP_NAME
 
-        echo "=== Starting fault injection experiment: ${TEST_APP_NAME}, file ${filename}, component ${COMPONENT_SET}, flip_count ${INJECT_BIT_FLIP_COUNT} ==="
+        echo "=== Starting fault injection experiment: ${TEST_APP_NAME}, file ${filename} ==="
         filename_no_ext="${filename%.txt}"
 
-        python3 pre_check.py -a $TEST_APP_NAME -t $filename_no_ext -c $COMPONENT_SET -i $INJECT_BIT_FLIP_COUNT
+        python3 pre_check.py -a $TEST_APP_NAME -t $filename_no_ext -c $COMPONENT_SET -b $INJECT_BIT_FLIP_COUNT
         ret=$?
         if [ $ret -eq 99 ]; then
             echo "=== Early stopping triggered. Skipping this file ==="
@@ -556,7 +556,7 @@ main() {
             # 等待主进程结束
             wait $CMD_PID
             echo "=== Fault injection for ${filename} finished ==="
-            python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext -c $COMPONENT_SET -i $INJECT_BIT_FLIP_COUNT
+            python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext  -c $COMPONENT_SET -b $INJECT_BIT_FLIP_COUNT
             ret=$?
             if [ $ret -eq 99 ]; then
                 echo "=== Early stopping triggered. Exiting loop ==="
