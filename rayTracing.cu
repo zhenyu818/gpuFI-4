@@ -1,3 +1,18 @@
+// Standalone render kernel demo
+// - Extracted core kernel concept: per-pixel, per-sample ray integration
+// - No project headers; uses only CUDA/runtime + C++ stdlib
+// - Host generates random inputs with macro-defined seed
+// - Kernel runs exactly once; no direct output
+// - Modified: Supports runtime parameters for NX, NY, SAMPLES via command-line args
+//   Usage: ./demo [nx] [ny] [samples] (defaults: 8 4 8 if not provided)
+// - Further modified: Uses traditional CUDA memory management (cudaMalloc + cudaMemcpy)
+//   instead of unified memory; allocates separate host and device buffers
+// - Latest: No printing of results; instead, load "result.txt" and compare computed colors
+//   with reference values (space-separated floats, 6-decimal precision in file).
+//   Handles NaN/inf comparisons: both NaN equal, both inf (same sign) equal.
+//   For finite values, allow |computed - ref| <= 1e-5f absolute error.
+//   Output: "Fault Injection Test Success!\n" or "Fault Injection Test Failed!\n"
+
 #include <cuda_runtime.h>
 #include <cstdio>
 #include <cstdlib>
@@ -11,7 +26,7 @@
 #include <sstream>  // for stringstream in parsing
 
 #ifndef RNG_SEED
-#define RNG_SEED 4837
+#define RNG_SEED 12345u
 #endif
 
 struct Vec3 {

@@ -11,7 +11,7 @@
 #include <sstream>  // for stringstream in parsing
 
 #ifndef RNG_SEED
-#define RNG_SEED 4837
+#define RNG_SEED 6768
 #endif
 
 struct Vec3 {

@@ -3,8 +3,10 @@
 //   ./gemm s         # M=N=K=16*s
 //   ./gemm mt nt kt  # M=16*mt, N=16*nt, K=16*kt
 //
-// 说明：把原先编译期固定的 M_TILES/N_TILES/K_TILES 与 M_GLOBAL/N_GLOBAL/K_GLOBAL
-//       改为运行时通过命令行参数决定；其余逻辑保持一致（含对抗性初始化/NaN/Inf 注入）。
+// 说明：按“运行时可调”方法改造：移除编译期固定的 M_TILES/N_TILES/K_TILES 与
+//      M_GLOBAL/N_GLOBAL/K_GLOBAL 宏；在 main 中解析命令行得到 mt/nt/kt，
+//      用运行时变量参与内存分配、初始化、网格尺寸与 kernel 调用。
+//      子正规数生成逻辑保持不变，只是改为接收运行时维度。
 
 #include <assert.h>
 #include <cstdio>
@@ -14,8 +16,8 @@
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 #include <mma.h>
-#include <limits>   // infinity
-#include <cmath>    // NAN
+#include <cfloat>    // for FLT_MIN
+#include <math.h>    // for ldexpf
 
 // ==== 辅助宏（保留）====
 #ifndef MAX
@@ -41,7 +43,7 @@
 
 #define M_SEED 6432
 
-// Implementation constants（保留以兼容你的设置）
+// 实现相关常量（原样保留）
 #define WARPS_PER_BLOCK 8
 #define THREADS_PER_BLOCK (WARP_SIZE * WARPS_PER_BLOCK)
 
@@ -65,13 +67,12 @@
 #define BLOCK_ROW_TILES (WARP_ROW_TILES * BLOCK_ROW_WARPS)
 #define BLOCK_COL_TILES (WARP_COL_TILES * BLOCK_COL_WARPS)
 
-// 运行时版本移除 GLOBAL_MEM_STRIDE（避免依赖编译期 N_GLOBAL）
+// 运行时版本不再需要 GLOBAL_MEM_STRIDE 宏
 // #define GLOBAL_MEM_STRIDE N_GLOBAL
 
 #define SHMEM_STRIDE (N * BLOCK_ROW_TILES)
 #define SHMEM_OFFSET (N * WARP_ROW_TILES)
 
-// shared memory bank 冲突移位
 #define SKEW_HALF 16
 
 #define checkKernelErrors(expr)                             \
@@ -89,7 +90,6 @@ using namespace nvcuda;
 
 // ================= 辅助函数 ==================
 #define checkCudaErrors(val)  check( (val), #val, __FILE__, __LINE__ )
-
 void check(cudaError_t result, char const *const func, const char *const file, int const line) {
     if (result != cudaSuccess) {
         fprintf(stderr, "CUDA error at %s:%d code=%d(%s) \"%s\"\n",
@@ -98,78 +98,57 @@ void check(cudaError_t result, char const *const func, const char *const file, i
     }
 }
 
-/**
- * 对抗性输入生成（运行时尺寸）：
- * - A：棋盘格 ±1；每 8 列重复；每 5 行置 0；对角附近放大到 FP16 上限；稀疏注入 NaN/Inf/TINY。
- * - B：列周期（每 7 列重复）；偶列极小、奇列较大；每 6 行 -1；对角附近放大；稀疏 NaN/±Inf/0。
- * - C：小随机+行偏置；稀疏 NaN/±Inf。
- */
+// ---- 生成子正规数：half 与 float ----
+// half 子正规范围：(2^-24, 2^-14) ≈ (5.96e-8, 6.10e-5)
+// 生成一个严格小于 2^-14 的正数，避免转换为 half 时变为 0 或变为 normal
+static inline float gen_half_subnormal_pos() {
+  const float min_sub = ldexpf(1.0f, -24);            // 2^-24
+  const float max_sub = ldexpf(1.0f, -14) * 0.999f;   // < 2^-14
+  float u = rand() / (float)RAND_MAX;                 // [0,1]
+  return min_sub + u * (max_sub - min_sub);           // (2^-24, 2^-14)
+}
+
+// float 子正规：小于 FLT_MIN 的正数
+static inline float gen_float_subnormal_pos() {
+  // 缩放 FLT_MIN 以确保进入 subnormal 区间
+  return (float)(rand() % 100 + 1) * FLT_MIN / 1e5f;  // 典型 ~1e-43
+}
+
+// 改：带维度参数（运行时）
 __host__ void init_host_matrices(half *a, half *b, float *c,
                                  int M_GLOBAL, int N_GLOBAL, int K_GLOBAL) {
   srand(M_SEED);
 
-  const float FP16_MAX = 65504.0f;
-  const float TINY     = 1.0e-8f;   // 转 half 可能为 0 或次法线
-  const float BIG      = FP16_MAX;  // 接近 FP16 上限
-  const float INF_F    = std::numeric_limits<float>::infinity();
-  const float NAN_F    = NAN;
-
-  // ====== A: M_GLOBAL x K_GLOBAL（row_major）======
-  for (int i = 0; i < M_GLOBAL; ++i) {
-    for (int j = 0; j < K_GLOBAL; ++j) {
-      float v = ((i ^ j) & 1) ? 1.0f : -1.0f;          // 棋盘格
-      int j_rep = j % 8;                               // 8 列周期
-      v *= (j_rep < 4 ? 1.0f : -1.0f);
-      if ((i % 5) == 0) v = 0.0f;                      // 每 5 行清零
-      if (abs(i - (j % M_GLOBAL)) <= 1) v = BIG;       // 近对角放大
-      if ((i + 3*j) % 17 == 0) v = TINY;               // 极小值
-      if ((i == 1 && j == 1) || ((i * 131 + j) % 997 == 0)) v = NAN_F; // NaN
-      if ((i == 2 && j == 3) || ((i * 211 + j) % 1231 == 0)) v =  INF_F; // +Inf
-      a[i * K_GLOBAL + j] = __float2half(v);
+  // A: half 子正规
+  for (int i = 0; i < M_GLOBAL; i++) {
+    for (int j = 0; j < K_GLOBAL; j++) {
+      a[i * K_GLOBAL + j] = __float2half(gen_half_subnormal_pos());
     }
   }
 
-  // ====== B: N_GLOBAL x K_GLOBAL（kernel 以 col_major 读）======
-  for (int i = 0; i < N_GLOBAL; ++i) {
-    for (int j = 0; j < K_GLOBAL; ++j) {
-      int jp = j % 7;
-      float base  = (jp < 3) ? 1.0f : -1.0f;
-      float scale = (jp % 2 == 0) ? TINY : 16.0f;      // 偶列极小、奇列较大
-      if ((i % 6) == 0) base = -1.0f;                  // 每 6 行 -1
-      float v = base * scale;
-      if (abs(i - (j % N_GLOBAL)) <= 1) v = BIG;       // 近对角放大
-      if (((i * 53 + j) % 101) == 0) v = 0.0f;         // 少量 0
-      if ((i == 0 && j == 0) || ((i * 97 + j) % 1493 == 0)) v = NAN_F;   // NaN
-      if ((i == 3 && j == 2) || ((i * 199 + j) % 1877 == 0)) v = -INF_F; // -Inf
-      b[i * K_GLOBAL + j] = __float2half(v);
+  // B: half 子正规
+  for (int i = 0; i < N_GLOBAL; i++) {
+    for (int j = 0; j < K_GLOBAL; j++) {
+      b[i * K_GLOBAL + j] = __float2half(gen_half_subnormal_pos());
     }
   }
 
-  // ====== C: M_GLOBAL x N_GLOBAL（float 累加器初值）======
-  for (int i = 0; i < M_GLOBAL; ++i) {
-    for (int j = 0; j < N_GLOBAL; ++j) {
-      float r = (static_cast<float>(rand()) / RAND_MAX) - 0.5f; // 小随机
-      if ((i % 4) == 0) r += 1.0f;                              // 行偏置
-      if ((i == 0 && j == 1) || ((i * 383 + j) % 2003 == 0)) r =  INF_F;
-      if ((i == 1 && j == 0) || ((i * 577 + j) % 2221 == 0)) r = -INF_F;
-      if ((i == 2 && j == 2) || ((i * 811 + j) % 2551 == 0)) r =  NAN;
-      c[i * N_GLOBAL + j] = r;
-    }
+  // C: float 子正规
+  for (int t = 0; t < M_GLOBAL * N_GLOBAL; t++) {
+    c[t] = gen_float_subnormal_pos();
   }
 }
 
-// 简易 WMMA kernel（保持你的写法，使用运行时维度）
+// 简单 WMMA GEMM（按运行时维度工作）
 __global__ void simple_wmma_gemm(half *a, half *b, float *c, float *d, int m_ld,
                                  int n_ld, int k_ld, float alpha, float beta) {
   int lda = k_ld;
   int ldb = k_ld;
   int ldc = n_ld;
 
-  // warp 级二维 tiling
   int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
   int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
 
-  // WMMA 片段
   wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> a_frag;
   wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> b_frag;
   wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> acc_frag;
@@ -177,11 +156,10 @@ __global__ void simple_wmma_gemm(half *a, half *b, float *c, float *d, int m_ld,
 
   wmma::fill_fragment(acc_frag, 0.0f);
 
-  // 沿 K 维累加
   for (int i = 0; i < k_ld; i += WMMA_K) {
     int aCol = i;
     int aRow = warpM * WMMA_M;
-    int bCol = warpN * WMMA_N; // = 16（用 WMMA_N 更直观）
+    int bCol = warpN * WMMA_N;  // = 16
     int bRow = i;
 
     if (aRow < m_ld && aCol < k_ld && bRow < k_ld && bCol < n_ld) {
@@ -191,7 +169,6 @@ __global__ void simple_wmma_gemm(half *a, half *b, float *c, float *d, int m_ld,
     }
   }
 
-  // C = alpha*acc + beta*C
   int cCol = warpN * WMMA_N;
   int cRow = warpM * WMMA_M;
 
@@ -249,7 +226,7 @@ int main(int argc, char **argv) {
   checkCudaErrors(cudaMemcpy(C, C_h, sizeof(float) * M_GLOBAL * N_GLOBAL, cudaMemcpyHostToDevice));
   checkCudaErrors(cudaMemset(D, 0, sizeof(float) * M_GLOBAL * N_GLOBAL));
 
-  // 共享内存需求估计（demo 内核未直接使用；保留计算以兼容）
+  // 共享内存需求（demo 内核未直接使用；保留计算以兼容）
   enum {
     SHMEM_SZ = MAX(
         sizeof(half) * (BLOCK_COL_TILES * M) * (CHUNK_K * K + SKEW_HALF) * 2,
@@ -269,8 +246,7 @@ int main(int argc, char **argv) {
 
   // ---- 网格/线程块 ----
   dim3 gridDim, blockDim;
-  // blockDim.x 必须是 warpSize 的倍数；128x4 => 16 warps
-  blockDim.x = 128;
+  blockDim.x = 128;  // 必须是 warpSize 的倍数
   blockDim.y = 4;
 
   gridDim.x = (M_GLOBAL + (WMMA_M * (blockDim.x / 32) - 1)) / (WMMA_M * (blockDim.x / 32));

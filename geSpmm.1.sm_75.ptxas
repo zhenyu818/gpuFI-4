@@ -1,0 +1,5 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z10spmm_test0IfEviiPiS0_PT_S2_S2_' for 'sm_75'
+ptxas info    : Function properties for _Z10spmm_test0IfEviiPiS0_PT_S2_S2_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 52 registers, 400 bytes cmem[0]

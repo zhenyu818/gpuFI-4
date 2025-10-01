@@ -1,0 +1,26 @@
+kernel,inst_line,inst_text,reg_names,REG_Masked,REG_SDC,REG_DUE,REG_Others,invalid_Masked,invalid_SDC,invalid_DUE,invalid_Others,Masked,SDC,DUE,Others,tot_inj
+invalid_summary,,unknown,,0,0,0,0,73,0,0,1,73,0,0,1,74
+select_item_owner,39,"ld.param.u64 %rd4, [_Z17select_item_ownerPKiS0_S0_iPi_param_4];",%rd4:1,0,1,0,0,0,0,0,0,0,1,0,0,1
+select_item_owner,41,"mov.u32 %r6, %ntid.x;",%r6:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,100,"ld.param.u64 %rd28, [_Z24sgd_update_deterministicPKiS0_PKfPfS2_S3_iS3_S2_S3_S0_fS0_Ph_param_1];",%rd28:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,107,"ld.param.u64 %rd31, [_Z24sgd_update_deterministicPKiS0_PKfPfS2_S3_iS3_S2_S3_S0_fS0_Ph_param_8];",%rd31:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,115,"cvta.to.global.u64 %rd3, %rd36;",%rd3:1,0,1,0,0,0,0,0,0,0,1,0,0,1
+sgd_update_deterministic,119,"mad.lo.s32 %r4, %r1, %r2, %r3;",%r4:3,1,2,0,0,0,0,0,0,1,2,0,0,3
+sgd_update_deterministic,125,"add.s64 %rd41, %rd39, %rd40;",%rd41:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,126,"ld.global.u32 %r5, [%rd41+4];",%r5:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,127,"ld.global.u32 %r6, [%rd41];",%r6:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,134,"cvta.to.global.u64 %rd45, %rd28;",%rd45:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,135,"cvta.to.global.u64 %rd46, %rd33;",%rd46:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,140,"add.s32 %r38, %r37, %r6;",%r38:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,148,"ld.global.f32 %f1, [%rd53];",%f1:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,149,"ld.const.u32 %r8, [_ZN6config9n_factorsE];",%r8:1,0,1,0,0,0,0,0,0,0,1,0,0,1
+sgd_update_deterministic,151,"cvt.s64.s32%rd5, %r9;",%rd5:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,209,"setp.lt.u32%p7, %r8, 4;",%p7:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,212,"cvt.u32.u64%r48, %rd4;",%r48:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,214,"mul.lo.s32 %r51, %r8, %r48;",%r51:2,2,0,0,0,0,0,0,0,2,0,0,0,2
+sgd_update_deterministic,220,"add.s64 %rd66, %rd12, %rd102;",%rd66:1,0,1,0,0,0,0,0,0,0,1,0,0,1
+sgd_update_deterministic,225,"ld.global.f32 %f31, [%rd67+4];",%f31:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,227,"fma.rn.f32 %f33, %f32, %f31, %f30;",%f33:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,230,"fma.rn.f32 %f36, %f35, %f34, %f33;",%f36:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,331,"ld.global.f32 %f71, [%rd103+8];",%f71:1,1,0,0,0,0,0,0,0,1,0,0,0,1
+sgd_update_deterministic,339,"mul.f32 %f78, %f77, %f17;",%f78:1,1,0,0,0,0,0,0,0,1,0,0,0,1

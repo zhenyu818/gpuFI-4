@@ -1,15 +1,15 @@
 #!/bin/bash
 
-TEST_APP_NAME="pathfinder"
+TEST_APP_NAME="recommSystem"
 COMPONENT_SET="0"
 INJECT_BIT_FLIP_COUNT=1 # number of bits to flip per injection (e.g. 2 means flip 2 bits per injection)
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
 RUN_PER_EPOCH=100
-EPOCH=100
+EPOCH=1
 
 
 DO_BUILD=0 # 1: build before run, 0: skip build
-DO_RESULT_GEN=0 # 1: generate result files, 0: skip result generation
+DO_RESULT_GEN=1 # 1: generate result files, 0: skip result generation
 
 
 
@@ -290,9 +290,13 @@ get_metrics() {
 
 main() {
 
-    pip3 install pathlib -i https://pypi.tuna.tsinghua.edu.cn/simple
-    pip3 install numpy -i https://pypi.tuna.tsinghua.edu.cn/simple
-    pip3 install pandas -i https://pypi.tuna.tsinghua.edu.cn/simple
+    # pip3 install pathlib -i https://pypi.tuna.tsinghua.edu.cn/simple
+    # pip3 install numpy -i https://pypi.tuna.tsinghua.edu.cn/simple
+    # pip3 install pandas -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+    pip3 install pathlib
+    pip3 install numpy
+    pip3 install pandas
 
     # load environment variables
     source setup_environment
@@ -480,7 +484,7 @@ main() {
             }
             # 替换TIMEOUT_VAL
             if ($0 ~ /^TIMEOUT_VAL=/) {
-                et = exec_time + 5
+                et = (exec_time * 3) + 10
                 print "TIMEOUT_VAL=" et "s"
                 next
             }

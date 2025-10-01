@@ -7,11 +7,9 @@
 #include <random>
 #include <iomanip>
 #include <string>
-#include <fstream>
-#include <sstream>  // for stringstream in parsing
 
 #ifndef RNG_SEED
-#define RNG_SEED 4837
+#define RNG_SEED 6768
 #endif
 
 struct Vec3 {
@@ -128,7 +126,6 @@ int main(int argc, char** argv) {
 
     const size_t num_pixels = static_cast<size_t>(nx) * static_cast<size_t>(ny);
     const size_t jitter_count = num_pixels * static_cast<size_t>(samples);
-    const size_t total_values = num_pixels * 3;  // RGB per pixel: 3 floats each
 
     // Host-side buffers
     std::vector<float> h_randU(jitter_count, 0.0f);
@@ -144,13 +141,8 @@ int main(int argc, char** argv) {
     cudaMalloc(&d_randU, jitter_count * sizeof(float));
     cudaMalloc(&d_randV, jitter_count * sizeof(float));
 
-    // Host-side random jitter using macro-defined seed
-    std::mt19937 rng(static_cast<unsigned int>(RNG_SEED));
-    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-    for (size_t i = 0; i < jitter_count; ++i) {
-        h_randU[i] = dist(rng);
-        h_randV[i] = dist(rng);
-    }
+    // Host-side zero jitter (all zeros for deterministic input)
+    // No random generation; vectors are already initialized to 0.0f
 
     // Copy jitter data from host to device
     cudaMemcpy(d_randU, h_randU.data(), jitter_count * sizeof(float), cudaMemcpyHostToDevice);
@@ -166,82 +158,13 @@ int main(int argc, char** argv) {
     // Copy results from device to host
     cudaMemcpy(h_colorBuffer.data(), d_colorBuffer, num_pixels * sizeof(Vec3), cudaMemcpyDeviceToHost);
 
-    // Prepare computed values: flatten RGB into a single vector of floats
-    std::vector<float> computed_values(total_values);
+    // Print all results: space-separated, no extra content
+    std::cout << std::setprecision(6) << std::fixed;
     for (size_t i = 0; i < num_pixels; ++i) {
-        computed_values[3 * i + 0] = h_colorBuffer[i].x();
-        computed_values[3 * i + 1] = h_colorBuffer[i].y();
-        computed_values[3 * i + 2] = h_colorBuffer[i].z();
+        std::cout << h_colorBuffer[i].x() << ' ' << h_colorBuffer[i].y() << ' ' << h_colorBuffer[i].z();
+        if (i + 1 < num_pixels) std::cout << ' ';
     }
-
-    // Load and parse reference values from "result.txt"
-    std::vector<float> reference_values;
-    std::ifstream file("result.txt");
-    if (!file.is_open()) {
-        std::cout << "Fault Injection Test Failed!\n";  // File not found or unreadable
-        // Free resources
-        cudaFree(d_randV);
-        cudaFree(d_randU);
-        cudaFree(d_colorBuffer);
-        return 1;
-    }
-
-    std::string line;
-    while (std::getline(file, line)) {
-        std::istringstream iss(line);
-        float value;
-        while (iss >> value) {
-            reference_values.push_back(value);
-        }
-    }
-    file.close();
-
-    // Check if reference has exactly the expected number of values
-    if (reference_values.size() != total_values) {
-        std::cout << "Fault Injection Test Failed!\n";  // Mismatch in value count
-        // Free resources
-        cudaFree(d_randV);
-        cudaFree(d_randU);
-        cudaFree(d_colorBuffer);
-        return 1;
-    }
-
-    // Compare computed vs reference with tolerance
-    bool match = true;
-    const float tolerance = 1e-5f;
-    for (size_t i = 0; i < total_values; ++i) {
-        float computed = computed_values[i];
-        float ref = reference_values[i];
-
-        // Handle NaN: both NaN are equal
-        if (std::isnan(computed) && std::isnan(ref)) {
-            continue;
-        }
-        // Handle inf: both inf with same sign are equal
-        else if (std::isinf(computed) && std::isinf(ref)) {
-            if (std::signbit(computed) != std::signbit(ref)) {
-                match = false;
-                break;
-            }
-            continue;
-        }
-        // If one is special (NaN/inf) and the other is finite, mismatch
-        else if (std::isnan(computed) || std::isinf(computed) || std::isnan(ref) || std::isinf(ref)) {
-            match = false;
-            break;
-        }
-        // Both finite: check absolute difference
-        else if (std::abs(computed - ref) > tolerance) {
-            match = false;
-            break;
-        }
-    }
-
-    if (match) {
-        std::cout << "Fault Injection Test Success!\n";
-    } else {
-        std::cout << "Fault Injection Test Failed!\n";
-    }
+    std::cout << '\n';
 
     // Free device memory
     cudaFree(d_randV);

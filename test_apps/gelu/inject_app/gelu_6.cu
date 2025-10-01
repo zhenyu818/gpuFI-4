@@ -3,6 +3,7 @@
 #include <string.h>
 #include <chrono>
 #include <cuda.h>
+#include <cfloat>   // for FLT_MIN
 
 #define M_SEED 9182
 #define M_BLOCK_SIZE 1024
@@ -30,10 +31,18 @@ __global__ void gelu_bias_loop(float* src, const float* bias, int width, int hei
     }
 }
 
+// ========== 非正规数生成函数 ==========
+float generate_subnormal_float() {
+    float tiny = (float)(rand() % 100 + 1) * FLT_MIN / 1e5f;
+    // 随机正负
+    if (rand() % 2 == 0) tiny = -tiny;
+    return tiny;
+}
+
 int main(int argc, char* argv[])
 {
     if (argc != 4) {
-        printf("Usage: %s <batch> <sequence length> <hidden dimension>\n", argv[0]);
+        printf("Usage: %s <batch> <sequence length> <hidden dimension> <repeat>\n", argv[0]);
         return 1;
     }
 
@@ -48,26 +57,14 @@ int main(int argc, char* argv[])
     const int bias_size_bytes = hidden_dim * sizeof(float);
 
     srand(M_SEED);
-    float* output = (float*) malloc(src_size_bytes);
-
-    // ====== 对抗性输入模式 ======
+    float* output = (float*) malloc (src_size_bytes);
     for (size_t i = 0; i < src_size; i++) {
-        // 模式1：交替极值（正负交替）
-        if (i % 2 == 0) {
-            output[i] = 10.0f;   // 大正值
-        } else {
-            output[i] = -10.0f;  // 大负值
-        }
-
-        // 模式2（可选）：周期性波动，可替换上面逻辑
-        // float val = (i % 100 < 50) ? 5.0f : -5.0f;
-        // output[i] = val;
+        output[i] = generate_subnormal_float();
     }
 
-    float* bias = (float*) malloc(bias_size_bytes);
+    float* bias = (float*) malloc (bias_size_bytes);
     for (int i = 0; i < hidden_dim; i++) {
-        // 让 bias 也有对抗性：大幅度波动
-        bias[i] = (i % 2 == 0) ? 6.0f : -6.0f;
+        bias[i] = generate_subnormal_float();
     }
 
     float* d_output;

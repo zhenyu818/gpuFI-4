@@ -3,8 +3,11 @@
 #include <string.h>
 #include <assert.h>
 #include <cuda_runtime.h>
+#include <climits>   // for INT_MAX, INT_MIN
+#include <cfloat>    // for DBL_MIN
+#include <math.h>    // for isnan, isinf, signbit
 
-#define M_SEED 5847
+#define M_SEED 1745
 #define M_BLOCK_SIZE 16
 
 // ================= 辅助函数 ==================
@@ -70,41 +73,19 @@ __global__ void MatrixMulCUDA(double *C, const double *A, const double *B, int w
     C[c + wB * ty + tx] = Csub;
 }
 
-void AdversarialInit(double *data, int rows, int cols) {
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            int idx = i * cols + j;
-
-            // 随机挑选一种模式
-            int mode = rand() % 6;
-
-            switch (mode) {
-                case 0:  // 全零
-                    data[idx] = 0.0;
-                    break;
-                case 1:  // 全一
-                    data[idx] = 1.0;
-                    break;
-                case 2:  // 单位矩阵
-                    data[idx] = (i == j) ? 1.0 : 0.0;
-                    break;
-                case 3:  // 棋盘格
-                    data[idx] = ((i + j) % 2 == 0) ? 1.0 : -1.0;
-                    break;
-                case 4:  // 极端数值
-                    data[idx] = (j % 2 == 0) ? 1e9 : -1e9;
-                    break;
-                default: // 随机
-                    data[idx] = (double)rand() / RAND_MAX;
-                    break;
-            }
-        }
+// ================= 输入生成函数（生成非正规数） ==================
+void RandomInitSubnormal(double *data, int size) {
+    srand(M_SEED);
+    for (int i = 0; i < size; i++) {
+        double tiny = (double)(rand() % 100 + 1) * DBL_MIN / 1e5;
+        data[i] = tiny;
     }
 }
 
-
 // ================= 主计算函数 ==================
-int MatrixMultiply(const dim3 &dimsA, const dim3 &dimsB) {
+int MatrixMultiply(int argc, char **argv,
+                   int block_size, const dim3 &dimsA,
+                   const dim3 &dimsB) {
     unsigned int size_A = dimsA.x * dimsA.y;
     unsigned int mem_size_A = sizeof(double) * size_A;
     double *h_A; checkCudaErrors(cudaMallocHost(&h_A, mem_size_A));
@@ -113,16 +94,15 @@ int MatrixMultiply(const dim3 &dimsA, const dim3 &dimsB) {
     unsigned int mem_size_B = sizeof(double) * size_B;
     double *h_B; checkCudaErrors(cudaMallocHost(&h_B, mem_size_B));
 
-    // 使用混合对抗性输入初始化
-    AdversarialInit(h_A, dimsA.y, dimsA.x);
-    AdversarialInit(h_B, dimsB.y, dimsB.x);
+    // ---- 使用非正规数输入生成 ----
+    RandomInitSubnormal(h_A, size_A);
+    RandomInitSubnormal(h_B, size_B);
 
-
+    double *d_A, *d_B, *d_C;
     dim3 dimsC(dimsB.x, dimsA.y, 1);
     unsigned int mem_size_C = sizeof(double) * dimsC.x * dimsC.y;
     double *h_C; checkCudaErrors(cudaMallocHost(&h_C, mem_size_C));
 
-    double *d_A, *d_B, *d_C;
     checkCudaErrors(cudaMalloc((void**)&d_A, mem_size_A));
     checkCudaErrors(cudaMalloc((void**)&d_B, mem_size_B));
     checkCudaErrors(cudaMalloc((void**)&d_C, mem_size_C));
@@ -130,7 +110,7 @@ int MatrixMultiply(const dim3 &dimsA, const dim3 &dimsB) {
     checkCudaErrors(cudaMemcpy(d_A, h_A, mem_size_A, cudaMemcpyHostToDevice));
     checkCudaErrors(cudaMemcpy(d_B, h_B, mem_size_B, cudaMemcpyHostToDevice));
 
-    dim3 threads(M_BLOCK_SIZE, M_BLOCK_SIZE);
+    dim3 threads(block_size, block_size);
     dim3 grid(dimsB.x / threads.x, dimsA.y / threads.y);
 
     MatrixMulCUDA<M_BLOCK_SIZE><<<grid, threads>>>(d_C, d_A, d_B, dimsA.x, dimsB.x);
@@ -178,6 +158,6 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    MatrixMultiply(dimsA, dimsB);
+    MatrixMultiply(argc, argv, block_size, dimsA, dimsB);
     return 0;
 }

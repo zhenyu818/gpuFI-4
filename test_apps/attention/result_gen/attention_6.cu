@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cuda.h>
 #include <cuda_fp16.h>
+#include <cfloat>   // for FLT_MIN
 
 #define M_SEED 5311
 #define BLOCK_SIZE 256
@@ -125,9 +126,13 @@ __half* attention_device(const __half* key, const __half* value, const __half* q
   return output;
 }
 
-float random_float(float min, float max) {
-    float scale = rand() / (float) RAND_MAX; // [0, 1]
-    return min + scale * (max - min);        // [min, max]
+// ================= 输入生成函数（生成非正规数） ==================
+float generate_subnormal_float() {
+    // 生成比 FLT_MIN 更小的正数
+    float tiny = (float)(rand() % 100 + 1) * FLT_MIN / 1e5f;
+    // 随机正负号
+    if (rand() % 2 == 0) tiny = -tiny;
+    return tiny;
 }
 
 int main(int argc, char* argv[]) {
@@ -145,24 +150,14 @@ int main(int argc, char* argv[]) {
   __half* query = (__half*) malloc (d * sizeof(__half));
 
   srand(M_SEED);
-
-  // === 对抗性模式输入生成 ===
-  for (int i = 0; i < n; i++) {
-      for (int j = 0; j < d; j++) {
-          // 极端值 + 小扰动
-          float base = (j % 2 == 0) ? 10.0f : -10.0f;  
-          float noise = random_float(-0.01f, 0.01f);   
-          key[i * d + j] = __float2half(base + noise);
-          value[i * d + j] = __float2half(base - noise);
-      }
+  for (int i = 0; i < n * d; i++) {
+      key[i] = __float2half(generate_subnormal_float());
+      value[i] = __float2half(generate_subnormal_float());
   }
 
-  for (int j = 0; j < d; j++) {
-      float qbase = (j % 2 == 0) ? 10.0f : -10.0f;
-      float qnoise = random_float(-0.1f, 0.1f); 
-      query[j] = __float2half(qbase + qnoise);
+  for (int i = 0; i < d; i++) {
+      query[i] = __float2half(generate_subnormal_float());
   }
-  // ===========================
 
   __half* dout = attention_device(key, value, query, n, d, r);
 

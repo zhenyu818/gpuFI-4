@@ -7,11 +7,9 @@
 #include <random>
 #include <iomanip>
 #include <string>
-#include <fstream>
-#include <sstream>  // for stringstream in parsing
 
 #ifndef RNG_SEED
-#define RNG_SEED 4837
+#define RNG_SEED 6768
 #endif
 
 struct Vec3 {
@@ -128,7 +126,6 @@ int main(int argc, char** argv) {
 
     const size_t num_pixels = static_cast<size_t>(nx) * static_cast<size_t>(ny);
     const size_t jitter_count = num_pixels * static_cast<size_t>(samples);
-    const size_t total_values = num_pixels * 3;  // RGB per pixel: 3 floats each
 
     // Host-side buffers
     std::vector<float> h_randU(jitter_count, 0.0f);
@@ -144,13 +141,8 @@ int main(int argc, char** argv) {
     cudaMalloc(&d_randU, jitter_count * sizeof(float));
     cudaMalloc(&d_randV, jitter_count * sizeof(float));
 
-    // Host-side random jitter using macro-defined seed
-    std::mt19937 rng(static_cast<unsigned int>(RNG_SEED));
-    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-    for (size_t i = 0; i < jitter_count; ++i) {
-        h_randU[i] = dist(rng);
-        h_randV[i] = dist(rng);
-    }
+    // Host-side zero jitter (all zeros for deterministic input)
+    // No random generation; vectors are already initialized to 0.0f
 
     // Copy jitter data from host to device
     cudaMemcpy(d_randU, h_randU.data(), jitter_count * sizeof(float), cudaMemcpyHostToDevice);

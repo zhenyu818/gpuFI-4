@@ -1,0 +1,9 @@
+ptxas info    : 0 bytes gmem, 25 bytes cmem[3]
+ptxas info    : Compiling entry function '_Z24sgd_update_deterministicPKiS0_PKfPfS2_S3_iS3_S2_S3_S0_fS0_Ph' for 'sm_75'
+ptxas info    : Function properties for _Z24sgd_update_deterministicPKiS0_PKfPfS2_S3_iS3_S2_S3_S0_fS0_Ph
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 56 registers, 464 bytes cmem[0]
+ptxas info    : Compiling entry function '_Z17select_item_ownerPKiS0_S0_iPi' for 'sm_75'
+ptxas info    : Function properties for _Z17select_item_ownerPKiS0_S0_iPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 15 registers, 392 bytes cmem[0]

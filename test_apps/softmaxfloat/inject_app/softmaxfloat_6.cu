@@ -1,10 +1,10 @@
-#include <chrono>
+#include <chrono> 
 #include <cstdlib>
 #include <cstdio>
 #include <cuda.h>
 #include <cmath>
-#include <climits>   // for INT_MAX, INT_MIN
-#include <cfloat>    // for INFINITY, NAN
+#include <climits>
+#include <cfloat>    // for FLT_MIN
 
 #define BLOCK_SIZE 256
 #define M_SEED 3608
@@ -31,43 +31,14 @@ void softMax(const int numSlice, const int sliceSize,
   }
 }
 
-// ---- 输入生成函数：对抗性模式 ----
-static void generate_input_with_special(float* input, int numSlice, int sliceSize) {
+// ---- 输入生成函数：只生成非正规数 ----
+static void generate_input_subnormal(float* input, int numSlice, int sliceSize) {
   srand(M_SEED);
   for (int i = 0; i < numSlice; i++) {
-    int pattern = rand() % 5;  // 随机选择一种对抗模式
     for (int j = 0; j < sliceSize; j++) {
-      switch (pattern) {
-        case 0:
-          // 模式0: 极大值 vs 极小值
-          input[i * sliceSize + j] = (j % 2 == 0) ? 1e9f : -1e9f;
-          break;
-
-        case 1:
-          // 模式1: 单点极大值 (one-hot-like)
-          input[i * sliceSize + j] = (j == 0) ? 1e6f : -1e6f;
-          break;
-
-        case 2:
-          // 模式2: 全相等值
-          input[i * sliceSize + j] = 123.456f;  // 任意常数
-          break;
-
-        case 3:
-          // 模式3: 交替正负
-          input[i * sliceSize + j] = (j % 2 == 0) ? (float)(rand() % 100) : -(float)(rand() % 100);
-          break;
-
-        case 4:
-          // 模式4: 特殊浮点值
-          if (j % 3 == 0)
-            input[i * sliceSize + j] = INFINITY;   // +Inf
-          else if (j % 3 == 1)
-            input[i * sliceSize + j] = -INFINITY;  // -Inf
-          else
-            input[i * sliceSize + j] = NAN;        // NaN
-          break;
-      }
+      // 生成比 FLT_MIN 更小的正数，属于 subnormal
+      float tiny = (float)(rand() % 100 + 1) * FLT_MIN / 1e5f;
+      input[i * sliceSize + j] = tiny;
     }
   }
 }
@@ -86,8 +57,8 @@ int main(int argc, char* argv[]) {
   float* input = (float*) aligned_alloc(1024, sizeof(float) * numElem);
   float* output_gpu = (float*) aligned_alloc(1024, sizeof(float) * numElem);
 
-  // ---- 使用对抗性输入生成 ----
-  generate_input_with_special(input, numSlice, sliceSize);
+  // ---- 使用非正规数输入生成 ----
+  generate_input_subnormal(input, numSlice, sliceSize);
 
   float *d_input, *d_output;
   cudaMalloc((void**)&d_input, sizeof(float) * numElem);
