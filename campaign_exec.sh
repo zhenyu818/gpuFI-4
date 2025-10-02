@@ -9,7 +9,7 @@ CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
 # persistent list of invalid parameter combinations to skip
 INVALID_COMBOS_FILE=./invalid_param_combos.txt
-RUNS=100
+RUNS=10
 COMPONENT_SET="0"
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
 DELETE_LOGS=0 # if 1 then all logs will be deleted at the end of the script
@@ -33,16 +33,16 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./floydwarshall 16"
+CUDA_UUT="./AdamW 32 2"
 # total cycles for all kernels
-CYCLES=1908
+CYCLES=2342
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
 # fix cycles.txt with kernel execution cycles
 # (e.g. seq 1 10 >> cycles.txt, or multiple seq commands if a kernel has multiple executions)
 # use the following command from profiling execution for easier creation of cycles.txt file
 # e.g. grep "_Z12lud_diagonalPfii" cycles.in | awk  '{ system("seq " $12 " " $18 ">> cycles.txt")}'
 CYCLES_FILE=./cycles.txt
-MAX_REGISTERS_USED=12
+MAX_REGISTERS_USED=17
 SHADER_USED="0"
 SUCCESS_MSG='Fault Injection Test Success!'
 FAILED_MSG='Fault Injection Test Failed!'

@@ -1,15 +1,15 @@
 #define SEED 4364
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <cuda_runtime.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-#define WARP_SIZE 32  // Assuming standard warp size
+#define WARP_SIZE 32 // Assuming standard warp size
 
 // Utility to generate random floats in [-1, 1)
-float* make_random_float(int size) {
-    float* data = (float*)malloc(size * sizeof(float));
+float *make_random_float(int size) {
+    float *data = (float *)malloc(size * sizeof(float));
     for (int i = 0; i < size; ++i) {
         data[i] = 2.0f * (rand() / (float)RAND_MAX) - 1.0f;
     }
@@ -23,11 +23,11 @@ int ceil_div(int a, int b) {
 
 // Kernels for layernorm forward pass (version 2 only)
 
-__global__ void mean_kernel(float* mean, const float* inp, int N, int C, int block_size) {
+__global__ void mean_kernel(float *mean, const float *inp, int N, int C, int block_size) {
     extern __shared__ float shared[];
-    int idx = blockIdx.x; // range [0, B*T)
+    int idx = blockIdx.x;  // range [0, B*T)
     int tid = threadIdx.x; // range [0, block_size)
-    const float* x = inp + idx * C;
+    const float *x = inp + idx * C;
     // thread coarsening
     float sum = 0.0f;
     for (int i = tid; i < C; i += block_size) {
@@ -48,11 +48,11 @@ __global__ void mean_kernel(float* mean, const float* inp, int N, int C, int blo
     }
 }
 
-__global__ void rstd_kernel(float* rstd, const float* inp, const float* mean, int N, int C, int block_size) {
+__global__ void rstd_kernel(float *rstd, const float *inp, const float *mean, int N, int C, int block_size) {
     extern __shared__ float shared[];
-    int idx = blockIdx.x; // range [0, B*T)
+    int idx = blockIdx.x;  // range [0, B*T)
     int tid = threadIdx.x; // range [0, block_size)
-    const float* x = inp + idx * C;
+    const float *x = inp + idx * C;
     float m = mean[idx];
     // thread coarsening
     float sum = 0.0f;
@@ -75,12 +75,13 @@ __global__ void rstd_kernel(float* rstd, const float* inp, const float* mean, in
     }
 }
 
-__global__ void normalization_kernel(float* out, const float* inp, float* mean, float* rstd,
-                                     const float* weight, const float* bias, int B, int T, int C) {
+__global__ void normalization_kernel(float *out, const float *inp, float *mean, float *rstd, const float *weight,
+                                     const float *bias, int B, int T, int C) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     // Guard against extra threads in the last block to avoid OOB accesses
     int total = B * T * C;
-    if (idx >= total) return;
+    if (idx >= total)
+        return;
     int bt = idx / C;
     int c = idx % C;
 
@@ -94,10 +95,8 @@ __global__ void normalization_kernel(float* out, const float* inp, float* mean, 
 }
 
 // Launcher for version 2
-void layernorm_forward2(float* out, float* mean, float* rstd,
-                       const float* inp, const float* weight, const float* bias,
-                       int B, int T, int C,
-                       const int block_size) {
+void layernorm_forward2(float *out, float *mean, float *rstd, const float *inp, const float *weight, const float *bias,
+                        int B, int T, int C, const int block_size) {
     int N = B * T;
     // in mean and rstd, threads cooperate within blocks via reductions
     mean_kernel<<<N, block_size, block_size * sizeof(float)>>>(mean, inp, N, C, block_size);
@@ -127,20 +126,20 @@ int main(int argc, char **argv) {
     cudaSetDevice(deviceIdx);
 
     // create host memory of random numbers
-    float* out = (float*)malloc(B * T * C * sizeof(float));
-    float* mean = (float*)malloc(B * T * sizeof(float));
-    float* rstd = (float*)malloc(B * T * sizeof(float));
-    float* inp = make_random_float(B * T * C);
-    float* weight = make_random_float(C);
-    float* bias = make_random_float(C);
+    float *out = (float *)malloc(B * T * C * sizeof(float));
+    float *mean = (float *)malloc(B * T * sizeof(float));
+    float *rstd = (float *)malloc(B * T * sizeof(float));
+    float *inp = make_random_float(B * T * C);
+    float *weight = make_random_float(C);
+    float *bias = make_random_float(C);
 
     // move to GPU
-    float* d_out;
-    float* d_mean;
-    float* d_rstd;
-    float* d_inp;
-    float* d_weight;
-    float* d_bias;
+    float *d_out;
+    float *d_mean;
+    float *d_rstd;
+    float *d_inp;
+    float *d_weight;
+    float *d_bias;
     cudaMalloc(&d_out, B * T * C * sizeof(float));
     cudaMalloc(&d_mean, B * T * sizeof(float));
     cudaMalloc(&d_rstd, B * T * sizeof(float));
@@ -170,7 +169,7 @@ int main(int argc, char **argv) {
         printf("%.6f ", mean[i]);
     }
     for (int i = 0; i < B * T; ++i) {
-        printf("%.6f ", rstd[i]);  // No trailing space after last
+        printf("%.6f ", rstd[i]); // No trailing space after last
     }
     printf("\n");
 

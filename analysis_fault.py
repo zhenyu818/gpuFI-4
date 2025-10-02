@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 
 # -*- coding: utf-8 -*-
 
 import argparse
@@ -426,8 +426,7 @@ def write_csv(app: str, test: str,components: str, bitflip: str, effects_occ, re
     return out_path, total_masked, total_sdc, total_due, total_others, total_inj
 
 
-# ============= 新增：计算“本次新数据”的 Perc_inv（不看合并后） =============
-
+# ============= Perc_inv（仅新数据） =============
 
 def _compute_perc_inv_from_new(effects_occ):
     """
@@ -445,196 +444,61 @@ def _compute_perc_inv_from_new(effects_occ):
     return (new_inv / new_all) if new_all > 0 else 0.0
 
 
-# ================= 新增：Spearman 及结果记录相关工具 =================
-
-
-def _rankdata_avg(values):
-    """平均秩（ties 取平均秩），1-based ranks"""
-    n = len(values)
-    order = sorted(range(n), key=lambda i: values[i])
-    ranks = [0.0] * n
-    i = 0
-    while i < n:
-        j = i + 1
-        while j < n and values[order[j]] == values[order[i]]:
-            j += 1
-        avg_rank = (i + 1 + j) / 2.0
-        for k in range(i, j):
-            ranks[order[k]] = avg_rank
-        i = j
-    return ranks
-
-
-def _pearsonr(x, y):
-    """皮尔逊相关，返回 None 表示不可定义"""
-    n = len(x)
-    if n < 2:
-        return None
-    mx = sum(x) / n
-    my = sum(y) / n
-    num = 0.0
-    sx = 0.0
-    sy = 0.0
-    for i in range(n):
-        dx = x[i] - mx
-        dy = y[i] - my
-        num += dx * dy
-        sx += dx * dx
-        sy += dy * dy
-    if sx <= 0.0 or sy <= 0.0:
-        return None
-    return num / math.sqrt(sx * sy)
-
-
-def _spearmanr(x, y):
-    """斯皮尔曼相关（皮尔逊相关作用在秩上）"""
-    rx = _rankdata_avg(x)
-    ry = _rankdata_avg(y)
-    return _pearsonr(rx, ry)
-
+# ============= CSV 汇总读取（供新指标与阈值判定使用） =============
 
 def _read_csv_summary(path):
     """
     读取 CSV，返回：
-      - noninv: dict[(kernel, inst_line, inst_text)] -> (tot_inj:int, SDC:int)，仅非 invalid
-      - inv_tot: invalid 行 tot_inj 之和
+      - rows_raw: 列表[dict]，按行原样（含 kernel/inst_text/tot_inj 等）
       - all_tot: 全部行 tot_inj 之和
     """
-    noninv = {}
-    inv_tot = 0
+    rows_raw = []
     all_tot = 0
     with open(path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            kernel = row["kernel"]
-            inst_line = -1 if row["inst_line"] == "" else int(row["inst_line"])
-            inst_text = row["inst_text"]
+            rows_raw.append(row)
             try:
-                tot_inj = int(row.get("tot_inj", "0"))
+                all_tot += int(row.get("tot_inj", "0"))
             except ValueError:
-                tot_inj = 0
-            try:
-                sdc = int(row.get("SDC", "0"))
-            except ValueError:
-                sdc = 0
-            all_tot += tot_inj
-            if kernel == "invalid_summary":
-                inv_tot += tot_inj
-            else:
-                noninv[(kernel, inst_line, inst_text)] = (tot_inj, sdc)
-    return noninv, inv_tot, all_tot
+                pass
+    return rows_raw, all_tot
 
 
-def _format_val(v):
-    if v is None:
-        return "NA"
-    try:
-        return f"{float(v):.6f}"
-    except Exception:
-        return "NA"
-
-
-def _append_result_info(app, test, components, bitflip, sp_tot, sp_sdc, perc_inv):
+def _compute_ratio_tot384_excluding_unknown(rows_raw):
     """
-    追加写入 result_info/result_info_{app}_{test}_{components}_{bitflip}.csv
-    列：index,Sp_tot,Sp_SDC,Perc_inv
-    返回：写入后的所有行（含表头）
+    计算：在当前 CSV（合并后）中，排除 invalid_summary 与 unknown，
+    满足 tot_inj >= 384 的指令数 / 有记录指令总数 的比例。
     """
-    info_dir = "result_info"
-    os.makedirs(info_dir, exist_ok=True)
-    info_path = os.path.join(info_dir, f"result_info_{app}_{test}_{components}_{bitflip}.csv")
+    valid_rows = []
+    for r in rows_raw:
+        kernel = r.get("kernel", "")
+        inst_text = r.get("inst_text", "")
+        if kernel == "invalid_summary":
+            continue
+        if (kernel or "").strip().lower() == "unknown":
+            continue
+        if (inst_text or "").strip().lower() == "unknown":
+            continue
+        valid_rows.append(r)
 
-    rows = []
-    if os.path.exists(info_path):
-        with open(info_path, "r", encoding="utf-8") as f:
-            rows = list(csv.reader(f))
+    denom = len(valid_rows)
+    if denom == 0:
+        return 0.0, 0, 0
 
-    if not rows:
-        rows = [["index", "Sp_tot", "Sp_SDC", "Perc_inv"]]
-
-    try:
-        last_idx = int(rows[-1][0]) if rows[-1][0].isdigit() else len(rows) - 1
-    except Exception:
-        last_idx = len(rows) - 1
-    next_idx = last_idx + 1
-
-    new_row = [
-        str(next_idx),
-        _format_val(sp_tot),
-        _format_val(sp_sdc),
-        _format_val(perc_inv),
-    ]
-    rows.append(new_row)
-
-    with open(info_path, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerows(rows)
-
-    print(f"Result info appended: {info_path}  ->  {','.join(new_row)}")
-    return rows
-
-
-def _check_consecutive_5(rows, thr=0.99):
-    """
-    只检查“最近5次”（最后5行数据，不含表头）是否同时满足：
-      Sp_tot >= thr 且 Sp_SDC >= thr
-    若不足5条数据或存在 NA/解析失败，返回 False
-    """
-    # rows 可能含表头：["index","Sp_tot","Sp_SDC","Perc_inv"]
-    data_rows = rows[1:] if rows and rows[0] and rows[0][0] == "" else rows
-    if len(data_rows) < 5:
-        return False
-
-    last5 = data_rows[-5:]
-
-    def geq(x):
+    num = 0
+    for r in valid_rows:
         try:
-            return float(x) >= thr
-        except Exception:
-            return False  # 包含 "NA" 等情况则判为不满足
+            tot = int(r.get("tot_inj", "0"))
+        except ValueError:
+            tot = 0
+        if tot >= 384:
+            num += 1
 
-    # 逐行同时满足 Sp_tot 和 Sp_SDC
-    return all(geq(r[1]) and geq(r[2]) for r in last5)
-
-
-def _check_consecutive_5_tot_95(rows, thr=0.95):
-    """
-    检查最近 5 次 Sp_tot >= thr
-    """
-    data_rows = rows[1:] if rows and rows[0][0] == "index" else rows
-    if len(data_rows) < 5:
-        return False
-    last5 = data_rows[-5:]
-
-    def geq(x):
-        try:
-            return float(x) >= thr
-        except Exception:
-            return False
-
-    return all(geq(r[1]) for r in last5)  # r[1] 是 Sp_tot
-
-
-def _check_consecutive_5_tot_99(rows, thr=0.99):
-    """
-    检查最近 5 次 Sp_tot >= thr
-    """
-    data_rows = rows[1:] if rows and rows[0][0] == "index" else rows
-    if len(data_rows) < 5:
-        return False
-    last5 = data_rows[-5:]
-
-    def geq(x):
-        try:
-            return float(x) >= thr
-        except Exception:
-            return False
-
-    return all(geq(r[1]) for r in last5)  # r[1] 是 Sp_tot
+    return num / denom, num, denom
 
 
 # ================= 主流程 =================
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -651,7 +515,7 @@ def main():
     # 解析本次日志
     effects_occ, results_occ, params_by_pair = parse_log(log_path)
 
-    # —— 新增：先基于“新数据”计算 Perc_inv（不看旧数据、也不看合并结果）——
+    # Perc_inv（仅新数据）
     perc_inv_new = _compute_perc_inv_from_new(effects_occ)
 
     # 结果 CSV 路径
@@ -659,40 +523,11 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"test_result_{args.app}_{args.test}_{args.component}_{args.bitflip}.csv")
 
-    # 读取旧结果（B），若存在
-    had_old = os.path.exists(out_path)
-    B_noninv = {}
-    if had_old:
-        try:
-            B_noninv, _, _ = _read_csv_summary(out_path)
-        except FileNotFoundError:
-            had_old = False
-
-    # 写入合并后的结果（A）
+    # 写入合并后的结果
     out_path, total_masked, total_sdc, total_due, total_others, total_inj = write_csv(
         args.app, args.test, args.component, args.bitflip, effects_occ, results_occ, params_by_pair)
 
-    # 读取合并后的 A（仅用于 Sp_* 和其他打印；Perc_inv 用新数据的 perc_inv_new）
-    A_noninv, A_inv_tot, A_all_tot = _read_csv_summary(out_path)
-
-    # 若有旧结果，计算 Spearman(A vs B)，仅非 invalid 指令
-    sp_tot = None
-    sp_sdc = None
-    if had_old:
-        keys = set(A_noninv.keys()) | set(B_noninv.keys())
-        A_tot_list, B_tot_list = [], []
-        A_sdc_list, B_sdc_list = [], []
-        for k in sorted(keys):
-            a_tot, a_sdc = A_noninv.get(k, (0, 0))
-            b_tot, b_sdc = B_noninv.get(k, (0, 0))
-            A_tot_list.append(float(a_tot))
-            B_tot_list.append(float(b_tot))
-            A_sdc_list.append(float(a_sdc))
-            B_sdc_list.append(float(b_sdc))
-        sp_tot = _spearmanr(A_tot_list, B_tot_list)
-        sp_sdc = _spearmanr(A_sdc_list, B_sdc_list)
-
-    # —— 原有功能：记录 invalid 参数组合（使用 reduce_combo）——
+    # —— 记录 invalid 参数组合（保持原有功能）——
     invalid_keys = set()
     for inj_key, recs in effects_occ.items():
         run_id, name, _ = inj_key
@@ -721,7 +556,7 @@ def main():
                 f"Appended {len(new_items)} invalid parameter combinations to {store_path}"
             )
 
-    # 新增：对“被归为 invalid 但结果为 SDC”的新注入，拷贝 tmp.out 并记录信息
+    # 对“被归为 invalid 但结果为 SDC”的新注入，拷贝 tmp.out 并记录信息（保持原有功能）
     _collect_invalid_sdc_outputs(
         effects_occ,
         results_occ,
@@ -732,31 +567,27 @@ def main():
         bitflip=args.bitflip,
     )
 
-    # 记录三项指标：Sp_tot、Sp_SDC、Perc_inv(本次新数据)
-    rows_all = _append_result_info(args.app, args.test, args.component, args.bitflip, sp_tot, sp_sdc, perc_inv_new)
+    # ===== 新指标与新的停止/备份条件 =====
+    rows_raw, all_tot_sum = _read_csv_summary(out_path)
 
-    # 新增：检查 Sp_tot 连续 5 次 >= 0.95（只保存一次）
-    if _check_consecutive_5_tot_95(rows_all, thr=0.95):
-        backup_path = out_path.replace(".csv", "_95.csv")
-        if not os.path.exists(backup_path):  # 避免重复保存
-            shutil.copyfile(out_path, backup_path)
-            print(
-                f"Sp_tot has been >= 0.95 for 5 consecutive runs. Backup created: {backup_path}"
-            )
-    if _check_consecutive_5_tot_99(rows_all, thr=0.99):
-        backup_path = out_path.replace(".csv", "_99.csv")
-        if not os.path.exists(backup_path):  # 避免重复保存
-            shutil.copyfile(out_path, backup_path)
-            print(
-                f"Sp_tot has been >= 0.99 for 5 consecutive runs. Backup created: {backup_path}"
-            )
+    # 比例：tot_inj >= 384 的指令数 / 有记录的指令数（排除 unknown 与 invalid_summary）
+    ratio_384, cnt_ge384, cnt_total_valid = _compute_ratio_tot384_excluding_unknown(rows_raw)
 
-    # 检查是否已连续 5 次 > 0.99（如满足则退出 99）
-    if _check_consecutive_5(rows_all):
-        print("Sp_SDC have been >= 0.99 for 5 consecutive runs.")
+    # 若所有指令的 tot_inj 之和 >= 384，则备份一个 *_384.csv（若不存在时）
+    if all_tot_sum >= 384:
+        backup_384 = out_path.replace(".csv", "_384.csv")
+        if not os.path.exists(backup_384):
+            shutil.copyfile(out_path, backup_384)
+            print(f"Total tot_inj across all recorded instructions >= 384. Backup created: {backup_384}")
+
+    # 若 ≥70% 的指令 tot_inj >= 384，则退出 99
+    if cnt_total_valid > 0 and ratio_384 >= 0.70:
+        print("========== Threshold Reached ==========")
+        print(f" Instructions with tot_inj >= 384 : {cnt_ge384}/{cnt_total_valid} ({ratio_384:.6f})")
+        print(" Condition met: 70% of recorded (excluding unknown) instructions have tot_inj >= 384.")
         sys.exit(99)
 
-    # 保持原有控制台输出
+    # 保持原有控制台输出 + 新指标
     print(f"CSV written: {out_path}")
     print("========== Overall Summary (previous + this log) ==========")
     print(f" Total injections : {total_inj}")
@@ -764,11 +595,29 @@ def main():
     print(f"   SDC            : {total_sdc}")
     print(f"   DUE            : {total_due}")
     print(f"   Others         : {total_others}")
-    # 同时也把三项新指标打印一下
     print("========== New Metrics ==========")
-    print(f" Sp_tot   : {_format_val(sp_tot)}")
-    print(f" Sp_SDC   : {_format_val(sp_sdc)}")
-    print(f" Perc_inv (new only) : {_format_val(perc_inv_new)}")
+    print(f" Perc_inv (new only) : {perc_inv_new:.6f}")
+    print("========== CSV Metrics ==========")
+    print(f" tot_inj>=384 ratio (excluding unknown) : {cnt_ge384}/{cnt_total_valid} ({ratio_384:.6f})")
+    print(f" Sum of tot_inj across all instructions : {all_tot_sum}")
+    # 新增写入 result_info
+    info_dir = "result_info"
+    os.makedirs(info_dir, exist_ok=True)
+    info_path = os.path.join(info_dir, f"result_info_{args.app}_{args.test}_{args.component}_{args.bitflip}.csv")
+
+    file_exists = os.path.exists(info_path)
+    with open(info_path, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["Perc_inv_new", "cnt_ge384", "cnt_total_valid", "ratio_384", "all_tot_sum"])
+        writer.writerow([
+            f"{perc_inv_new:.6f}",
+            cnt_ge384,
+            cnt_total_valid,
+            f"{ratio_384:.6f}",
+            all_tot_sum
+        ])
+    print(f"Result info appended: {info_path}")
 
 
 if __name__ == "__main__":

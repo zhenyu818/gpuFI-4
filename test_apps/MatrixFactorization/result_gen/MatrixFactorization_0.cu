@@ -1,39 +1,38 @@
 #include <cuda_runtime.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
-#include <random>
 #include <limits>
-#include <algorithm>
+#include <random>
 #include <vector>
 
 #define HOST_RANDOM_SEED 4124
 
-#define CUDA_CHECK(call)                                                             \
-    do {                                                                             \
-        cudaError_t err__ = (call);                                                  \
-        if (err__ != cudaSuccess) {                                                  \
-            std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__           \
-                      << " code=" << err__ << " (" << cudaGetErrorString(err__)     \
-                      << ")\n";                                                    \
-            std::exit(EXIT_FAILURE);                                                 \
-        }                                                                            \
+#define CUDA_CHECK(call)                                                                                               \
+    do {                                                                                                               \
+        cudaError_t err__ = (call);                                                                                    \
+        if (err__ != cudaSuccess) {                                                                                    \
+            std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__ << " code=" << err__ << " ("                  \
+                      << cudaGetErrorString(err__) << ")\n";                                                           \
+            std::exit(EXIT_FAILURE);                                                                                   \
+        }                                                                                                              \
     } while (0)
 
 namespace config {
-    __constant__ int n_factors;
-    __constant__ float learning_rate;
-    __constant__ float P_reg;
-    __constant__ float Q_reg;
-    __constant__ float user_bias_reg;
-    __constant__ float item_bias_reg;
-    __constant__ bool is_train;
-}
+__constant__ int n_factors;
+__constant__ float learning_rate;
+__constant__ float P_reg;
+__constant__ float Q_reg;
+__constant__ float user_bias_reg;
+__constant__ float item_bias_reg;
+__constant__ bool is_train;
+} // namespace config
 
-__device__ float get_prediction(int factors, const float *p, const float *q,
-                                float user_bias, float item_bias, float global_bias) {
+__device__ float get_prediction(int factors, const float *p, const float *q, float user_bias, float item_bias,
+                                float global_bias) {
     float pred = global_bias + user_bias + item_bias;
     for (int f = 0; f < factors; ++f) {
         pred += q[f] * p[f];
@@ -42,14 +41,16 @@ __device__ float get_prediction(int factors, const float *p, const float *q,
 }
 
 // First pass: deterministically select a unique winner (min user id) per item
-__global__ void select_item_owner(const int *indptr, const int *indices, const int *random_offsets,
-                                  int n_rows, int *item_owner) {
+__global__ void select_item_owner(const int *indptr, const int *indices, const int *random_offsets, int n_rows,
+                                  int *item_owner) {
     int user = blockDim.x * blockIdx.x + threadIdx.x;
-    if (user >= n_rows) return;
+    if (user >= n_rows)
+        return;
 
     int low = indptr[user];
     int high = indptr[user + 1];
-    if (low == high) return;
+    if (low == high)
+        return;
 
     int width = high - low;
     int choice = random_offsets[user] % width;
@@ -61,18 +62,18 @@ __global__ void select_item_owner(const int *indptr, const int *indices, const i
 }
 
 // Second pass: apply updates; only the selected owner updates Q/item_bias
-__global__ void sgd_update_deterministic(const int *indptr, const int *indices, const float *data,
-                                         float *P, const float *Q, float *Q_target,
-                                         int n_rows, float *user_bias, const float *item_bias,
-                                         float *item_bias_target, const int *random_offsets,
-                                         float global_bias, const int *item_owner,
-                                         unsigned char *item_is_updated) {
+__global__ void sgd_update_deterministic(const int *indptr, const int *indices, const float *data, float *P,
+                                         const float *Q, float *Q_target, int n_rows, float *user_bias,
+                                         const float *item_bias, float *item_bias_target, const int *random_offsets,
+                                         float global_bias, const int *item_owner, unsigned char *item_is_updated) {
     int user = blockDim.x * blockIdx.x + threadIdx.x;
-    if (user >= n_rows) return;
+    if (user >= n_rows)
+        return;
 
     int low = indptr[user];
     int high = indptr[user + 1];
-    if (low == high) return;
+    if (low == high)
+        return;
 
     int width = high - low;
     int choice = random_offsets[user] % width;
@@ -82,17 +83,14 @@ __global__ void sgd_update_deterministic(const int *indptr, const int *indices, 
     float ub = user_bias[user];
     float ib = item_bias[item];
 
-    float error = data[y_i] - get_prediction(config::n_factors,
-                                             &P[user * config::n_factors],
-                                             &Q[item * config::n_factors],
-                                             ub, ib, global_bias);
+    float error = data[y_i] - get_prediction(config::n_factors, &P[user * config::n_factors],
+                                             &Q[item * config::n_factors], ub, ib, global_bias);
 
     // Update P (per-user, no conflicts with one thread per user)
     for (int f = 0; f < config::n_factors; ++f) {
         float P_old = P[user * config::n_factors + f];
         float Q_old = Q[item * config::n_factors + f];
-        P[user * config::n_factors + f] =
-            P_old + config::learning_rate * (error * Q_old - config::P_reg * P_old);
+        P[user * config::n_factors + f] = P_old + config::learning_rate * (error * Q_old - config::P_reg * P_old);
     }
 
     // Update user bias
@@ -113,8 +111,7 @@ __global__ void sgd_update_deterministic(const int *indptr, const int *indices, 
 
 int main(int argc, char **argv) {
     if (argc != 4) {
-        std::cerr << "Usage: " << argv[0]
-                  << " <num_users> <num_items> <items_per_user>\n";
+        std::cerr << "Usage: " << argv[0] << " <num_users> <num_items> <items_per_user>\n";
         return EXIT_FAILURE;
     }
 
@@ -230,43 +227,46 @@ int main(int argc, char **argv) {
     CUDA_CHECK(cudaMemcpy(d_Q_target, h_Q_target.data(), h_Q_target.size() * sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_user_bias, h_user_bias.data(), h_user_bias.size() * sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_item_bias, h_item_bias.data(), h_item_bias.size() * sizeof(float), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(d_item_bias_target, h_item_bias_target.data(), h_item_bias_target.size() * sizeof(float), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(d_item_is_updated, h_item_updated.data(), h_item_updated.size() * sizeof(unsigned char), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(d_random_choice, h_random_choice.data(), h_random_choice.size() * sizeof(int), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_item_bias_target, h_item_bias_target.data(), h_item_bias_target.size() * sizeof(float),
+                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_item_is_updated, h_item_updated.data(), h_item_updated.size() * sizeof(unsigned char),
+                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_random_choice, h_random_choice.data(), h_random_choice.size() * sizeof(int),
+                          cudaMemcpyHostToDevice));
     // Initialize item_owner to a large value so atomicMin selects actual user ids
     {
         std::vector<int> h_item_owner(num_items, std::numeric_limits<int>::max());
-        CUDA_CHECK(cudaMemcpy(d_item_owner, h_item_owner.data(), h_item_owner.size() * sizeof(int), cudaMemcpyHostToDevice));
+        CUDA_CHECK(
+            cudaMemcpy(d_item_owner, h_item_owner.data(), h_item_owner.size() * sizeof(int), cudaMemcpyHostToDevice));
     }
 
     dim3 block_dim(std::min(128, num_users));
-    if (block_dim.x == 0) block_dim.x = 1;
+    if (block_dim.x == 0)
+        block_dim.x = 1;
     dim3 grid_dim((num_users + block_dim.x - 1) / block_dim.x);
     if (grid_dim.x == 0) {
         grid_dim.x = 1;
     }
 
     // First pass: pick deterministic item owner per item
-    select_item_owner<<<grid_dim, block_dim>>>(d_indptr, d_indices, d_random_choice,
-                                               num_users, d_item_owner);
+    select_item_owner<<<grid_dim, block_dim>>>(d_indptr, d_indices, d_random_choice, num_users, d_item_owner);
     CUDA_CHECK(cudaGetLastError());
     CUDA_CHECK(cudaDeviceSynchronize());
 
     // Second pass: apply updates; winners update item state
-    sgd_update_deterministic<<<grid_dim, block_dim>>>(d_indptr, d_indices, d_data,
-                                                      d_P, d_Q, d_Q_target,
-                                                      num_users, d_user_bias, d_item_bias,
-                                                      d_item_bias_target, d_random_choice,
-                                                      global_bias, d_item_owner,
-                                                      d_item_is_updated);
+    sgd_update_deterministic<<<grid_dim, block_dim>>>(d_indptr, d_indices, d_data, d_P, d_Q, d_Q_target, num_users,
+                                                      d_user_bias, d_item_bias, d_item_bias_target, d_random_choice,
+                                                      global_bias, d_item_owner, d_item_is_updated);
     CUDA_CHECK(cudaGetLastError());
     CUDA_CHECK(cudaDeviceSynchronize());
 
     CUDA_CHECK(cudaMemcpy(h_P.data(), d_P, h_P.size() * sizeof(float), cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaMemcpy(h_Q_target.data(), d_Q_target, h_Q_target.size() * sizeof(float), cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaMemcpy(h_user_bias.data(), d_user_bias, h_user_bias.size() * sizeof(float), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(h_item_bias_target.data(), d_item_bias_target, h_item_bias_target.size() * sizeof(float), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(h_item_updated.data(), d_item_is_updated, h_item_updated.size() * sizeof(unsigned char), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(h_item_bias_target.data(), d_item_bias_target, h_item_bias_target.size() * sizeof(float),
+                          cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(h_item_updated.data(), d_item_is_updated, h_item_updated.size() * sizeof(unsigned char),
+                          cudaMemcpyDeviceToHost));
 
     std::cout << std::fixed << std::setprecision(6);
     for (float v : h_P) {

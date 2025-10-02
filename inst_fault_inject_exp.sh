@@ -1,11 +1,11 @@
 #!/bin/bash
 
-TEST_APP_NAME="floydwarshall"
+TEST_APP_NAME="AdamW"
 COMPONENT_SET="0"
 INJECT_BIT_FLIP_COUNT=1 # number of bits to flip per injection (e.g. 2 means flip 2 bits per injection)
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
-RUN_PER_EPOCH=100
-EPOCH=1
+RUN_PER_EPOCH=10
+EPOCH=2
 
 
 DO_BUILD=0 # 1: build before run, 0: skip build
@@ -576,13 +576,6 @@ main() {
 
         echo "=== Starting fault injection experiment: ${TEST_APP_NAME}, file ${filename} ==="
         filename_no_ext="${filename%.txt}"
-
-        python3 pre_check.py -a $TEST_APP_NAME -t $filename_no_ext -c $COMPONENT_SET -b $INJECT_BIT_FLIP_COUNT
-        ret=$?
-        if [ $ret -eq 99 ]; then
-            echo "=== Early stopping triggered. Skipping this file ==="
-            continue
-        fi
 
         for i in $(seq 1 $EPOCH); do
             echo "  --- Injection run $i / $EPOCH ---"

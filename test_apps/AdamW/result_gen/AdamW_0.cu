@@ -1,7 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <cuda_runtime.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define RANDOM_SEED 12345
 
@@ -16,10 +16,12 @@ __device__ inline float lerp(float start, float end, float weight) {
     return fma(weight, end, fma(-weight, start, start));
 }
 
-__global__ void adamw_kernel2(float* params_memory, const float* grads_memory, float* m_memory, float* v_memory, long num_parameters,
-                              float learning_rate, float beta1, float beta2, float beta1_correction, float beta2_correction, float eps, float weight_decay) {
+__global__ void adamw_kernel2(float *params_memory, const float *grads_memory, float *m_memory, float *v_memory,
+                              long num_parameters, float learning_rate, float beta1, float beta2,
+                              float beta1_correction, float beta2_correction, float eps, float weight_decay) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= num_parameters) return;
+    if (i >= num_parameters)
+        return;
     float grad = grads_memory[i];
     float m = m_memory[i];
     float v = v_memory[i];
@@ -29,12 +31,12 @@ __global__ void adamw_kernel2(float* params_memory, const float* grads_memory, f
     // update the second moment (RMSprop)
     v = lerp(grad * grad, v, beta2);
     v_memory[i] = v;
-    m /= beta1_correction;  // m_hat
-    v /= beta2_correction;  // v_hat
+    m /= beta1_correction; // m_hat
+    v /= beta2_correction; // v_hat
     params_memory[i] -= learning_rate * (m / (sqrtf(v) + eps) + weight_decay * params_memory[i]);
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     if (argc != 3) {
         printf("Usage: %s <num_parameters> <t>\n", argv[0]);
         printf("<num_parameters>: number of parameters (long integer, size of arrays)\n");
@@ -58,13 +60,13 @@ int main(int argc, char** argv) {
 
     srand(RANDOM_SEED);
 
-    float* params_memory = (float*)malloc(num_parameters * sizeof(float));
-    float* grads_memory = (float*)malloc(num_parameters * sizeof(float));
-    float* m_memory = (float*)malloc(num_parameters * sizeof(float));
-    float* v_memory = (float*)malloc(num_parameters * sizeof(float));
+    float *params_memory = (float *)malloc(num_parameters * sizeof(float));
+    float *grads_memory = (float *)malloc(num_parameters * sizeof(float));
+    float *m_memory = (float *)malloc(num_parameters * sizeof(float));
+    float *v_memory = (float *)malloc(num_parameters * sizeof(float));
     for (long i = 0; i < num_parameters; i++) {
         float r = (float)rand() / RAND_MAX;
-        params_memory[i] = r * 2.0f - 1.0f;  // uniform [-1, 1]
+        params_memory[i] = r * 2.0f - 1.0f; // uniform [-1, 1]
         grads_memory[i] = r * 2.0f - 1.0f;  // uniform [-1, 1]
         m_memory[i] = r * 2.0f - 1.0f;      // uniform [-1, 1]
         v_memory[i] = r;                    // uniform [0, 1]
@@ -83,8 +85,8 @@ int main(int argc, char** argv) {
 
     dim3 block(512);
     dim3 grid((num_parameters + block.x - 1) / block.x);
-    adamw_kernel2<<<grid, block>>>(d_params, d_grads, d_m, d_v, num_parameters,
-                                   learning_rate, beta1, beta2, beta1_correction, beta2_correction, eps, weight_decay);
+    adamw_kernel2<<<grid, block>>>(d_params, d_grads, d_m, d_v, num_parameters, learning_rate, beta1, beta2,
+                                   beta1_correction, beta2_correction, eps, weight_decay);
     cudaCheck(cudaGetLastError());
     cudaCheck(cudaDeviceSynchronize());
 
@@ -94,17 +96,20 @@ int main(int argc, char** argv) {
 
     bool first = true;
     for (long i = 0; i < num_parameters; i++) {
-        if (!first) printf(" ");
+        if (!first)
+            printf(" ");
         printf("%.6f", params_memory[i]);
         first = false;
     }
     for (long i = 0; i < num_parameters; i++) {
-        if (!first) printf(" ");
+        if (!first)
+            printf(" ");
         printf("%.6f", m_memory[i]);
         first = false;
     }
     for (long i = 0; i < num_parameters; i++) {
-        if (!first) printf(" ");
+        if (!first)
+            printf(" ");
         printf("%.6f", v_memory[i]);
         first = false;
     }

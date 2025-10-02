@@ -1,21 +1,20 @@
+#include <assert.h>
+#include <cfloat>  // for DBL_MIN
+#include <climits> // for INT_MAX, INT_MIN
+#include <cuda_runtime.h>
+#include <math.h> // for isnan, isinf, signbit
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include <cuda_runtime.h>
-#include <climits>   // for INT_MAX, INT_MIN
-#include <cfloat>    // for DBL_MIN
-#include <math.h>    // for isnan, isinf, signbit
 
 #define M_SEED 1745
 #define M_BLOCK_SIZE 16
 
 // ================= 辅助函数 ==================
-#define checkCudaErrors(val)  check((val), #val, __FILE__, __LINE__)
+#define checkCudaErrors(val) check((val), #val, __FILE__, __LINE__)
 void check(cudaError_t result, char const *const func, const char *const file, int const line) {
     if (result != cudaSuccess) {
-        fprintf(stderr, "CUDA error at %s:%d code=%d(%s) \"%s\" \n",
-                file, line, (unsigned int)result,
+        fprintf(stderr, "CUDA error at %s:%d code=%d(%s) \"%s\" \n", file, line, (unsigned int)result,
                 cudaGetErrorString(result), func);
         exit(EXIT_FAILURE);
     }
@@ -23,7 +22,8 @@ void check(cudaError_t result, char const *const func, const char *const file, i
 
 bool checkCmdLineFlag(int argc, const char **argv, const char *flag) {
     for (int i = 0; i < argc; i++) {
-        if (!strcmp(argv[i], flag)) return true;
+        if (!strcmp(argv[i], flag))
+            return true;
     }
     return false;
 }
@@ -38,17 +38,16 @@ int getCmdLineArgumentInt(int argc, const char **argv, const char *argName) {
 }
 
 // ================= CUDA Kernel ==================
-template <int BLOCK_SIZE>
-__global__ void MatrixMulCUDA(double *C, const double *A, const double *B, int wA, int wB) {
+template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(double *C, const double *A, const double *B, int wA, int wB) {
     int bx = blockIdx.x, by = blockIdx.y;
     int tx = threadIdx.x, ty = threadIdx.y;
 
     int aBegin = wA * BLOCK_SIZE * by;
-    int aEnd   = aBegin + wA - 1;
-    int aStep  = BLOCK_SIZE;
+    int aEnd = aBegin + wA - 1;
+    int aStep = BLOCK_SIZE;
 
     int bBegin = BLOCK_SIZE * bx;
-    int bStep  = BLOCK_SIZE * wB;
+    int bStep = BLOCK_SIZE * wB;
 
     double Csub = 0.0;
 
@@ -61,7 +60,7 @@ __global__ void MatrixMulCUDA(double *C, const double *A, const double *B, int w
 
         __syncthreads();
 
-        #pragma unroll
+#pragma unroll
         for (int k = 0; k < BLOCK_SIZE; ++k) {
             Csub += As[ty][k] * Bs[k][tx];
         }
@@ -83,16 +82,16 @@ void RandomInitSubnormal(double *data, int size) {
 }
 
 // ================= 主计算函数 ==================
-int MatrixMultiply(int argc, char **argv,
-                   int block_size, const dim3 &dimsA,
-                   const dim3 &dimsB) {
+int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, const dim3 &dimsB) {
     unsigned int size_A = dimsA.x * dimsA.y;
     unsigned int mem_size_A = sizeof(double) * size_A;
-    double *h_A; checkCudaErrors(cudaMallocHost(&h_A, mem_size_A));
+    double *h_A;
+    checkCudaErrors(cudaMallocHost(&h_A, mem_size_A));
 
     unsigned int size_B = dimsB.x * dimsB.y;
     unsigned int mem_size_B = sizeof(double) * size_B;
-    double *h_B; checkCudaErrors(cudaMallocHost(&h_B, mem_size_B));
+    double *h_B;
+    checkCudaErrors(cudaMallocHost(&h_B, mem_size_B));
 
     // ---- 使用非正规数输入生成 ----
     RandomInitSubnormal(h_A, size_A);
@@ -101,11 +100,12 @@ int MatrixMultiply(int argc, char **argv,
     double *d_A, *d_B, *d_C;
     dim3 dimsC(dimsB.x, dimsA.y, 1);
     unsigned int mem_size_C = sizeof(double) * dimsC.x * dimsC.y;
-    double *h_C; checkCudaErrors(cudaMallocHost(&h_C, mem_size_C));
+    double *h_C;
+    checkCudaErrors(cudaMallocHost(&h_C, mem_size_C));
 
-    checkCudaErrors(cudaMalloc((void**)&d_A, mem_size_A));
-    checkCudaErrors(cudaMalloc((void**)&d_B, mem_size_B));
-    checkCudaErrors(cudaMalloc((void**)&d_C, mem_size_C));
+    checkCudaErrors(cudaMalloc((void **)&d_A, mem_size_A));
+    checkCudaErrors(cudaMalloc((void **)&d_B, mem_size_B));
+    checkCudaErrors(cudaMalloc((void **)&d_C, mem_size_C));
 
     checkCudaErrors(cudaMemcpy(d_A, h_A, mem_size_A, cudaMemcpyHostToDevice));
     checkCudaErrors(cudaMemcpy(d_B, h_B, mem_size_B, cudaMemcpyHostToDevice));

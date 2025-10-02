@@ -1,12 +1,12 @@
-#include <cuda_runtime.h>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <cmath>
-#include <iostream>
-#include <vector>
-#include <random>
+#include <cuda_runtime.h>
 #include <iomanip>
+#include <iostream>
+#include <random>
 #include <string>
+#include <vector>
 
 #ifndef RNG_SEED
 #define RNG_SEED 6768
@@ -14,65 +14,111 @@
 
 struct Vec3 {
     float e[3];
-    __host__ __device__ Vec3() : e{0,0,0} {}
-    __host__ __device__ Vec3(float x, float y, float z) : e{x,y,z} {}
-    __host__ __device__ float x() const { return e[0]; }
-    __host__ __device__ float y() const { return e[1]; }
-    __host__ __device__ float z() const { return e[2]; }
-    __host__ __device__ float& operator[](int i) { return e[i]; }
-    __host__ __device__ const float& operator[](int i) const { return e[i]; }
-    __host__ __device__ Vec3 operator+(const Vec3& o) const { return Vec3(e[0]+o.e[0], e[1]+o.e[1], e[2]+o.e[2]); }
-    __host__ __device__ Vec3 operator-(const Vec3& o) const { return Vec3(e[0]-o.e[0], e[1]-o.e[1], e[2]-o.e[2]); }
-    __host__ __device__ Vec3 operator*(float t) const { return Vec3(e[0]*t, e[1]*t, e[2]*t); }
-    __host__ __device__ Vec3 operator/(float t) const { return Vec3(e[0]/t, e[1]/t, e[2]/t); }
-    __host__ __device__ Vec3& operator+=(const Vec3& o) { e[0]+=o.e[0]; e[1]+=o.e[1]; e[2]+=o.e[2]; return *this; }
+    __host__ __device__ Vec3() : e{0, 0, 0} {
+    }
+    __host__ __device__ Vec3(float x, float y, float z) : e{x, y, z} {
+    }
+    __host__ __device__ float x() const {
+        return e[0];
+    }
+    __host__ __device__ float y() const {
+        return e[1];
+    }
+    __host__ __device__ float z() const {
+        return e[2];
+    }
+    __host__ __device__ float &operator[](int i) {
+        return e[i];
+    }
+    __host__ __device__ const float &operator[](int i) const {
+        return e[i];
+    }
+    __host__ __device__ Vec3 operator+(const Vec3 &o) const {
+        return Vec3(e[0] + o.e[0], e[1] + o.e[1], e[2] + o.e[2]);
+    }
+    __host__ __device__ Vec3 operator-(const Vec3 &o) const {
+        return Vec3(e[0] - o.e[0], e[1] - o.e[1], e[2] - o.e[2]);
+    }
+    __host__ __device__ Vec3 operator*(float t) const {
+        return Vec3(e[0] * t, e[1] * t, e[2] * t);
+    }
+    __host__ __device__ Vec3 operator/(float t) const {
+        return Vec3(e[0] / t, e[1] / t, e[2] / t);
+    }
+    __host__ __device__ Vec3 &operator+=(const Vec3 &o) {
+        e[0] += o.e[0];
+        e[1] += o.e[1];
+        e[2] += o.e[2];
+        return *this;
+    }
 };
 
-__host__ __device__ inline Vec3 operator*(float t, const Vec3& v) { return v * t; }
-__host__ __device__ inline float dot(const Vec3& a, const Vec3& b) { return a.e[0]*b.e[0] + a.e[1]*b.e[1] + a.e[2]*b.e[2]; }
-__host__ __device__ inline float length(const Vec3& v) { return sqrtf(dot(v, v)); }
-__host__ __device__ inline Vec3 unit_vector(const Vec3& v) { return v / length(v); }
-__host__ __device__ inline Vec3 clip01(const Vec3& v) { return Vec3(fminf(fmaxf(v.e[0], 0.0f), 0.999f), fminf(fmaxf(v.e[1], 0.0f), 0.999f), fminf(fmaxf(v.e[2], 0.0f), 0.999f)); }
+__host__ __device__ inline Vec3 operator*(float t, const Vec3 &v) {
+    return v * t;
+}
+__host__ __device__ inline float dot(const Vec3 &a, const Vec3 &b) {
+    return a.e[0] * b.e[0] + a.e[1] * b.e[1] + a.e[2] * b.e[2];
+}
+__host__ __device__ inline float length(const Vec3 &v) {
+    return sqrtf(dot(v, v));
+}
+__host__ __device__ inline Vec3 unit_vector(const Vec3 &v) {
+    return v / length(v);
+}
+__host__ __device__ inline Vec3 clip01(const Vec3 &v) {
+    return Vec3(fminf(fmaxf(v.e[0], 0.0f), 0.999f), fminf(fmaxf(v.e[1], 0.0f), 0.999f),
+                fminf(fmaxf(v.e[2], 0.0f), 0.999f));
+}
 
 struct Ray {
     Vec3 A; // origin
     Vec3 B; // direction
-    __host__ __device__ Ray() {}
-    __host__ __device__ Ray(const Vec3& a, const Vec3& b) : A(a), B(b) {}
-    __host__ __device__ Vec3 origin() const { return A; }
-    __host__ __device__ Vec3 direction() const { return B; }
-    __host__ __device__ Vec3 point_at_parameter(float t) const { return A + t * B; }
+    __host__ __device__ Ray() {
+    }
+    __host__ __device__ Ray(const Vec3 &a, const Vec3 &b) : A(a), B(b) {
+    }
+    __host__ __device__ Vec3 origin() const {
+        return A;
+    }
+    __host__ __device__ Vec3 direction() const {
+        return B;
+    }
+    __host__ __device__ Vec3 point_at_parameter(float t) const {
+        return A + t * B;
+    }
 };
 
 // Simple ray-sphere hit: returns true if hit, setting tHit and surface normal
-__device__ bool hit_sphere(const Vec3& center, float radius, const Ray& r, float& tHit, Vec3& n) {
+__device__ bool hit_sphere(const Vec3 &center, float radius, const Ray &r, float &tHit, Vec3 &n) {
     Vec3 oc = r.origin() - center;
     float a = dot(r.direction(), r.direction());
     float b = 2.0f * dot(oc, r.direction());
     float c = dot(oc, oc) - radius * radius;
-    float disc = b*b - 4*a*c;
-    if (disc < 0.0f) return false;
+    float disc = b * b - 4 * a * c;
+    if (disc < 0.0f)
+        return false;
     float sdisc = sqrtf(disc);
     float t0 = (-b - sdisc) / (2.0f * a);
     float t1 = (-b + sdisc) / (2.0f * a);
     float t = t0;
-    if (t < 0.001f) t = t1;
-    if (t < 0.001f) return false;
+    if (t < 0.001f)
+        t = t1;
+    if (t < 0.001f)
+        return false;
     tHit = t;
     n = (r.point_at_parameter(t) - center) / radius;
     return true;
 }
 
 // Core kernel: per-pixel, per-sample rendering with jitter supplied from host
-__global__ void render(Vec3* colorBuffer,
-                       const float* randU, // size nx*ny*samples
-                       const float* randV, // size nx*ny*samples
-                       int nx,
-                       int ny,
-                       int samples) {
+__global__ void render(Vec3 *colorBuffer,
+                       const float *randU, // size nx*ny*samples
+                       const float *randV, // size nx*ny*samples
+                       int nx, int ny, int samples) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
-    if (x >= nx || y >= ny) return;
+    if (x >= nx || y >= ny)
+        return;
     int pixel_index = y * nx + x;
 
     // Simple pinhole camera
@@ -89,7 +135,8 @@ __global__ void render(Vec3* colorBuffer,
         Ray r(origin, lower_left_corner + u * horizontal + v * vertical - origin);
 
         // Scene: single sphere + sky background
-        float tHit; Vec3 n;
+        float tHit;
+        Vec3 n;
         Vec3 sample;
         if (hit_sphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f, r, tHit, n)) {
             sample = 0.5f * Vec3(n.x() + 1.0f, n.y() + 1.0f, n.z() + 1.0f);
@@ -105,7 +152,7 @@ __global__ void render(Vec3* colorBuffer,
     colorBuffer[pixel_index] = clip01(col);
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     // Default values
     int nx = 8;
     int ny = 4;
@@ -133,7 +180,7 @@ int main(int argc, char** argv) {
     std::vector<Vec3> h_colorBuffer(num_pixels);
 
     // Device-side buffers
-    Vec3* d_colorBuffer = nullptr;
+    Vec3 *d_colorBuffer = nullptr;
     float *d_randU = nullptr, *d_randV = nullptr;
 
     // Allocate device memory
@@ -170,7 +217,7 @@ int main(int argc, char** argv) {
     std::vector<float> reference_values;
     std::ifstream file("result.txt");
     if (!file.is_open()) {
-        std::cout << "Fault Injection Test Failed!\n";  // File not found or unreadable
+        std::cout << "Fault Injection Test Failed!\n"; // File not found or unreadable
         // Free resources
         cudaFree(d_randV);
         cudaFree(d_randU);
@@ -190,7 +237,7 @@ int main(int argc, char** argv) {
 
     // Check if reference has exactly the expected number of values
     if (reference_values.size() != total_values) {
-        std::cout << "Fault Injection Test Failed!\n";  // Mismatch in value count
+        std::cout << "Fault Injection Test Failed!\n"; // Mismatch in value count
         // Free resources
         cudaFree(d_randV);
         cudaFree(d_randU);
@@ -240,7 +287,6 @@ int main(int argc, char** argv) {
     cudaFree(d_randU);
     cudaFree(d_colorBuffer);
     // Host vectors auto-free on scope exit
-
 
     return 0;
 }

@@ -1,32 +1,29 @@
-#include <iostream>
+#include <cmath>
+#include <cstdio>
 #include <cuda_runtime.h>
+#include <fstream>
+#include <iostream>
+#include <limits>
+#include <sstream>
 #include <stdlib.h>
+#include <string>
 #include <time.h>
 #include <vector>
-#include <cstdio>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <cmath>
-#include <limits>
 
 #define SEED 42
 #define TILE_ROW 4
 
-#define checkCudaError(a) do { \
-    if (cudaSuccess != (a)) { \
-        fprintf(stderr, "CUDA error in line %d: %s\n", __LINE__, cudaGetErrorString(cudaGetLastError())); \
-        exit(EXIT_FAILURE); \
-    } \
-} while(0)
+#define checkCudaError(a)                                                                                              \
+    do {                                                                                                               \
+        if (cudaSuccess != (a)) {                                                                                      \
+            fprintf(stderr, "CUDA error in line %d: %s\n", __LINE__, cudaGetErrorString(cudaGetLastError()));          \
+            exit(EXIT_FAILURE);                                                                                        \
+        }                                                                                                              \
+    } while (0)
 
-template<typename T>
-__global__ void spmm_test0(
-    int A_nrows, int B_ncols,
-    int* A_csrRowPtr, int* A_csrColInd, T* A_csrVal,
-    T* B_dnVal, T* C_dnVal
-)
-{
+template <typename T>
+__global__ void spmm_test0(int A_nrows, int B_ncols, int *A_csrRowPtr, int *A_csrColInd, T *A_csrVal, T *B_dnVal,
+                           T *C_dnVal) {
     int rid = blockDim.y * blockIdx.x + threadIdx.y;
     if (rid < A_nrows) {
         int cid = (blockIdx.y << 5) + threadIdx.x;
@@ -40,8 +37,7 @@ __global__ void spmm_test0(
                 acc += A_csrVal[ptr] * B_dnVal[offset];
             }
             C_dnVal[(rid * B_ncols + cid)] = acc;
-        }
-        else {
+        } else {
             for (int ptr = lb; ptr < hb; ptr++) {
                 if (cid < B_ncols) {
                     offset = A_csrColInd[ptr] * B_ncols + cid;
@@ -55,7 +51,7 @@ __global__ void spmm_test0(
     }
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     if (argc != 5) {
         fprintf(stderr, "Usage: %s <A_nrows> <A_ncols> <B_ncols> <nnz>\n", argv[0]);
         return 1;
@@ -80,13 +76,13 @@ int main(int argc, char** argv) {
     for (int i = 0; i < nnz; ++i) {
         row_indices[i] = rand() % A_nrows;
         col_indices[i] = rand() % A_ncols;
-        values[i] = (float)(rand() % 1000 - 500) / 500.0f;  // -1.0 到 1.0
+        values[i] = (float)(rand() % 1000 - 500) / 500.0f; // -1.0 到 1.0
     }
 
     // 主机分配 CSR 格式
-    int* A_indptr = (int*)malloc((A_nrows + 1) * sizeof(int));
-    int* A_indices = (int*)malloc(nnz * sizeof(int));
-    float* A_data = (float*)malloc(nnz * sizeof(float));
+    int *A_indptr = (int *)malloc((A_nrows + 1) * sizeof(int));
+    int *A_indices = (int *)malloc(nnz * sizeof(int));
+    float *A_data = (float *)malloc(nnz * sizeof(float));
     if (!A_indptr || !A_indices || !A_data) {
         fprintf(stderr, "Host malloc failed for A.\n");
         return 1;
@@ -115,30 +111,35 @@ int main(int argc, char** argv) {
     A_indptr[0] = 0;
 
     // 生成 B
-    float* B = (float*)malloc(A_ncols * B_ncols * sizeof(float));
+    float *B = (float *)malloc(A_ncols * B_ncols * sizeof(float));
     if (!B) {
         fprintf(stderr, "Host malloc failed for B.\n");
-        free(A_indptr); free(A_indices); free(A_data);
+        free(A_indptr);
+        free(A_indices);
+        free(A_data);
         return 1;
     }
     for (int i = 0; i < A_ncols * B_ncols; ++i) {
-        B[i] = (float)(rand() % 100 - 50) / 50.0f;  // -1.0 到 1.0
+        B[i] = (float)(rand() % 100 - 50) / 50.0f; // -1.0 到 1.0
     }
 
     // 主机分配 C
-    float* C = (float*)malloc(A_nrows * B_ncols * sizeof(float));
+    float *C = (float *)malloc(A_nrows * B_ncols * sizeof(float));
     if (!C) {
         fprintf(stderr, "Host malloc failed for C.\n");
-        free(A_indptr); free(A_indices); free(A_data); free(B);
+        free(A_indptr);
+        free(A_indices);
+        free(A_data);
+        free(B);
         return 1;
     }
 
     // 设备内存分配
-    int* A_indptr_dev;
-    int* A_indices_dev;
-    float* A_data_dev;
-    float* B_dev;
-    float* C_dev;
+    int *A_indptr_dev;
+    int *A_indices_dev;
+    float *A_data_dev;
+    float *B_dev;
+    float *C_dev;
 
     checkCudaError(cudaMalloc(&A_indptr_dev, (A_nrows + 1) * sizeof(int)));
     checkCudaError(cudaMalloc(&A_indices_dev, nnz * sizeof(int)));
@@ -178,7 +179,11 @@ int main(int argc, char** argv) {
     std::ifstream in("result.txt");
     if (!in.is_open()) {
         fprintf(stderr, "Failed to open result.txt\n");
-        free(A_indptr); free(A_indices); free(A_data); free(B); free(C);
+        free(A_indptr);
+        free(A_indices);
+        free(A_data);
+        free(B);
+        free(C);
         checkCudaError(cudaFree(A_indptr_dev));
         checkCudaError(cudaFree(A_indices_dev));
         checkCudaError(cudaFree(A_data_dev));
@@ -246,7 +251,11 @@ int main(int argc, char** argv) {
     }
 
     // 清理
-    free(A_indptr); free(A_indices); free(A_data); free(B); free(C);
+    free(A_indptr);
+    free(A_indices);
+    free(A_data);
+    free(B);
+    free(C);
     checkCudaError(cudaFree(A_indptr_dev));
     checkCudaError(cudaFree(A_indices_dev));
     checkCudaError(cudaFree(A_data_dev));

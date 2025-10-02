@@ -3,19 +3,19 @@
 //   ./gemm s         # M=N=K=16*s
 //   ./gemm mt nt kt  # M=16*mt, N=16*nt, K=16*kt
 
+#include <algorithm>
 #include <assert.h>
+#include <climits>
+#include <cmath> // for NAN
 #include <cstdio>
 #include <cstdlib>
-#include <algorithm>
-#include <climits>
-#include <cmath>      // for NAN
-#include <cuda_runtime.h>
 #include <cuda_fp16.h>
+#include <cuda_runtime.h>
 #include <mma.h>
 
 // ==== 辅助宏 ====
 #ifndef MAX
-#define MAX(a,b) (( (a) > (b) ) ? (a) : (b))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #endif
 
 #ifndef SHARED_MEMORY_LIMIT_64K
@@ -67,186 +67,188 @@
 // shared memory bank 冲突移位
 #define SKEW_HALF 16
 
-#define checkKernelErrors(expr)                             \
-  do {                                                      \
-    expr;                                                   \
-    cudaError_t __err = cudaGetLastError();                 \
-    if (__err != cudaSuccess) {                             \
-      printf("Line %d: '%s' failed: %s\n", __LINE__, #expr, \
-             cudaGetErrorString(__err));                    \
-      abort();                                              \
-    }                                                       \
-  } while (0)
+#define checkKernelErrors(expr)                                                                                        \
+    do {                                                                                                               \
+        expr;                                                                                                          \
+        cudaError_t __err = cudaGetLastError();                                                                        \
+        if (__err != cudaSuccess) {                                                                                    \
+            printf("Line %d: '%s' failed: %s\n", __LINE__, #expr, cudaGetErrorString(__err));                          \
+            abort();                                                                                                   \
+        }                                                                                                              \
+    } while (0)
 
 using namespace nvcuda;
 
 // ================= 辅助函数 ==================
-#define checkCudaErrors(val)  check( (val), #val, __FILE__, __LINE__ )
+#define checkCudaErrors(val) check((val), #val, __FILE__, __LINE__)
 
 void check(cudaError_t result, char const *const func, const char *const file, int const line) {
     if (result != cudaSuccess) {
-        fprintf(stderr, "CUDA error at %s:%d code=%d(%s) \"%s\"\n",
-                file, line, (int)result, cudaGetErrorString(result), func);
+        fprintf(stderr, "CUDA error at %s:%d code=%d(%s) \"%s\"\n", file, line, (int)result, cudaGetErrorString(result),
+                func);
         exit(EXIT_FAILURE);
     }
 }
 
 // === 输入生成函数（half/float，包含 NaN） ===
-static inline void generate_input_with_special_half(half* buf, int total_len) {
-  for (int i = 0; i < total_len; i++) {
-    if (rand() % 2 == 0) {
-      buf[i] = __float2half(NAN);   // 50% NaN
-    } else {
-      buf[i] = __float2half((float)(rand() % 10)); // 50% 随机 0–9
+static inline void generate_input_with_special_half(half *buf, int total_len) {
+    for (int i = 0; i < total_len; i++) {
+        if (rand() % 2 == 0) {
+            buf[i] = __float2half(NAN); // 50% NaN
+        } else {
+            buf[i] = __float2half((float)(rand() % 10)); // 50% 随机 0–9
+        }
     }
-  }
 }
 
-static inline void generate_input_with_special_float(float* buf, int total_len) {
-  for (int i = 0; i < total_len; i++) {
-    if (rand() % 2 == 0) {
-      buf[i] = NAN;   // 50% NaN
-    } else {
-      buf[i] = (float)(rand() % 10); // 50% 随机 0–9
+static inline void generate_input_with_special_float(float *buf, int total_len) {
+    for (int i = 0; i < total_len; i++) {
+        if (rand() % 2 == 0) {
+            buf[i] = NAN; // 50% NaN
+        } else {
+            buf[i] = (float)(rand() % 10); // 50% 随机 0–9
+        }
     }
-  }
 }
 
 // 初始化主机端矩阵
-__host__ void init_host_matrices(half *a, half *b, float *c,
-                                 int M_GLOBAL, int N_GLOBAL, int K_GLOBAL) {
-  srand(M_SEED);
-  // A: M_GLOBAL x K_GLOBAL
-  generate_input_with_special_half(a, M_GLOBAL * K_GLOBAL);
-  // B: N_GLOBAL x K_GLOBAL
-  generate_input_with_special_half(b, N_GLOBAL * K_GLOBAL);
-  // C: M_GLOBAL x N_GLOBAL
-  generate_input_with_special_float(c, M_GLOBAL * N_GLOBAL);
+__host__ void init_host_matrices(half *a, half *b, float *c, int M_GLOBAL, int N_GLOBAL, int K_GLOBAL) {
+    srand(M_SEED);
+    // A: M_GLOBAL x K_GLOBAL
+    generate_input_with_special_half(a, M_GLOBAL * K_GLOBAL);
+    // B: N_GLOBAL x K_GLOBAL
+    generate_input_with_special_half(b, N_GLOBAL * K_GLOBAL);
+    // C: M_GLOBAL x N_GLOBAL
+    generate_input_with_special_float(c, M_GLOBAL * N_GLOBAL);
 }
 
 // 简易 WMMA kernel
-__global__ void simple_wmma_gemm(half *a, half *b, float *c, float *d, int m_ld,
-                                 int n_ld, int k_ld, float alpha, float beta) {
-  int lda = k_ld;
-  int ldb = k_ld;
-  int ldc = n_ld;
+__global__ void simple_wmma_gemm(half *a, half *b, float *c, float *d, int m_ld, int n_ld, int k_ld, float alpha,
+                                 float beta) {
+    int lda = k_ld;
+    int ldb = k_ld;
+    int ldc = n_ld;
 
-  int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
-  int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
+    int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
+    int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
 
-  wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> a_frag;
-  wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> b_frag;
-  wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> acc_frag;
-  wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
+    wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> a_frag;
+    wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> b_frag;
+    wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> acc_frag;
+    wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
 
-  wmma::fill_fragment(acc_frag, 0.0f);
+    wmma::fill_fragment(acc_frag, 0.0f);
 
-  for (int i = 0; i < k_ld; i += WMMA_K) {
-    int aCol = i;
-    int aRow = warpM * WMMA_M;
-    int bCol = warpN * WMMA_N;
-    int bRow = i;
+    for (int i = 0; i < k_ld; i += WMMA_K) {
+        int aCol = i;
+        int aRow = warpM * WMMA_M;
+        int bCol = warpN * WMMA_N;
+        int bRow = i;
 
-    if (aRow < m_ld && aCol < k_ld && bRow < k_ld && bCol < n_ld) {
-      wmma::load_matrix_sync(a_frag, a + aCol + aRow * lda, lda);
-      wmma::load_matrix_sync(b_frag, b + bRow + bCol * ldb, ldb);
-      wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
+        if (aRow < m_ld && aCol < k_ld && bRow < k_ld && bCol < n_ld) {
+            wmma::load_matrix_sync(a_frag, a + aCol + aRow * lda, lda);
+            wmma::load_matrix_sync(b_frag, b + bRow + bCol * ldb, ldb);
+            wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
+        }
     }
-  }
 
-  int cCol = warpN * WMMA_N;
-  int cRow = warpM * WMMA_M;
+    int cCol = warpN * WMMA_N;
+    int cRow = warpM * WMMA_M;
 
-  if (cRow < m_ld && cCol < n_ld) {
-    wmma::load_matrix_sync(c_frag, c + cCol + cRow * ldc, ldc, wmma::mem_row_major);
-    for (int i = 0; i < c_frag.num_elements; i++) {
-      c_frag.x[i] = alpha * acc_frag.x[i] + beta * c_frag.x[i];
+    if (cRow < m_ld && cCol < n_ld) {
+        wmma::load_matrix_sync(c_frag, c + cCol + cRow * ldc, ldc, wmma::mem_row_major);
+        for (int i = 0; i < c_frag.num_elements; i++) {
+            c_frag.x[i] = alpha * acc_frag.x[i] + beta * c_frag.x[i];
+        }
+        wmma::store_matrix_sync(d + cCol + cRow * ldc, c_frag, ldc, wmma::mem_row_major);
     }
-    wmma::store_matrix_sync(d + cCol + cRow * ldc, c_frag, ldc, wmma::mem_row_major);
-  }
 }
 
 int main(int argc, char **argv) {
-  int mt = 2, nt = 2, kt = 2;
-  if (argc == 2) {
-    int s = atoi(argv[1]);
-    if (s > 0) mt = nt = kt = s;
-  } else if (argc >= 4) {
-    int t1 = atoi(argv[1]);
-    int t2 = atoi(argv[2]);
-    int t3 = atoi(argv[3]);
-    if (t1 > 0) mt = t1;
-    if (t2 > 0) nt = t2;
-    if (t3 > 0) kt = t3;
-  }
+    int mt = 2, nt = 2, kt = 2;
+    if (argc == 2) {
+        int s = atoi(argv[1]);
+        if (s > 0)
+            mt = nt = kt = s;
+    } else if (argc >= 4) {
+        int t1 = atoi(argv[1]);
+        int t2 = atoi(argv[2]);
+        int t3 = atoi(argv[3]);
+        if (t1 > 0)
+            mt = t1;
+        if (t2 > 0)
+            nt = t2;
+        if (t3 > 0)
+            kt = t3;
+    }
 
-  const int M_GLOBAL = M * mt;
-  const int N_GLOBAL = N * nt;
-  const int K_GLOBAL = K * kt;
+    const int M_GLOBAL = M * mt;
+    const int N_GLOBAL = N * nt;
+    const int K_GLOBAL = K * kt;
 
-  half  *A_h = (half *)malloc(sizeof(half)  * M_GLOBAL * K_GLOBAL);
-  half  *B_h = (half *)malloc(sizeof(half)  * N_GLOBAL * K_GLOBAL);
-  float *C_h = (float*)malloc(sizeof(float) * M_GLOBAL * N_GLOBAL);
-  float *result_hD = (float*)malloc(sizeof(float) * M_GLOBAL * N_GLOBAL);
+    half *A_h = (half *)malloc(sizeof(half) * M_GLOBAL * K_GLOBAL);
+    half *B_h = (half *)malloc(sizeof(half) * N_GLOBAL * K_GLOBAL);
+    float *C_h = (float *)malloc(sizeof(float) * M_GLOBAL * N_GLOBAL);
+    float *result_hD = (float *)malloc(sizeof(float) * M_GLOBAL * N_GLOBAL);
 
-  half  *A = NULL;
-  half  *B = NULL;
-  float *C = NULL;
-  float *D = NULL;
+    half *A = NULL;
+    half *B = NULL;
+    float *C = NULL;
+    float *D = NULL;
 
-  checkCudaErrors(cudaMalloc((void**)&A, sizeof(half)  * M_GLOBAL * K_GLOBAL));
-  checkCudaErrors(cudaMalloc((void**)&B, sizeof(half)  * N_GLOBAL * K_GLOBAL));
-  checkCudaErrors(cudaMalloc((void**)&C, sizeof(float) * M_GLOBAL * N_GLOBAL));
-  checkCudaErrors(cudaMalloc((void**)&D, sizeof(float) * M_GLOBAL * N_GLOBAL));
+    checkCudaErrors(cudaMalloc((void **)&A, sizeof(half) * M_GLOBAL * K_GLOBAL));
+    checkCudaErrors(cudaMalloc((void **)&B, sizeof(half) * N_GLOBAL * K_GLOBAL));
+    checkCudaErrors(cudaMalloc((void **)&C, sizeof(float) * M_GLOBAL * N_GLOBAL));
+    checkCudaErrors(cudaMalloc((void **)&D, sizeof(float) * M_GLOBAL * N_GLOBAL));
 
-  init_host_matrices(A_h, B_h, C_h, M_GLOBAL, N_GLOBAL, K_GLOBAL);
+    init_host_matrices(A_h, B_h, C_h, M_GLOBAL, N_GLOBAL, K_GLOBAL);
 
-  checkCudaErrors(cudaMemcpy(A, A_h, sizeof(half)  * M_GLOBAL * K_GLOBAL, cudaMemcpyHostToDevice));
-  checkCudaErrors(cudaMemcpy(B, B_h, sizeof(half)  * N_GLOBAL * K_GLOBAL, cudaMemcpyHostToDevice));
-  checkCudaErrors(cudaMemcpy(C, C_h, sizeof(float) * M_GLOBAL * N_GLOBAL, cudaMemcpyHostToDevice));
-  checkCudaErrors(cudaMemset(D, 0, sizeof(float) * M_GLOBAL * N_GLOBAL));
+    checkCudaErrors(cudaMemcpy(A, A_h, sizeof(half) * M_GLOBAL * K_GLOBAL, cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemcpy(B, B_h, sizeof(half) * N_GLOBAL * K_GLOBAL, cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemcpy(C, C_h, sizeof(float) * M_GLOBAL * N_GLOBAL, cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemset(D, 0, sizeof(float) * M_GLOBAL * N_GLOBAL));
 
-  const float alpha = 1.1f;
-  const float beta  = 1.2f;
+    const float alpha = 1.1f;
+    const float beta = 1.2f;
 
-  cudaEvent_t start, stop;
-  checkCudaErrors(cudaEventCreate(&start));
-  checkCudaErrors(cudaEventCreate(&stop));
-  checkCudaErrors(cudaEventRecord(start));
+    cudaEvent_t start, stop;
+    checkCudaErrors(cudaEventCreate(&start));
+    checkCudaErrors(cudaEventCreate(&stop));
+    checkCudaErrors(cudaEventRecord(start));
 
-  dim3 gridDim, blockDim;
-  blockDim.x = 128;
-  blockDim.y = 4;
+    dim3 gridDim, blockDim;
+    blockDim.x = 128;
+    blockDim.y = 4;
 
-  gridDim.x = (M_GLOBAL + (WMMA_M * (blockDim.x / 32) - 1)) / (WMMA_M * (blockDim.x / 32));
-  gridDim.y = (N_GLOBAL + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
+    gridDim.x = (M_GLOBAL + (WMMA_M * (blockDim.x / 32) - 1)) / (WMMA_M * (blockDim.x / 32));
+    gridDim.y = (N_GLOBAL + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
 
-  simple_wmma_gemm<<<gridDim, blockDim>>>(A, B, C, D, M_GLOBAL, N_GLOBAL, K_GLOBAL, alpha, beta);
-  checkCudaErrors(cudaGetLastError());
-  checkCudaErrors(cudaDeviceSynchronize());
+    simple_wmma_gemm<<<gridDim, blockDim>>>(A, B, C, D, M_GLOBAL, N_GLOBAL, K_GLOBAL, alpha, beta);
+    checkCudaErrors(cudaGetLastError());
+    checkCudaErrors(cudaDeviceSynchronize());
 
-  checkCudaErrors(cudaMemcpy(result_hD, D, sizeof(float) * M_GLOBAL * N_GLOBAL, cudaMemcpyDeviceToHost));
+    checkCudaErrors(cudaMemcpy(result_hD, D, sizeof(float) * M_GLOBAL * N_GLOBAL, cudaMemcpyDeviceToHost));
 
-  checkCudaErrors(cudaEventRecord(stop));
-  checkCudaErrors(cudaEventSynchronize(stop));
+    checkCudaErrors(cudaEventRecord(stop));
+    checkCudaErrors(cudaEventSynchronize(stop));
 
-  for (int i = 0; i < N_GLOBAL * M_GLOBAL; i++) {
-    printf("%.6f ", result_hD[i]);
-  }
-  printf("\n");
+    for (int i = 0; i < N_GLOBAL * M_GLOBAL; i++) {
+        printf("%.6f ", result_hD[i]);
+    }
+    printf("\n");
 
-  float milliseconds = 0.f;
-  checkCudaErrors(cudaEventElapsedTime(&milliseconds, start, stop));
+    float milliseconds = 0.f;
+    checkCudaErrors(cudaEventElapsedTime(&milliseconds, start, stop));
 
-  free(A_h);
-  free(B_h);
-  free(C_h);
-  free(result_hD);
+    free(A_h);
+    free(B_h);
+    free(C_h);
+    free(result_hD);
 
-  checkCudaErrors(cudaFree(A));
-  checkCudaErrors(cudaFree(B));
-  checkCudaErrors(cudaFree(C));
-  checkCudaErrors(cudaFree(D));
+    checkCudaErrors(cudaFree(A));
+    checkCudaErrors(cudaFree(B));
+    checkCudaErrors(cudaFree(C));
+    checkCudaErrors(cudaFree(D));
 
-  return 0;
+    return 0;
 }
