@@ -78,7 +78,9 @@ __global__ void rstd_kernel(float* rstd, const float* inp, const float* mean, in
 __global__ void normalization_kernel(float* out, const float* inp, float* mean, float* rstd,
                                      const float* weight, const float* bias, int B, int T, int C) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
+    // Guard against extra threads in the last block to avoid OOB accesses
+    int total = B * T * C;
+    if (idx >= total) return;
     int bt = idx / C;
     int c = idx % C;
 
@@ -168,7 +170,7 @@ int main(int argc, char **argv) {
         printf("%f ", mean[i]);
     }
     for (int i = 0; i < B * T; ++i) {
-        printf("%f", rstd[i]);  // No trailing space after last
+        printf("%f ", rstd[i]);  // No trailing space after last
     }
     printf("\n");
 

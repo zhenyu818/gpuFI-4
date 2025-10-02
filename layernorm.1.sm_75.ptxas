@@ -1,0 +1,13 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z20normalization_kernelPfPKfS_S_S1_S1_iii' for 'sm_75'
+ptxas info    : Function properties for _Z20normalization_kernelPfPKfS_S_S1_S1_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 18 registers, 412 bytes cmem[0]
+ptxas info    : Compiling entry function '_Z11rstd_kernelPfPKfS1_iii' for 'sm_75'
+ptxas info    : Function properties for _Z11rstd_kernelPfPKfS1_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 15 registers, 388 bytes cmem[0]
+ptxas info    : Compiling entry function '_Z11mean_kernelPfPKfiii' for 'sm_75'
+ptxas info    : Function properties for _Z11mean_kernelPfPKfiii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 15 registers, 380 bytes cmem[0]

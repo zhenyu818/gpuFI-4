@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <stdbool.h>
 #include <cuda.h>
 
 #define MAXDISTANCE (200)
@@ -95,69 +94,25 @@ int main(int argc, char** argv) {
   cudaMemcpy(pathDistanceMatrix, pathDistanceBuffer, matrixSizeBytes, cudaMemcpyDeviceToHost);
   cudaMemcpy(pathMatrix, pathBuffer, matrixSizeBytes, cudaMemcpyDeviceToHost);
 
-  // Read expected results from result.txt
-  FILE *fp = fopen("result.txt", "r");
-  if (!fp) {
-    printf("Failed to open result.txt\n");
-    return 1;
-  }
-
-  unsigned int* expected_distance = (unsigned int*) malloc(matrixSizeBytes);
-  assert(expected_distance != NULL);
-  unsigned int* expected_path = (unsigned int*) malloc(matrixSizeBytes);
-  assert(expected_path != NULL);
-
-  // Read expected pathDistanceMatrix
-  for (unsigned int i = 0; i < numNodes * numNodes; i++) {
-    if (fscanf(fp, "%u", &expected_distance[i]) != 1) {
-      printf("Failed to read expected distance data\n");
-      fclose(fp);
-      free(expected_distance);
-      free(expected_path);
-      return 1;
+  // Print all results from pathDistanceMatrix
+  for(unsigned int i = 0; i < numNodes * numNodes; i++) {
+    printf("%u", pathDistanceMatrix[i]);
+    if(i < numNodes * numNodes - 1) {
+      printf(" ");
     }
   }
+  printf("\n");
 
-  // Read expected pathMatrix
-  for (unsigned int i = 0; i < numNodes * numNodes; i++) {
-    if (fscanf(fp, "%u", &expected_path[i]) != 1) {
-      printf("Failed to read expected path data\n");
-      fclose(fp);
-      free(expected_distance);
-      free(expected_path);
-      return 1;
+  // Print all results from pathMatrix
+  for(unsigned int i = 0; i < numNodes * numNodes; i++) {
+    printf("%u", pathMatrix[i]);
+    if(i < numNodes * numNodes - 1) {
+      printf(" ");
     }
   }
-  fclose(fp);
-
-  // Compare pathDistanceMatrix
-  bool match_distance = true;
-  for (unsigned int i = 0; i < numNodes * numNodes; i++) {
-    if (pathDistanceMatrix[i] != expected_distance[i]) {
-      match_distance = false;
-      break;
-    }
-  }
-
-  // Compare pathMatrix
-  bool match_path = true;
-  for (unsigned int i = 0; i < numNodes * numNodes; i++) {
-    if (pathMatrix[i] != expected_path[i]) {
-      match_path = false;
-      break;
-    }
-  }
-
-  // Output result
-  if (match_distance && match_path) {
-    printf("Fault Injection Test Success!\n");
-  } else {
-    printf("Fault Injection Test Failed!\n");
-  }
+  printf("\n");
 
   // Cleanup
-  free(expected_distance);
-  free(expected_path);
   cudaFree(pathDistanceBuffer);
   cudaFree(pathBuffer);
   free(pathDistanceMatrix);

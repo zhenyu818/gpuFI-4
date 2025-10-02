@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TEST_APP_NAME="recommSystem"
+TEST_APP_NAME="floydwarshall"
 COMPONENT_SET="0"
 INJECT_BIT_FLIP_COUNT=1 # number of bits to flip per injection (e.g. 2 means flip 2 bits per injection)
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
@@ -199,11 +199,56 @@ get_metrics() {
     local cycles regs lmem smem lmem_bits smem_bits shader_used_list dtype_bits exec_time
     local max_regs max_lmem max_smem all_shaders
 
+    # Maps for dynamic shared-memory inference (per kernel)
+    declare -A K_STATIC_SMEM_BYTES  # from resource line smem= (static only)
+    declare -A K_BLOCK_ELEMS        # blockDim.x*blockDim.y*blockDim.z
+    declare -A K_SHARED_ELEM_BYTES  # inferred element width from ld/st.shared.* (bytes)
+    declare -A K_EFFECTIVE_SMEM     # effective smem bytes per kernel (max(static, dynamic_est))
+
     cycles=$(get_cycles)
     dtype_bits=$(get_datatype_bits)
 
     # Multi-kernel aware collection
     mapfile -t kernel_lines < <(collect_kernels_info)
+
+    # Build per-kernel static smem map from resource lines
+    while IFS= read -r line; do
+        kname=$(echo "$line" | sed -E "s/.*Kernel '([^']+)'.*/\1/")
+        ksmem=$(echo "$line" | sed -E 's/.*smem=([0-9]+).*/\1/')
+        [[ -n "$kname" ]] && K_STATIC_SMEM_BYTES["$kname"]="$ksmem"
+    done < <(grep -E "GPGPU-Sim PTX: Kernel '.*' : regs=[0-9]+, lmem=[0-9]+, smem=[0-9]+" "$FILE_PATH")
+
+    # Parse blockDim per kernel from push lines
+    while IFS= read -r line; do
+        kname=$(echo "$line" | sed -E "s/.*pushing kernel '([^']+)'.*/\1/")
+        bxyz=$(echo "$line" | sed -E "s/.*blockDim = \(([0-9]+),([0-9]+),([0-9]+)\).*/\1 \2 \3/")
+        bx=$(echo "$bxyz" | awk '{print $1}')
+        by=$(echo "$bxyz" | awk '{print $2}')
+        bz=$(echo "$bxyz" | awk '{print $3}')
+        if [[ -n "$kname" && -n "$bx" && -n "$by" && -n "$bz" ]]; then
+            K_BLOCK_ELEMS["$kname"]=$(( bx * by * bz ))
+        fi
+    done < <(grep -E "pushing kernel '.*'.*blockDim\s*=\s*\([0-9]+,[0-9]+,[0-9]+\)" "$FILE_PATH")
+
+    # Infer shared element byte width from PTX_INST_SUM lines (ld/st.shared.<type>) per kernel
+    while IFS= read -r kname; do
+        [[ -z "$kname" ]] && continue
+        maxb=0
+        while IFS= read -r tline; do
+            suf=$(echo "$tline" | sed -nE 's/.*(ld|st)\.shared\.([a-z0-9]+).*/\2/p')
+            case "$suf" in
+                *64) bytes=8 ;;
+                *32) bytes=4 ;;
+                *16) bytes=2 ;;
+                *8)  bytes=1 ;;
+                *)   bytes=0 ;;
+            esac
+            (( bytes > maxb )) && maxb=$bytes
+        done < <(grep -F "kernel=\"$kname\"" "$FILE_PATH" | grep -E "\[PTX_INST_SUM\].*(ld\.shared|st\.shared)\.")
+        if (( maxb > 0 )); then
+            K_SHARED_ELEM_BYTES["$kname"]=$maxb
+        fi
+    done < <(grep -oE "kernel='[^']+'|kernel=\"[^\"]+\"" "$FILE_PATH" | sed -E "s/kernel=['\"]([^'\"]+)['\"]/\1/" | sort -u)
 
     exec_time=$(grep -E "^gpgpu_simulation_time" "$FILE_PATH" | tail -n1)
 
@@ -257,7 +302,28 @@ get_metrics() {
     fi
 
     lmem_bits=$((max_lmem * 8))
-    smem_bits=$((max_smem * 8))
+
+    # Compute effective shared memory (consider dynamic + static) across kernels
+    # Start with the static max as baseline
+    eff_smem_bytes=${max_smem}
+    # Build kernels_order copy from previously collected function by re-parsing names
+    # and compute per-kernel effective smem
+    while IFS= read -r kname; do
+        [[ -z "$kname" ]] && continue
+        bs_elems=${K_BLOCK_ELEMS[$kname]:-0}
+        elem_bytes=${K_SHARED_ELEM_BYTES[$kname]:-0}
+        dyn_bytes=0
+        if (( bs_elems > 0 && elem_bytes > 0 )); then
+            dyn_bytes=$(( bs_elems * elem_bytes ))
+        fi
+        static_bytes=${K_STATIC_SMEM_BYTES[$kname]:-0}
+        # choose max to avoid double-counting
+        (( dyn_bytes > static_bytes )) && chosen=$dyn_bytes || chosen=$static_bytes
+        K_EFFECTIVE_SMEM["$kname"]=$chosen
+        (( chosen > eff_smem_bytes )) && eff_smem_bytes=$chosen
+    done < <(grep -E "GPGPU-Sim PTX: Kernel '.*' : regs=[0-9]+, lmem=[0-9]+, smem=[0-9]+" "$FILE_PATH" | sed -E "s/.*Kernel '([^']+)'.*/\1/" | sort -u)
+
+    smem_bits=$((eff_smem_bytes * 8))
 
     echo
     # Store into global variables (keep existing prints unchanged)

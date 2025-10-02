@@ -1,0 +1,5 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z6KernelPK4NodePKiPcS4_PKcPii' for 'sm_75'
+ptxas info    : Function properties for _Z6KernelPK4NodePKiPcS4_PKcPii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, 404 bytes cmem[0]

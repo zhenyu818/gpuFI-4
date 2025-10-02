@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <cuda_runtime.h>
 #include <math.h>
+#include <stdbool.h>
 
 #define WARP_SIZE 32  // Assuming standard warp size
 
@@ -19,6 +20,17 @@ float* make_random_float(int size) {
 // ceil_div utility
 int ceil_div(int a, int b) {
     return (a + b - 1) / b;
+}
+
+// Comparison function for floats, handling NaN, Inf, and tolerance
+bool approx_equal(float a, float b) {
+    if (isnan(a) || isnan(b)) {
+        return isnan(a) && isnan(b);
+    }
+    if (isinf(a) || isinf(b)) {
+        return isinf(a) && isinf(b) && ((a > 0.0f) == (b > 0.0f));
+    }
+    return fabsf(a - b) <= 1e-5f;
 }
 
 // Kernels for layernorm forward pass (version 2 only)
@@ -78,7 +90,9 @@ __global__ void rstd_kernel(float* rstd, const float* inp, const float* mean, in
 __global__ void normalization_kernel(float* out, const float* inp, float* mean, float* rstd,
                                      const float* weight, const float* bias, int B, int T, int C) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
+    // Guard against extra threads in the last block to avoid OOB accesses
+    int total = B * T * C;
+    if (idx >= total) return;
     int bt = idx / C;
     int c = idx % C;
 
@@ -107,100 +121,6 @@ void layernorm_forward2(float* out, float* mean, float* rstd,
     const int grid_size = ceil_div(B * T * C, block_size2);
     normalization_kernel<<<grid_size, block_size2>>>(out, inp, mean, rstd, weight, bias, B, T, C);
     cudaDeviceSynchronize();
-}
-
-// Function to compare two floats with tolerance, handling NaN and inf
-int floats_equal(float a, float b, float tolerance) {
-    // Check for NaN
-    if (isnan(a) && isnan(b)) {
-        return 1;  // Both NaN: equal
-    }
-    if (isnan(a) || isnan(b)) {
-        return 0;  // One NaN, one not: not equal
-    }
-
-    // Check for inf
-    if (isinf(a) && isinf(b)) {
-        // Both inf: check signs
-        return (signbit(a) == signbit(b));
-    }
-    if (isinf(a) || isinf(b)) {
-        return 0;  // One inf, one not: not equal
-    }
-
-    // Finite values: check absolute difference
-    return (fabsf(a - b) <= tolerance);
-}
-
-// Function to read reference from file and compare
-int compare_with_reference(float* out, float* mean, float* rstd, int B, int T, int C, float tolerance) {
-    FILE* fp = fopen("result.txt", "r");
-    if (!fp) {
-        fprintf(stderr, "Error: Cannot open result.txt\n");
-        return 0;
-    }
-
-    int total_elements = B * T * C + 2 * B * T;
-    float* ref = (float*)malloc(total_elements * sizeof(float));
-    if (!ref) {
-        fclose(fp);
-        return 0;
-    }
-
-    int read_count = 0;
-    for (int i = 0; i < total_elements; ++i) {
-        if (fscanf(fp, "%f", &ref[i]) != 1) {
-            // End of file or invalid data
-            break;
-        }
-        read_count++;
-    }
-    fclose(fp);
-
-    if (read_count != total_elements) {
-        free(ref);
-        return 0;  // Mismatch in count
-    }
-
-    // Now compare
-    int all_match = 1;
-
-    // Compare out: first B*T*C elements
-    for (int i = 0; i < B * T * C; ++i) {
-        if (!floats_equal(out[i], ref[i], tolerance)) {
-            all_match = 0;
-            break;
-        }
-    }
-    if (!all_match) {
-        free(ref);
-        return 0;
-    }
-
-    // Compare mean: next B*T elements
-    int offset = B * T * C;
-    for (int i = 0; i < B * T; ++i) {
-        if (!floats_equal(mean[i], ref[offset + i], tolerance)) {
-            all_match = 0;
-            break;
-        }
-    }
-    if (!all_match) {
-        free(ref);
-        return 0;
-    }
-
-    // Compare rstd: last B*T elements
-    offset += B * T;
-    for (int i = 0; i < B * T; ++i) {
-        if (!floats_equal(rstd[i], ref[offset + i], tolerance)) {
-            all_match = 0;
-            break;
-        }
-    }
-
-    free(ref);
-    return all_match;
 }
 
 int main(int argc, char **argv) {
@@ -254,15 +174,105 @@ int main(int argc, char **argv) {
     cudaMemcpy(mean, d_mean, B * T * sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(rstd, d_rstd, B * T * sizeof(float), cudaMemcpyDeviceToHost);
 
-    // Compare with reference
-    float tolerance = 1e-5f;
-    int success = compare_with_reference(out, mean, rstd, B, T, C, tolerance);
+    // Read reference from result.txt
+    FILE* fp = fopen("result.txt", "r");
+    if (!fp) {
+        fprintf(stderr, "Cannot open result.txt\n");
+        // free memory
+        free(out);
+        free(mean);
+        free(rstd);
+        free(inp);
+        free(weight);
+        free(bias);
+        cudaFree(d_out);
+        cudaFree(d_mean);
+        cudaFree(d_rstd);
+        cudaFree(d_inp);
+        cudaFree(d_weight);
+        cudaFree(d_bias);
+        return 1;
+    }
+
+    float* ref_out = (float*)malloc(B * T * C * sizeof(float));
+    float* ref_mean = (float*)malloc(B * T * sizeof(float));
+    float* ref_rstd = (float*)malloc(B * T * sizeof(float));
+
+    bool read_ok = true;
+
+    for (int i = 0; i < B * T * C; ++i) {
+        if (fscanf(fp, "%f", &ref_out[i]) != 1) {
+            read_ok = false;
+            break;
+        }
+    }
+    if (read_ok) {
+        for (int i = 0; i < B * T; ++i) {
+            if (fscanf(fp, "%f", &ref_mean[i]) != 1) {
+                read_ok = false;
+                break;
+            }
+        }
+    }
+    if (read_ok) {
+        for (int i = 0; i < B * T; ++i) {
+            if (fscanf(fp, "%f", &ref_rstd[i]) != 1) {
+                read_ok = false;
+                break;
+            }
+        }
+    }
+    fclose(fp);
+
+    if (!read_ok) {
+        printf("Fault Injection Test Failed!\n");
+        free(ref_out);
+        free(ref_mean);
+        free(ref_rstd);
+        // free memory
+        free(out);
+        free(mean);
+        free(rstd);
+        free(inp);
+        free(weight);
+        free(bias);
+        cudaFree(d_out);
+        cudaFree(d_mean);
+        cudaFree(d_rstd);
+        cudaFree(d_inp);
+        cudaFree(d_weight);
+        cudaFree(d_bias);
+        return 1;
+    }
+
+    // Compare
+    bool success = true;
+    for (int i = 0; i < B * T * C && success; ++i) {
+        if (!approx_equal(out[i], ref_out[i])) {
+            success = false;
+        }
+    }
+    for (int i = 0; i < B * T && success; ++i) {
+        if (!approx_equal(mean[i], ref_mean[i])) {
+            success = false;
+        }
+    }
+    for (int i = 0; i < B * T && success; ++i) {
+        if (!approx_equal(rstd[i], ref_rstd[i])) {
+            success = false;
+        }
+    }
 
     if (success) {
         printf("Fault Injection Test Success!\n");
     } else {
         printf("Fault Injection Test Failed!\n");
     }
+
+    // free reference memory
+    free(ref_out);
+    free(ref_mean);
+    free(ref_rstd);
 
     // free memory
     free(out);
