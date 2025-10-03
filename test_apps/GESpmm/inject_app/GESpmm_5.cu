@@ -95,7 +95,8 @@ int main(int argc, char **argv) {
     }
     A_indptr[0] = 0;
     for (int i = 0; i < nnz; ++i) {
-        A_data[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : ((float)(rand() % 10));
+        A_data[i] =
+            (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : ((float)(rand() % 1000 - 500) / 500.0f);
     }
     float *B = (float *)malloc(A_ncols * B_ncols * sizeof(float));
     if (!B) {
@@ -106,7 +107,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     for (int i = 0; i < A_ncols * B_ncols; ++i) {
-        B[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : ((float)(rand() % 10));
+        B[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : ((float)(rand() % 100 - 50) / 50.0f);
     }
     float *C = (float *)malloc(A_nrows * B_ncols * sizeof(float));
     if (!C) {

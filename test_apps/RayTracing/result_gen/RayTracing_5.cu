@@ -146,8 +146,8 @@ int main(int argc, char **argv) {
             h_randU[i] = NAN;
             h_randV[i] = NAN;
         } else {
-            h_randU[i] = (float)(rand() % 10);
-            h_randV[i] = (float)(rand() % 10);
+            h_randU[i] = (float)rand() / RAND_MAX;
+            h_randV[i] = (float)rand() / RAND_MAX;
         }
     }
     Vec3 *d_colorBuffer = nullptr;

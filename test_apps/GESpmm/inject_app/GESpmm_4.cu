@@ -52,6 +52,23 @@ __global__ void spmm_test0(int A_nrows, int B_ncols, int *A_csrRowPtr, int *A_cs
     }
 }
 
+static void gen_2to4_B(float *a, size_t n) {
+    for (size_t i = 0; i < n; i += GROUP) {
+        bool keep[GROUP] = {0};
+        int cnt = 0;
+        while (cnt < KEEP) {
+            int idx = rand() % GROUP;
+            if (!keep[idx]) {
+                keep[idx] = 1;
+                cnt++;
+            }
+        }
+        for (int k = 0; k < GROUP && (i + k) < n; k++) {
+            a[i + k] = keep[k] ? ((float)(rand() % 100 - 50) / 50.0f) : 0.0f;
+        }
+    }
+}
+
 static void gen_2to4(float *a, size_t n) {
     for (size_t i = 0; i < n; i += GROUP) {
         bool keep[GROUP] = {0};
@@ -64,7 +81,7 @@ static void gen_2to4(float *a, size_t n) {
             }
         }
         for (int k = 0; k < GROUP && (i + k) < n; k++) {
-            a[i + k] = keep[k] ? (((float)rand() / RAND_MAX) * 2.0f - 1.0f) : 0.0f;
+            a[i + k] = keep[k] ? ((float)(rand() % 1000 - 500) / 500.0f) : 0.0f;
         }
     }
 }
@@ -83,7 +100,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     srand(SEED);
-    std::vector<int> row_indices(nnz), col_indices(nnz);
+    std::vector<int> row_indices(nnz);
+    std::vector<int> col_indices(nnz);
     for (int i = 0; i < nnz; ++i) {
         row_indices[i] = rand() % A_nrows;
         col_indices[i] = rand() % A_ncols;
@@ -112,8 +130,8 @@ int main(int argc, char **argv) {
     for (int n = A_nrows - 1; n > 0; --n) {
         A_indptr[n] = A_indptr[n - 1];
     }
-    A_indptr[0] = 0;
-    gen_2to4(A_data, (size_t)nnz);
+    A_indptr[0] = 0; // fill A_data with 2:4 over nnz
+    gen_2to4(A_data, nnz);
     float *B = (float *)malloc(A_ncols * B_ncols * sizeof(float));
     if (!B) {
         fprintf(stderr, "Host malloc failed for B.\n");
@@ -122,7 +140,7 @@ int main(int argc, char **argv) {
         free(A_data);
         return 1;
     }
-    gen_2to4(B, (size_t)A_ncols * B_ncols);
+    gen_2to4_B(B, (size_t)A_ncols * B_ncols);
     float *C = (float *)malloc(A_nrows * B_ncols * sizeof(float));
     if (!C) {
         fprintf(stderr, "Host malloc failed for C.\n");

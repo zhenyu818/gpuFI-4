@@ -79,7 +79,7 @@ void RandomInitSpecial(double *data, int size) {
         if (rand_val < 50) {
             data[i] = NAN; // 50% 概率 NaN
         } else {
-            data[i] = (double)(rand() % 10); // 50% 概率 0–9
+            data[i] = (double)rand() / RAND_MAX;
         }
     }
 }

@@ -104,10 +104,32 @@ static void generate_2to4_sparse_half(half *data, int size) {
         }
         for (int k = 0; k < 4 && i + k < size; ++k) {
             if (selected[k]) {
-                float v = static_cast<float>((rand() % 10) + 1); // 非零 ∈ [1,10]
+                float v = static_cast<float>(rand() % 3);
                 data[i + k] = __float2half(v);
             } else {
                 data[i + k] = __float2half(0.0f);
+            }
+        }
+    }
+}
+// ---- 2:4 稀疏输入生成（float 版，逐组 4 个元素里保留 2 个非零）----
+static void generate_2to4_sparse_float(float *data, int size) {
+    for (int i = 0; i < size; i += 4) {
+        bool selected[4] = {false, false, false, false};
+        int cnt = 0;
+        while (cnt < 2) {
+            int idx = rand() % 4;
+            if (!selected[idx]) {
+                selected[idx] = true;
+                cnt++;
+            }
+        }
+        for (int k = 0; k < 4 && i + k < size; ++k) {
+            if (selected[k]) {
+                float v = static_cast<float>(rand() % 3); // 0,1,2
+                data[i + k] = v;
+            } else {
+                data[i + k] = 0.0f;
             }
         }
     }
@@ -123,10 +145,8 @@ __host__ void init_host_matrices(half *a, half *b, float *c, int M_GLOBAL, int N
     // B: N_GLOBAL x K_GLOBAL，同样做 2:4 稀疏
     generate_2to4_sparse_half(b, N_GLOBAL * K_GLOBAL);
 
-    // C 随机（此处复用你原来的 0%3 = 0 写法的话全 0，不妨给一点随机性）
-    for (int t = 0; t < M_GLOBAL * N_GLOBAL; t++) {
-        c[t] = static_cast<float>(rand() % 3);
-    }
+    // C : M_GLOBAL x N_GLOBAL，同样做 2:4 稀疏
+    generate_2to4_sparse_float(c, M_GLOBAL * N_GLOBAL);
 }
 
 // 简化 wmma 演示 kernel（按运行时维度工作）

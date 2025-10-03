@@ -96,7 +96,7 @@ static inline void generate_input_with_special_half(half *buf, int total_len) {
         if (rand() % 2 == 0) {
             buf[i] = __float2half(NAN); // 50% NaN
         } else {
-            buf[i] = __float2half((float)(rand() % 10)); // 50% 随机 0–9
+            buf[i] = __float2half((float)(rand() % 3)); // 50% 随机 0–9
         }
     }
 }
@@ -106,7 +106,7 @@ static inline void generate_input_with_special_float(float *buf, int total_len) 
         if (rand() % 2 == 0) {
             buf[i] = NAN; // 50% NaN
         } else {
-            buf[i] = (float)(rand() % 10); // 50% 随机 0–9
+            buf[i] = (float)(rand() % 3); // 50% 随机 0–9
         }
     }
 }

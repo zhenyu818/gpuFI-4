@@ -47,9 +47,9 @@ static void generate_2to4_sparse_group(float *group, int group_len) {
 
     for (int k = 0; k < group_len; k++) {
         if (selected[k]) {
-            group[k] = static_cast<float>(rand() % 10);
+            group[k] = static_cast<float>(rand() % 13);
             while (group[k] == 0.0f) {
-                group[k] = static_cast<float>(rand() % 10);
+                group[k] = static_cast<float>(rand() % 13);
             }
         }
     }

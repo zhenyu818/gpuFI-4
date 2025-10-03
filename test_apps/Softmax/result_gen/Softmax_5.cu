@@ -39,7 +39,7 @@ static void generate_input_with_nan(float *input, int numSlice, int sliceSize) {
                 input[i * sliceSize + j] = NAN;
             } else {
                 // 50% 概率 0~9 普通数
-                input[i * sliceSize + j] = static_cast<float>(rand() % 10);
+                input[i * sliceSize + j] = static_cast<float>(rand() % 13);
             }
         }
     }

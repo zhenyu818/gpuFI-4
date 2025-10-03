@@ -104,11 +104,11 @@ int main(int argc, char **argv) {
     float *bias = (float *)malloc(C * sizeof(float));
     srand(SEED);
     for (int i = 0; i < B * T * C; ++i) {
-        inp[i] = (rand() % 2 == 0) ? NAN : ((float)(rand() % 10));
+        inp[i] = (rand() % 2 == 0) ? NAN : ((float)(2.0f * (rand() / (float)RAND_MAX) - 1.0f));
     }
     for (int i = 0; i < C; ++i) {
-        weight[i] = ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
-        bias[i] = ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
+        weight[i] = (rand() % 2 == 0) ? NAN : ((float)(2.0f * (rand() / (float)RAND_MAX) - 1.0f));
+        bias[i] = (rand() % 2 == 0) ? NAN : ((float)(2.0f * (rand() / (float)RAND_MAX) - 1.0f));
     }
     float *d_out, *d_mean, *d_rstd, *d_inp, *d_weight, *d_bias;
     cudaMalloc(&d_out, B * T * C * sizeof(float));

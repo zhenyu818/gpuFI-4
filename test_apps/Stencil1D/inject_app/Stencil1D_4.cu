@@ -36,7 +36,7 @@ __global__ void stencil_1d(const int *__restrict__ in, int *__restrict__ out, in
 }
 
 // ==================== 生成 2:4 稀疏输入 ====================
-static void generate_2to4_sparse_group(int *group, int group_len) {
+static void generate_2to4_sparse_group(int *group, int group_len, int max_val) {
     for (int k = 0; k < group_len; k++)
         group[k] = 0;
 
@@ -52,9 +52,9 @@ static void generate_2to4_sparse_group(int *group, int group_len) {
 
     for (int k = 0; k < SPARSE_M; k++) {
         if (selected[k]) {
-            group[k] = rand() % 10;
+            group[k] = rand() % max_val;
             while (group[k] == 0) {
-                group[k] = rand() % 10;
+                group[k] = rand() % max_val;
             }
         }
     }
@@ -63,10 +63,11 @@ static void generate_2to4_sparse_group(int *group, int group_len) {
 static void generate_sparse_input(int *a, int length) {
     srand(M_SEED);
     int aligned_len = (length % SPARSE_M == 0) ? length : (length / SPARSE_M + 1) * SPARSE_M;
+    int max_val = length + RADIUS; // 生成非零数据时的范围
 
     for (int i = 0; i < aligned_len; i += SPARSE_M) {
         int group[SPARSE_M];
-        generate_2to4_sparse_group(group, SPARSE_M);
+        generate_2to4_sparse_group(group, SPARSE_M, max_val);
         for (int k = 0; k < SPARSE_M; k++) {
             if (i + k < length) {
                 a[i + k] = group[k];
@@ -76,9 +77,10 @@ static void generate_sparse_input(int *a, int length) {
 
     // pad 区域保持随机 (避免访问越界)
     for (int i = length; i < length + RADIUS; i++) {
-        a[i] = rand() % 10;
+        a[i] = rand() % max_val;
     }
 }
+
 // =========================================================
 
 int main(int argc, char *argv[]) {

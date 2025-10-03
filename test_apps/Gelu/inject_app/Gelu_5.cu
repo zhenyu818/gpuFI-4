@@ -54,13 +54,17 @@ int main(int argc, char *argv[]) {
         if (rand() % 2 == 0) {
             output[i] = NAN; // 50% 概率 NaN
         } else {
-            output[i] = (float)(rand() % 10); // 50% 概率 0~9 的小正数
+            output[i] = rand() / (float)RAND_MAX;
         }
     }
 
     float *bias = (float *)malloc(bias_size_bytes);
     for (int i = 0; i < hidden_dim; i++) {
-        bias[i] = -6.0f + (rand() % 12); // -6 ~ +5
+        if (rand() % 2 == 0) {
+            bias[i] = NAN; // 50% 概率 NaN
+        } else {
+            bias[i] = -6.0f + (rand() % 12); // -6 ~ +5
+        }
     }
 
     float *d_output;

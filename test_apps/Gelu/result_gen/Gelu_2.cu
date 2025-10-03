@@ -64,12 +64,12 @@ int main(int argc, char *argv[]) {
     srand(M_SEED);
     float *output = (float *)malloc(src_size_bytes);
     for (size_t i = 0; i < src_size; i++) {
-        output[i] = 0 / (float)RAND_MAX; // [0,1) 随机数
+        output[i] = 0; // [0,1) 随机数
     }
 
     float *bias = (float *)malloc(bias_size_bytes);
     for (int i = 0; i < hidden_dim; i++) {
-        bias[i] = -6.0f + (0 % 12); // [-6,6) 整数
+        bias[i] = 0; // [-6,6) 整数
     }
 
     float *d_output;

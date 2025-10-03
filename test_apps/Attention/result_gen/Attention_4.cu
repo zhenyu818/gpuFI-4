@@ -131,7 +131,23 @@ static void gen_sparse_2to4(float *a, long n) {
         }
     }
 }
-
+static void gen_sparse_2to4_2_2(float *a, long n) {
+    srand(SEED);
+    for (long i = 0; i < n; i += SPARSE_GROUP) {
+        bool keep[SPARSE_GROUP] = {0};
+        int cnt = 0;
+        while (cnt < SPARSE_KEEP) {
+            int idx = rand() % SPARSE_GROUP;
+            if (!keep[idx]) {
+                keep[idx] = true;
+                cnt++;
+            }
+        }
+        for (int k = 0; k < SPARSE_GROUP && (i + k) < n; k++) {
+            a[i + k] = keep[k] ? (((float)rand() / RAND_MAX) * 4.0f - 2.0f) : 0.0f;
+        }
+    }
+}
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         printf("Usage: %s <rows> <columns>\n", argv[0]);
@@ -162,7 +178,7 @@ int main(int argc, char *argv[]) {
     free(value_float);
 
     float *query_float = (float *)malloc(d * sizeof(float));
-    gen_sparse_2to4(query_float, d);
+    gen_sparse_2to4_2_2(query_float, d);
     for (int i = 0; i < d; i++) {
         query[i] = __float2half(query_float[i]);
     }

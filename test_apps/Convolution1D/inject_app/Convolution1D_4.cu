@@ -65,7 +65,7 @@ template <typename T> static void generate_2to4_sparse(T *data, int size) {
         }
         for (int k = 0; k < SPARSE_M && i + k < size; k++) {
             if (selected[k]) {
-                data[i + k] = (T)((rand() % 10) + 1); // 非零范围 [1,10]
+                data[i + k] = (T)(rand() % 256); // 非零范围 [0,255]
             } else {
                 data[i + k] = (T)0;
             }

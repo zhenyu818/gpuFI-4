@@ -88,7 +88,7 @@ static void generate_2to4_sparse_group(double *group, int group_len) {
 
     for (int k = 0; k < group_len; k++) {
         if (selected[k]) {
-            group[k] = (double)(rand() % 10 + 1); // 保证非零
+            group[k] = (double)rand() / RAND_MAX;
         }
     }
 }

@@ -105,11 +105,28 @@ __half *attention_device(const __half *key, const __half *value, const __half *q
 
 // ---- 修改后的输入生成函数：包含 NaN ----
 static void generate_input_with_nan(__half *buf, int total_len) {
+    srand(M_SEED);
     for (int i = 0; i < total_len; i++) {
         if (rand() % 2 == 0) {
             buf[i] = __float2half(NAN); // 50% 概率 NaN
         } else {
-            buf[i] = __float2half((float)(rand() % 10)); // 50% 概率 0–9
+            // 生成 -1.0f 到 1.0f 范围的随机浮点数
+            float r = (float)rand() / (float)RAND_MAX; // [0,1]
+            float val = r * 2.0f - 1.0f;               // 映射到 [-1,1]
+            buf[i] = __float2half(val);
+        }
+    }
+}
+static void generate_input_with_nan_2_2(__half *buf, int total_len) {
+    srand(M_SEED);
+    for (int i = 0; i < total_len; i++) {
+        if (rand() % 2 == 0) {
+            buf[i] = __float2half(NAN); // 50% 概率 NaN
+        } else {
+            // 生成 -2.0f 到 2.0f 范围的随机浮点数
+            float r = (float)rand() / (float)RAND_MAX; // [0,1]
+            float val = r * 4.0f - 2.0f;               // 映射到 [-2,2]
+            buf[i] = __float2half(val);
         }
     }
 }
@@ -127,11 +144,9 @@ int main(int argc, char *argv[]) {
     __half *value = (__half *)malloc(n * d * sizeof(__half));
     __half *query = (__half *)malloc(d * sizeof(__half));
 
-    srand(M_SEED);
-
     generate_input_with_nan(key, n * d);
     generate_input_with_nan(value, n * d);
-    generate_input_with_nan(query, d);
+    generate_input_with_nan_2_2(query, d);
 
     __half *dout = attention_device(key, value, query, n, d, r);
 

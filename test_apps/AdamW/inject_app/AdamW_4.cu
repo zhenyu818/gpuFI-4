@@ -51,6 +51,23 @@ static void gen_sparse_2to4(float *a, long n) {
         }
     }
 }
+static void gen_sparse_2to4_0_1(float *a, long n) {
+    srand(SEED);
+    for (long i = 0; i < n; i += SPARSE_GROUP) {
+        bool keep[SPARSE_GROUP] = {0};
+        int cnt = 0;
+        while (cnt < SPARSE_KEEP) {
+            int idx = rand() % SPARSE_GROUP;
+            if (!keep[idx]) {
+                keep[idx] = true;
+                cnt++;
+            }
+        }
+        for (int k = 0; k < SPARSE_GROUP && (i + k) < n; k++) {
+            a[i + k] = keep[k] ? ((float)rand() / RAND_MAX) : 0.0f;
+        }
+    }
+}
 int main(int argc, char **argv) {
     if (argc != 3) {
         printf("Usage: %s <num_parameters> <t>\n", argv[0]);
@@ -69,7 +86,8 @@ int main(int argc, char **argv) {
     gen_sparse_2to4(params_memory, num_parameters);
     gen_sparse_2to4(grads_memory, num_parameters);
     gen_sparse_2to4(m_memory, num_parameters);
-    gen_sparse_2to4(v_memory, num_parameters);
+    gen_sparse_2to4_0_1(v_memory, num_parameters);
+
     float *d_params, *d_grads, *d_m, *d_v;
     cudaCheck(cudaMalloc(&d_params, num_parameters * sizeof(float)));
     cudaCheck(cudaMalloc(&d_grads, num_parameters * sizeof(float)));

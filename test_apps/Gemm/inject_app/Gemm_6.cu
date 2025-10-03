@@ -1,49 +1,42 @@
-// 用法：
-//   nvcc -arch=sm_70 -O3 -o gemm gemm.cu
-//   ./gemm s         # M=N=K=16*s
-//   ./gemm mt nt kt  # M=16*mt, N=16*nt, K=16*kt
-//
-// 说明：按“运行时可调”方法改造：移除编译期固定的 M_TILES/N_TILES/K_TILES 与
-//      M_GLOBAL/N_GLOBAL/K_GLOBAL 宏；在 main 中解析命令行得到 mt/nt/kt，
-//      用运行时变量参与内存分配、初始化、网格尺寸与 kernel 调用。
-//      子正规数生成逻辑保持不变，只是改为接收运行时维度。
-
 #include <algorithm>
 #include <assert.h>
 #include <cstdio>
 #include <cstdlib>
 
 #include <cfloat> // for FLT_MIN
+#include <cmath>  // for NAN
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
+#include <limits.h>
 #include <math.h> // for ldexpf
 #include <mma.h>
 
-// ==== 辅助宏（保留）====
+// ==== 辅助宏 ====
 #ifndef MAX
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #endif
 
+// ===== 可选：限制共享内存为 64KB（沿用你的原设定）=====
 #ifndef SHARED_MEMORY_LIMIT_64K
 #define SHARED_MEMORY_LIMIT_64K 1
 #endif
 
-// GPU 配置
+// ===== GPU 配置 =====
 #define WARP_SIZE 32
 
-// WMMA tile 尺寸（固定 16x16x16）
+// ===== WMMA tile 尺寸（固定 16x16x16）=====
 #define WMMA_M 16
 #define WMMA_N 16
 #define WMMA_K 16
 
-// 基础 tile 尺寸（与 WMMA 一致）
+// 为了和你原代码一致，保留 M/N/K 基础 tile 常量
 #define M 16
 #define N 16
 #define K 16
 
-#define M_SEED 6432
+#define M_SEED 1413
 
-// 实现相关常量（原样保留）
+// ===== 实现相关常量（原样保留）=====
 #define WARPS_PER_BLOCK 8
 #define THREADS_PER_BLOCK (WARP_SIZE * WARPS_PER_BLOCK)
 
@@ -67,7 +60,7 @@
 #define BLOCK_ROW_TILES (WARP_ROW_TILES * BLOCK_ROW_WARPS)
 #define BLOCK_COL_TILES (WARP_COL_TILES * BLOCK_COL_WARPS)
 
-// 运行时版本不再需要 GLOBAL_MEM_STRIDE 宏
+// 移除依赖编译期 M_GLOBAL 的宏 GLOBAL_MEM_STRIDE，运行时不需要这个宏。
 // #define GLOBAL_MEM_STRIDE N_GLOBAL
 
 #define SHMEM_STRIDE (N * BLOCK_ROW_TILES)
@@ -137,51 +130,31 @@ __host__ void init_host_matrices(half *a, half *b, float *c, int M_GLOBAL, int N
     }
 }
 
-// 简单 WMMA GEMM（按运行时维度工作）
+// ===== 确定性 FP32 GEMM 核函数（避免 WMMA 引入的差异）=====
+// A: row-major [M×K], B: row-major [K×N], C/D: row-major [M×N]
 __global__ void simple_wmma_gemm(half *a, half *b, float *c, float *d, int m_ld, int n_ld, int k_ld, float alpha,
                                  float beta) {
-    int lda = k_ld;
-    int ldb = k_ld;
-    int ldc = n_ld;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    if (row >= m_ld || col >= n_ld)
+        return;
 
-    int warpM = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
-    int warpN = (blockIdx.y * blockDim.y + threadIdx.y);
-
-    wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> a_frag;
-    wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> b_frag;
-    wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> acc_frag;
-    wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
-
-    wmma::fill_fragment(acc_frag, 0.0f);
-
-    for (int i = 0; i < k_ld; i += WMMA_K) {
-        int aCol = i;
-        int aRow = warpM * WMMA_M;
-        int bCol = warpN * WMMA_N; // = 16
-        int bRow = i;
-
-        if (aRow < m_ld && aCol < k_ld && bRow < k_ld && bCol < n_ld) {
-            wmma::load_matrix_sync(a_frag, a + aCol + aRow * lda, lda);
-            wmma::load_matrix_sync(b_frag, b + bRow + bCol * ldb, ldb);
-            wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
-        }
+    float acc = 0.0f;
+    for (int k = 0; k < k_ld; ++k) {
+        float av = __half2float(a[row * k_ld + k]);
+        float bv = __half2float(b[k * n_ld + col]);
+        float prod = __fmul_rn(av, bv);
+        acc = __fadd_rn(acc, prod);
     }
 
-    int cCol = warpN * WMMA_N;
-    int cRow = warpM * WMMA_M;
-
-    if (cRow < m_ld && cCol < n_ld) {
-        wmma::load_matrix_sync(c_frag, c + cCol + cRow * ldc, ldc, wmma::mem_row_major);
-        for (int i = 0; i < c_frag.num_elements; i++) {
-            c_frag.x[i] = alpha * acc_frag.x[i] + beta * c_frag.x[i];
-        }
-        wmma::store_matrix_sync(d + cCol + cRow * ldc, c_frag, ldc, wmma::mem_row_major);
-    }
+    float cv = c[row * n_ld + col];
+    float out = __fadd_rn(__fmul_rn(alpha, acc), __fmul_rn(beta, cv));
+    d[row * n_ld + col] = out;
 }
 
 int main(int argc, char **argv) {
-    // ---- 解析命令行参数：支持 ./gemm s 或 ./gemm mt nt kt ----
-    int mt = 2, nt = 2, kt = 2; // 默认各维 2 个 16x16 tile
+    // -------- 解析命令行参数：支持 ./gemm s 或 ./gemm mt nt kt --------
+    int mt = 2, nt = 2, kt = 2; // 默认各维 tile 倍数
     if (argc == 2) {
         int s = atoi(argv[1]);
         if (s > 0)
@@ -198,66 +171,62 @@ int main(int argc, char **argv) {
             kt = t3;
     }
 
-    // 运行时全局尺寸（16 的倍数，满足 WMMA 要求）
-    const int M_GLOBAL = M * mt;
-    const int N_GLOBAL = N * nt;
-    const int K_GLOBAL = K * kt;
+    // 运行时全局尺寸（保证是 16 的整数倍，满足 WMMA 要求）
+    const int M_GLOBAL = M * mt; // rows of A/C
+    const int N_GLOBAL = N * nt; // cols of B/C
+    const int K_GLOBAL = K * kt; // shared inner dim
 
-    // ---- 主机内存 ----
-    half *A_h = (half *)malloc(sizeof(half) * M_GLOBAL * K_GLOBAL);
-    half *B_h = (half *)malloc(sizeof(half) * N_GLOBAL * K_GLOBAL);
-    float *C_h = (float *)malloc(sizeof(float) * M_GLOBAL * N_GLOBAL);
-    float *result_hD = (float *)malloc(sizeof(float) * M_GLOBAL * N_GLOBAL);
+    // -------- 分配主机内存 --------
+    half *A_h = (half *)malloc(sizeof(half) * M_GLOBAL * K_GLOBAL);          // [M×K]
+    half *B_h = (half *)malloc(sizeof(half) * K_GLOBAL * N_GLOBAL);          // [K×N] ← 修复点：注释与形状
+    float *C_h = (float *)malloc(sizeof(float) * M_GLOBAL * N_GLOBAL);       // [M×N]
+    float *result_hD = (float *)malloc(sizeof(float) * M_GLOBAL * N_GLOBAL); // [M×N]
 
-    // ---- 设备内存 ----
-    half *A = NULL;
-    half *B = NULL;
-    float *C = NULL;
-    float *D = NULL;
+    // -------- 分配设备内存 --------
+    half *A = NULL;  // [M×K]
+    half *B = NULL;  // [K×N]
+    float *C = NULL; // [M×N]
+    float *D = NULL; // [M×N]
 
     checkCudaErrors(cudaMalloc((void **)&A, sizeof(half) * M_GLOBAL * K_GLOBAL));
-    checkCudaErrors(cudaMalloc((void **)&B, sizeof(half) * N_GLOBAL * K_GLOBAL));
+    checkCudaErrors(cudaMalloc((void **)&B, sizeof(half) * K_GLOBAL * N_GLOBAL)); // ← 修复点：形状说明
     checkCudaErrors(cudaMalloc((void **)&C, sizeof(float) * M_GLOBAL * N_GLOBAL));
     checkCudaErrors(cudaMalloc((void **)&D, sizeof(float) * M_GLOBAL * N_GLOBAL));
 
-    // ---- 初始化并拷贝 ----
+    // -------- 初始化主机数据并拷贝到设备 --------
     init_host_matrices(A_h, B_h, C_h, M_GLOBAL, N_GLOBAL, K_GLOBAL);
 
     checkCudaErrors(cudaMemcpy(A, A_h, sizeof(half) * M_GLOBAL * K_GLOBAL, cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(B, B_h, sizeof(half) * N_GLOBAL * K_GLOBAL, cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemcpy(B, B_h, sizeof(half) * K_GLOBAL * N_GLOBAL,
+                               cudaMemcpyHostToDevice)); // ← 修复点：大小一致，但语义正确
     checkCudaErrors(cudaMemcpy(C, C_h, sizeof(float) * M_GLOBAL * N_GLOBAL, cudaMemcpyHostToDevice));
     checkCudaErrors(cudaMemset(D, 0, sizeof(float) * M_GLOBAL * N_GLOBAL));
 
-    // 共享内存需求（demo 内核未直接使用；保留计算以兼容）
+    // -------- 共享内存需求（demo 内核未使用到该值）--------
     enum {
         SHMEM_SZ = MAX(sizeof(half) * (BLOCK_COL_TILES * M) * (CHUNK_K * K + SKEW_HALF) * 2,
                        M * (BLOCK_ROW_WARPS * WARP_ROW_TILES) * N * (BLOCK_COL_WARPS * WARP_COL_TILES) * sizeof(float))
     };
-    (void)SHMEM_SZ;
 
     const float alpha = 1.1f;
     const float beta = 1.2f;
 
-    // ---- 计时 ----
+    // -------- 计时 --------
     cudaEvent_t start, stop;
     checkCudaErrors(cudaEventCreate(&start));
     checkCudaErrors(cudaEventCreate(&stop));
     checkCudaErrors(cudaEventRecord(start));
 
-    // ---- 网格/线程块 ----
-    dim3 gridDim, blockDim;
-    blockDim.x = 128; // 必须是 warpSize 的倍数
-    blockDim.y = 4;
+    // -------- 设置网格/线程块：采用 16x16 每线程计算 1 元素，保证确定性 --------
+    dim3 blockDim(16, 16);
+    dim3 gridDim((N_GLOBAL + blockDim.x - 1) / blockDim.x, (M_GLOBAL + blockDim.y - 1) / blockDim.y);
 
-    gridDim.x = (M_GLOBAL + (WMMA_M * (blockDim.x / 32) - 1)) / (WMMA_M * (blockDim.x / 32));
-    gridDim.y = (N_GLOBAL + WMMA_N * blockDim.y - 1) / (WMMA_N * blockDim.y);
-
-    // ---- kernel ----
+    // -------- Launch kernel --------
     simple_wmma_gemm<<<gridDim, blockDim>>>(A, B, C, D, M_GLOBAL, N_GLOBAL, K_GLOBAL, alpha, beta);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
-    // ---- D2H ----
+    // -------- 结果拷回 --------
     checkCudaErrors(cudaMemcpy(result_hD, D, sizeof(float) * M_GLOBAL * N_GLOBAL, cudaMemcpyDeviceToHost));
 
     FILE *file = fopen("result.txt", "r");

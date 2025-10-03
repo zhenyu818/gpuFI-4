@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <random>
 #include <vector>
 
 #define SPARSE_GROUP 4
@@ -93,11 +94,12 @@ __global__ void sgd_update_deterministic(const int *indptr, const int *indices, 
     }
 }
 
-static inline float rand_uniform_minus1_1() {
-    return ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
+static inline float rand_uniform_float32(std::mt19937 &rng) {
+    return static_cast<float>(rng()); // 范围 [0, 4.294967295e9]，但精度不足
 }
 
 static void gen_sparse_2to4(float *a, size_t n) {
+    std::mt19937 rng(SEED);
     for (size_t i = 0; i < n; i += SPARSE_GROUP) {
         bool keep[SPARSE_GROUP] = {false, false, false, false};
         int cnt = 0;
@@ -108,9 +110,8 @@ static void gen_sparse_2to4(float *a, size_t n) {
                 cnt++;
             }
         }
-        for (int k = 0; k < SPARSE_GROUP && (i + (size_t)k) < n; ++k) {
-            a[i + k] = keep[k] ? rand_uniform_minus1_1() : 0.0f;
-        }
+        for (int k = 0; k < SPARSE_GROUP && (i + (size_t)k) < n; ++k)
+            a[i + k] = keep[k] ? rand_uniform_float32(rng) : 0.0f;
     }
 }
 

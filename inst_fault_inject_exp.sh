@@ -1,11 +1,11 @@
 #!/bin/bash
 
-TEST_APP_NAME="AdamW"
+TEST_APP_NAME="Dijkstra"
 COMPONENT_SET="0"
 INJECT_BIT_FLIP_COUNT=1 # number of bits to flip per injection (e.g. 2 means flip 2 bits per injection)
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
 RUN_PER_EPOCH=10
-EPOCH=2
+EPOCH=1
 
 
 DO_BUILD=0 # 1: build before run, 0: skip build
@@ -363,12 +363,23 @@ main() {
     pip3 install pathlib
     pip3 install numpy
     pip3 install pandas
+    pip3 install scipy
 
     # load environment variables
     source setup_environment
 
     # Ensure destination directory for classification artifacts exists
+    error_classification_dir="error_classification"
+    if [[ -d "$error_classification_dir" ]]; then
+        rm -rf "$error_classification_dir"
+    fi
     mkdir -p error_classification
+
+    inconsistent_dir="inconsistent_with_gpu"
+    if [[ -d "$inconsistent_dir" ]]; then
+        rm -rf "$inconsistent_dir"
+    fi
+    mkdir -p "$inconsistent_dir"
 
     if [[ $DO_BUILD -eq 1 ]]; then
         echo "=== Start compiling ==="
@@ -407,9 +418,48 @@ main() {
                     x_val=$(echo "$filename" | sed -n "s/^${TEST_APP_NAME}_\([0-9]\+\)\.cu$/\1/p")
                     if [[ -n "$x_val" ]]; then
                         cp "$cu_file" "${cu_file}.bak"
-                        /usr/local/cuda/bin/nvcc "$cu_file" -o "test_apps/${TEST_APP_NAME}/result_gen/gen" -arch=sm_75
-                        ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-                        rm -rf "test_apps/${TEST_APP_NAME}/result_gen/gen"
+                        nvcc "$cu_file" -o "./gen" -g -lcudart -arch=sm_75 
+                        /usr/local/cuda/bin/nvcc "$cu_file" -o "./gpu_gen" -arch=sm_75
+                        ./gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                        ./gpu_gen $line >> "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}_gpu.txt"
+                        # 仅保留最后一个GPGPU-Sim所在行到倒数第二个GPGPU-Sim所在行之间的内容（不包括GPGPU-Sim所在行）
+                        tmpfile="test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt.tmp"
+                        gpgpu_lines=($(grep -n "GPGPU-Sim" "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt" | cut -d: -f1))
+                        if (( ${#gpgpu_lines[@]} >= 2 )); then
+                            start_line=$(( ${gpgpu_lines[-2]} + 1 ))
+                            end_line=$(( ${gpgpu_lines[-1]} - 1 ))
+                            if (( start_line <= end_line )); then
+                                sed -n "${start_line},${end_line}p" "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt" > "$tmpfile"
+                                mv "$tmpfile" "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                            else
+                                # 区间无内容，清空文件
+                                > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                            fi
+                        fi
+                        # 比较CPU和GPU结果文件是否一致
+                        cpu_file="test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                        gpu_file="test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}_gpu.txt"
+                        # 比较CPU和GPU结果文件是否一致，并输出不同项的索引和值
+                        if ! diff -q "$cpu_file" "$gpu_file" >/dev/null 2>&1; then
+                            out_file="${inconsistent_dir}/${TEST_APP_NAME}_${idx}-${x_val}.txt"
+                            echo "GPGPU-Sim and GPU results are inconsistent:" > "$out_file"
+                            # 将两个文件的内容按空白分割为数组
+                            cpu_arr=($(tr -s ' \n' '\n' < "$cpu_file"))
+                            gpu_arr=($(tr -s ' \n' '\n' < "$gpu_file"))
+                            len_cpu=${#cpu_arr[@]}
+                            len_gpu=${#gpu_arr[@]}
+                            max_len=$(( len_cpu > len_gpu ? len_cpu : len_gpu ))
+                            for ((i=0; i<max_len; i++)); do
+                                cpu_val="${cpu_arr[i]}"
+                                gpu_val="${gpu_arr[i]}"
+                                if [[ "$cpu_val" != "$gpu_val" ]]; then
+                                    echo "Index $i: CPU='$cpu_val' GPU='$gpu_val'" >> "$out_file"
+                                fi
+                            done
+                        fi
+                        rm -rf "./gen"
+                        rm -rf "./gpu_gen"
+                        rm -f "$gpu_file"
                         mv "${cu_file}.bak" "$cu_file"
                     fi
                 fi
@@ -421,10 +471,49 @@ main() {
                         continue
                     fi
                     cp "$cu_file" "${cu_file}.bak"
-                    /usr/local/cuda/bin/nvcc "$cu_file" -o "test_apps/${TEST_APP_NAME}/result_gen/gen" -arch=sm_75
-                    ./test_apps/${TEST_APP_NAME}/result_gen/gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
-                    rm -rf "test_apps/${TEST_APP_NAME}/result_gen/gen"
-                    mv "${cu_file}.bak" "$cu_file"
+                        nvcc "$cu_file" -o "./gen" -g -lcudart -arch=sm_75 
+                        /usr/local/cuda/bin/nvcc "$cu_file" -o "./gpu_gen" -arch=sm_75
+                        ./gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                        ./gpu_gen $line >> "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}_gpu.txt"
+                        # 仅保留最后一个GPGPU-Sim所在行到倒数第二个GPGPU-Sim所在行之间的内容（不包括GPGPU-Sim所在行）
+                        tmpfile="test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt.tmp"
+                        gpgpu_lines=($(grep -n "GPGPU-Sim" "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt" | cut -d: -f1))
+                        if (( ${#gpgpu_lines[@]} >= 2 )); then
+                            start_line=$(( ${gpgpu_lines[-2]} + 1 ))
+                            end_line=$(( ${gpgpu_lines[-1]} - 1 ))
+                            if (( start_line <= end_line )); then
+                                sed -n "${start_line},${end_line}p" "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt" > "$tmpfile"
+                                mv "$tmpfile" "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                            else
+                                # 区间无内容，清空文件
+                                > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                            fi
+                        fi
+                        # 比较CPU和GPU结果文件是否一致
+                        cpu_file="test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
+                        gpu_file="test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}_gpu.txt"
+                        # 比较CPU和GPU结果文件是否一致，并输出不同项的索引和值
+                        if ! diff -q "$cpu_file" "$gpu_file" >/dev/null 2>&1; then
+                            out_file="${inconsistent_dir}/${TEST_APP_NAME}_${idx}-${x_val}.txt"
+                            echo "GPGPU-Sim and GPU results are inconsistent:" > "$out_file"
+                            # 将两个文件的内容按空白分割为数组
+                            cpu_arr=($(tr -s ' \n' '\n' < "$cpu_file"))
+                            gpu_arr=($(tr -s ' \n' '\n' < "$gpu_file"))
+                            len_cpu=${#cpu_arr[@]}
+                            len_gpu=${#gpu_arr[@]}
+                            max_len=$(( len_cpu > len_gpu ? len_cpu : len_gpu ))
+                            for ((i=0; i<max_len; i++)); do
+                                cpu_val="${cpu_arr[i]}"
+                                gpu_val="${gpu_arr[i]}"
+                                if [[ "$cpu_val" != "$gpu_val" ]]; then
+                                    echo "Index $i: CPU='$cpu_val' GPU='$gpu_val'" >> "$out_file"
+                                fi
+                            done
+                        fi
+                        rm -rf "./gen"
+                        rm -rf "./gpu_gen"
+                        rm -f "$gpu_file"
+                        mv "${cu_file}.bak" "$cu_file"
                 done
             fi
             idx=$((idx+1))
@@ -622,7 +711,7 @@ main() {
             # 等待主进程结束
             wait $CMD_PID
             echo "=== Fault injection for ${filename} finished ==="
-            python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext  -c $COMPONENT_SET -b $INJECT_BIT_FLIP_COUNT
+            python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext  -c $COMPONENT_SET -b $INJECT_BIT_FLIP_COUNT --alpha 0.05 --eps_share 0.01 --eps_inv 0.01 --eps_sdc 0.01 --coverage 0.6 
             ret=$?
             if [ $ret -eq 99 ]; then
                 echo "=== Early stopping triggered. Exiting loop ==="
@@ -631,6 +720,13 @@ main() {
         done
     done
     rm -f register_used.txt
+    rm -f $TEST_APP_NAME.ptx
+    rm -f $TEST_APP_NAME.1.sm_75.ptx
+    rm -f $TEST_APP_NAME.1.sm_75.ptxas
+    rm -f $TEST_APP_NAME.cu
+    rm -f $TEST_APP_NAME
+    rm -f result.txt
+
 }
 
 echo "=== Running main with COMPONENT_SET=${COMPONENT_SET} ==="

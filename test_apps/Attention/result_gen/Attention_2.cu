@@ -108,11 +108,6 @@ __half *attention_device(const __half *key, const __half *value, const __half *q
     return output;
 }
 
-float random_float(float min, float max) {
-    float scale = 0 / (float)RAND_MAX; // [0, 1]
-    return min + scale * (max - min);  // [min, max]
-}
-
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         printf("Usage: %s <rows> <columns>\n", argv[0]);
@@ -129,12 +124,12 @@ int main(int argc, char *argv[]) {
 
     srand(M_SEED);
     for (int i = 0; i < n * d; i++) {
-        key[i] = __float2half(random_float(-1.0f, 1.0f));
-        value[i] = __float2half(random_float(-1.0f, 1.0f));
+        key[i] = __float2half(0.0f);
+        value[i] = __float2half(0.0f);
     }
 
     for (int i = 0; i < d; i++) {
-        query[i] = __float2half(random_float(-2.0f, 2.0f));
+        query[i] = __float2half(0.0f);
     }
 
     __half *dout = attention_device(key, value, query, n, d, r);

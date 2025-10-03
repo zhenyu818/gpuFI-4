@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <random>
 #include <vector>
 
 #define SEED 24680
@@ -89,6 +90,10 @@ __global__ void sgd_update_deterministic(const int *indptr, const int *indices, 
     }
 }
 
+static inline float rand_uniform_float32(std::mt19937 &rng) {
+    return static_cast<float>(rng()); // 范围 [0, 4.294967295e9]，但精度不足
+}
+
 int main(int argc, char **argv) {
     if (argc != 4) {
         std::cerr << "Usage: " << argv[0] << " <num_users> <num_items> <items_per_user>\n";
@@ -103,6 +108,7 @@ int main(int argc, char **argv) {
     }
 
     srand(SEED);
+    std::mt19937 rng(SEED);
 
     const int latent_factors = 8;
     const float learning_rate = 0.01f;
@@ -123,31 +129,27 @@ int main(int argc, char **argv) {
     std::vector<int> h_indptr(num_users + 1);
     for (int u = 0; u <= num_users; ++u)
         h_indptr[u] = u * items_per_user;
-
     std::vector<int> h_indices(nnz);
     std::vector<float> h_data(nnz);
     for (int i = 0; i < nnz; ++i) {
         h_indices[i] = rand() % num_items;
-        // 50% NaN, 50% small integer 0..9
-        h_data[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : (float)(rand() % 10);
+        h_data[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : rand_uniform_float32(rng);
     }
-
     std::vector<float> h_P(num_users * latent_factors);
     std::vector<float> h_Q(num_items * latent_factors);
     std::vector<float> h_Q_target(num_items * latent_factors);
     for (size_t i = 0; i < h_P.size(); ++i)
-        h_P[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : (float)(rand() % 10);
+        h_P[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : rand_uniform_float32(rng);
     for (size_t i = 0; i < h_Q.size(); ++i)
-        h_Q[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : (float)(rand() % 10);
+        h_Q[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : rand_uniform_float32(rng);
     h_Q_target = h_Q;
-
     std::vector<float> h_user_bias(num_users);
     std::vector<float> h_item_bias(num_items);
     std::vector<float> h_item_bias_target(num_items);
     for (int i = 0; i < num_users; ++i)
-        h_user_bias[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : (float)(rand() % 10);
+        h_user_bias[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : rand_uniform_float32(rng);
     for (int i = 0; i < num_items; ++i)
-        h_item_bias[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : (float)(rand() % 10);
+        h_item_bias[i] = (rand() % 2 == 0) ? std::numeric_limits<float>::quiet_NaN() : rand_uniform_float32(rng);
     h_item_bias_target = h_item_bias;
 
     std::vector<unsigned char> h_item_updated(num_items, 0u);
