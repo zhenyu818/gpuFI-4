@@ -33,20 +33,20 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./Attention 2 2"
+CUDA_UUT="./AdamW 128 3"
 # total cycles for all kernels
-CYCLES=7099
+CYCLES=2357
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
 # fix cycles.txt with kernel execution cycles
 # (e.g. seq 1 10 >> cycles.txt, or multiple seq commands if a kernel has multiple executions)
 # use the following command from profiling execution for easier creation of cycles.txt file
 # e.g. grep "_Z12lud_diagonalPfii" cycles.in | awk  '{ system("seq " $12 " " $18 ">> cycles.txt")}'
 CYCLES_FILE=./cycles.txt
-MAX_REGISTERS_USED=49
-SHADER_USED="0 1 2"
+MAX_REGISTERS_USED=17
+SHADER_USED="0"
 SUCCESS_MSG='Fault Injection Test Success!'
 FAILED_MSG='Fault Injection Test Failed!'
-TIMEOUT_VAL=16s
+TIMEOUT_VAL=13s
 DATATYPE_SIZE=32
 # lmem and smem values are taken from gpgpu-sim ptx output per kernel
 # e.g. GPGPU-Sim PTX: Kernel '_Z9vectorAddPKdS0_Pdi' : regs=8, lmem=0, smem=0, cmem=380
@@ -209,11 +209,11 @@ gather_results() {
 
             echo "[INJ_PARAMS] [Run ${1}] ${TMP_FILE}${idx} ${combo_line}"
         fi
-        grep -iq "${SUCCESS_MSG}" $file; success_msg_grep=$(echo $?)
-	grep -i "${CYCLES_MSG}" $file | tail -1 | grep -q "${CYCLES}"; cycles_grep=$(echo $?)
-        grep -iq "${FAILED_MSG}" $file; failed_msg_grep=$(echo $?)
-        if grep -qE "FI_WRITER|FI_READER" "$file"; then
-            grep -hE "FI_WRITER|FI_READER" "$file" | while IFS= read -r line; do
+        grep -a -iq "${SUCCESS_MSG}" "$file"; success_msg_grep=$(echo $?)
+	grep -a -i "${CYCLES_MSG}" "$file" | tail -1 | grep -a -q "${CYCLES}"; cycles_grep=$(echo $?)
+        grep -a -iq "${FAILED_MSG}" "$file"; failed_msg_grep=$(echo $?)
+        if grep -a -qE "FI_WRITER|FI_READER" "$file"; then
+            grep -a -hE "FI_WRITER|FI_READER" "$file" | while IFS= read -r line; do
             echo "[Run ${1}] Effects from ${file}: $line"
             done
         fi
@@ -237,7 +237,7 @@ gather_results() {
             let SDC++
             echo "[Run ${1}] ${filename}: SDC" ;;
         *)
-            grep -iq "${FAULT_INJECTION_OCCURRED}" $file
+            grep -a -iq "${FAULT_INJECTION_OCCURRED}" "$file"
             if [ $? -eq 0 ]; then
                 let RUNS--
                 let crashes++

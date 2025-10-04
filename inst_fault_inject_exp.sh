@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TEST_APP_NAME="Attention"
+TEST_APP_NAME="Pathfinder"
 COMPONENT_SET="0"
 INJECT_BIT_FLIP_COUNT=1 # number of bits to flip per injection (e.g. 2 means flip 2 bits per injection)
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
@@ -405,7 +405,7 @@ main() {
         echo "=== Start result generation ==="
 
         # 删除旧的 result 文件
-        rm -rf "test_apps/${TEST_APP_NAME}/result/*"
+        rm -rf test_apps/${TEST_APP_NAME}/result/*
 
         # 生成 result
         idx=0
@@ -573,7 +573,13 @@ main() {
         exit 1
         fi
         echo "=== Collecting metrics ==="
-        get_metrics
+        app_info_file="test_apps/${TEST_APP_NAME}/app_info.txt"
+        if [[ -f "$app_info_file" ]]; then
+            rm -f "$app_info_file"
+        fi
+        touch "$app_info_file"
+        { get_metrics; } > >(tee "test_apps/${TEST_APP_NAME}/app_info.txt")
+
 
         # 读取campaign.sh内容到变量
         campaign_file="campaign_exec.sh"
@@ -582,6 +588,10 @@ main() {
             exit 1
         fi
         bash generate_cycles.sh $GLOBAL_CYCLES $GLOBAL_CYCLES
+        if [ $? -ne 0 ]; then
+            echo "Error: generate_cycles.sh failed." >&2
+            exit 1
+        fi
 
         echo "=== Updating campaign_exec.sh with metrics ==="
         # 生成新的内容
@@ -662,6 +672,7 @@ main() {
         nvcc -arch=sm_75 -ptx -g -lineinfo $TEST_APP_NAME.cu -o $TEST_APP_NAME.ptx
 
         python3 extract_registers.py $TEST_APP_NAME
+        python3 count_ptx_inst.py $TEST_APP_NAME >> "test_apps/${TEST_APP_NAME}/app_info.txt"
 
         echo "=== Starting fault injection experiment: ${TEST_APP_NAME}, file ${filename} ==="
         filename_no_ext="${filename%.txt}"
