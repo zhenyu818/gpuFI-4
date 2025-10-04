@@ -190,6 +190,10 @@ int main(int argc, char **argv) {
 
     // Host-side zero jitter (all zeros for deterministic input)
     // No random generation; vectors are already initialized to 0.0f
+    for (size_t i = 0; i < jitter_count; ++i) {
+        h_randU[i] = 0.0f;
+        h_randV[i] = 0.0f;
+    }
 
     // Copy jitter data from host to device
     cudaMemcpy(d_randU, h_randU.data(), jitter_count * sizeof(float), cudaMemcpyHostToDevice);

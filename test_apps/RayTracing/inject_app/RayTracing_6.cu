@@ -6,7 +6,9 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <sstream>
+#include <limits>
+#include <random>
+#include <sstream> // for stringstream in parsing
 #include <string>
 #include <vector>
 

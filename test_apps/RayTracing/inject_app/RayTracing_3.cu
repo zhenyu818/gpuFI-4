@@ -2,9 +2,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cuda_runtime.h>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <random>
+#include <sstream> // for stringstream in parsing
 #include <string>
 #include <vector>
 
@@ -173,6 +175,7 @@ int main(int argc, char **argv) {
 
     const size_t num_pixels = static_cast<size_t>(nx) * static_cast<size_t>(ny);
     const size_t jitter_count = num_pixels * static_cast<size_t>(samples);
+    const size_t total_values = num_pixels * 3; // RGB per pixel: 3 floats each
 
     // Host-side buffers
     std::vector<float> h_randU(jitter_count, 1.0f);
@@ -190,6 +193,10 @@ int main(int argc, char **argv) {
 
     // Host-side one jitter (all ones for deterministic input)
     // No random generation; vectors are already initialized to 1.0f
+    for (size_t i = 0; i < jitter_count; ++i) {
+        h_randU[i] = 0.0f;
+        h_randV[i] = 0.0f;
+    }
 
     // Copy jitter data from host to device
     cudaMemcpy(d_randU, h_randU.data(), jitter_count * sizeof(float), cudaMemcpyHostToDevice);
