@@ -30,22 +30,30 @@ def normalize_result(s: str) -> str:
 
 
 def parse_log(log_path: str):
-    """逐条解析日志"""
+    """逐条解析日志（同时支持“内联 Effects+WRITER/READER”与“分段模式”）"""
+    # 1) 独立的 Effects 起始行（旧格式）
     re_effects_start = re.compile(
         r"^\[Run\s+(\d+)\]\s+Effects from\s+(?:.+/)?(tmp\.out\d+):\s*$"
     )
+    # 2) 内联形式：同一行既有 Effects 前缀也有 Writer/Reader（新格式）
+    re_effects_inline = re.compile(
+        r"^\[Run\s+(\d+)\]\s+Effects from\s+(?:.+/)?(tmp\.out\d+):\s*(.*\S.*)$"
+    )
+    # 3) Writer/Reader 本体
+    #    - 放宽 src 允许连字符；
+    #    - 仍要求形如 "-> <kernel> PC=...(file:line) ..." 的结构（与你现有打印一致）
     re_writer = re.compile(
-        r"^\[(?P<src>[A-Za-z0-9_]+)_FI_WRITER\].*?->\s*(\S+)\s+PC=.*\(([^:()]+):(\d+)\)\s*(.*)$"
+        r"^\[(?P<src>[-A-Za-z0-9_]+)_FI_WRITER\].*?->\s*(\S+)\s+PC=.*\(([^:()]+):(\d+)\)\s*(.*)$"
     )
     re_reader = re.compile(
-        r"^\[(?P<src>[A-Za-z0-9_]+)_FI_READER\].*?->\s*(\S+)\s+PC=.*\(([^:()]+):(\d+)\)\s*(.*)$"
+        r"^\[(?P<src>[-A-Za-z0-9_]+)_FI_READER\].*?->\s*(\S+)\s+PC=.*\(([^:()]+):(\d+)\)\s*(.*)$"
     )
+    # 4) 结果与参数
     re_result = re.compile(r"^\[Run\s+(\d+)\]\s+(tmp\.out\d+):\s*(.*?)\s*$")
-    # [INJ_PARAMS] [Run <id>] tmp.outN key-vals
     re_params = re.compile(r"^\[INJ_PARAMS\]\s+\[Run\s+(\d+)\]\s+(tmp\.out\d+)\s+(.*)$")
 
-    latest_effects_by_pair = {}
-    params_by_pair = {}
+    latest_effects_by_pair = {}   # {(run_id,name): [records...]} 跨段缓存、去重后的最新汇总
+    params_by_pair = {}           # {(run_id,name): "k=v;..."}
     cur_key = None
     cur_writers, cur_readers = [], []
 
@@ -53,7 +61,7 @@ def parse_log(log_path: str):
     effects_occ, results_occ = {}, {}
 
     def _merge_unique(writers, readers):
-        # 合并 WRITER 与 READER，并按 (src,kernel,line,text) 去重
+        """合并 WRITER 与 READER，并按 (src,kernel,line,text) 去重"""
         seen = set()
         merged = []
         for rec in writers + readers:
@@ -64,19 +72,25 @@ def parse_log(log_path: str):
             merged.append(deepcopy(rec))
         if not merged:
             merged = [
-                {
-                    "kernel": "invalid_summary",
-                    "inst_line": -1,
-                    "inst_text": "",
-                    "src": "invalid",
-                }
+                {"kernel": "invalid_summary", "inst_line": -1, "inst_text": "", "src": "invalid"}
             ]
         return merged
 
+    def _merge_records(existing, add):
+        """把 existing 与 add 两份 record 列表合并去重"""
+        if not existing:
+            return _merge_unique(add, [])
+        if not add:
+            return _merge_unique(existing, [])
+        return _merge_unique(existing + add, [])
+
     def flush_current_effects():
+        """把当前累积的 cur_writers/readers 合并到 latest_effects_by_pair[cur_key]（去重/追加）"""
         nonlocal cur_key, cur_writers, cur_readers
         if cur_key is not None:
-            latest_effects_by_pair[cur_key] = _merge_unique(cur_writers, cur_readers)
+            new_pack = _merge_unique(cur_writers, cur_readers)
+            existed = latest_effects_by_pair.get(cur_key, [])
+            latest_effects_by_pair[cur_key] = _merge_records(existed, new_pack)
             cur_key = None
             cur_writers, cur_readers = [], []
 
@@ -85,8 +99,53 @@ def parse_log(log_path: str):
             for raw in f:
                 line = raw.rstrip("\n")
 
+                # ---- (A) 先匹配“内联 Effects + Writer/Reader”的新格式 ----
+                m = re_effects_inline.match(line)
+                if m:
+                    run_id = int(m.group(1))
+                    name = m.group(2)
+                    rest = m.group(3).strip()
+                    new_key = (run_id, name)
+
+                    # 如果切换到新 key，先把上一个 key 的累积刷进缓存
+                    if cur_key != new_key:
+                        flush_current_effects()
+                        cur_key = new_key
+                        cur_writers, cur_readers = [], []
+
+                    # 尝试把“余下部分”作为 WRITER / READER 解析
+                    mw = re_writer.match(rest)
+                    if mw:
+                        cur_writers.append(
+                            {
+                                "kernel": mw.group(2),
+                                "inst_line": int(mw.group(4)),
+                                "inst_text": mw.group(5).strip(),
+                                "src": mw.group("src"),
+                            }
+                        )
+                        # 不立即 flush，允许同一 (run_id,name) 的多条内联继续累积
+                        continue
+                    mr = re_reader.match(rest)
+                    if mr:
+                        cur_readers.append(
+                            {
+                                "kernel": mr.group(2),
+                                "inst_line": int(mr.group(4)),
+                                "inst_text": mr.group(5).strip(),
+                                "src": mr.group("src"),
+                            }
+                        )
+                        continue
+
+                    # 如果 rest 不是 WRITER/READER，本行只是“起始+附带说明”，当作普通起始
+                    # 此时不 flush，保持 cur_key，以便随后行继续累积
+                    continue
+
+                # ---- (B) 其次匹配旧格式的“独立 Effects 起始行” ----
                 m = re_effects_start.match(line)
                 if m:
+                    # 每遇到新的 Effects 起始，先把上一个 key 的累积刷进缓存
                     flush_current_effects()
                     run_id = int(m.group(1))
                     name = m.group(2)
@@ -94,10 +153,10 @@ def parse_log(log_path: str):
                     cur_writers, cur_readers = [], []
                     continue
 
+                # ---- (C) 在已有 cur_key 的上下文中累积 WRITER/READER（旧格式）----
                 if cur_key is not None:
                     m = re_writer.match(line)
                     if m:
-                        # 支持一次注入打印多个 FI_WRITER：累积
                         cur_writers.append(
                             {
                                 "kernel": m.group(2),
@@ -109,7 +168,6 @@ def parse_log(log_path: str):
                         continue
                     m = re_reader.match(line)
                     if m:
-                        # 累积所有 FI_READER（与 FI_WRITER 并存）
                         cur_readers.append(
                             {
                                 "kernel": m.group(2),
@@ -120,6 +178,7 @@ def parse_log(log_path: str):
                         )
                         continue
 
+                # ---- (D) INJ_PARAMS ----
                 m = re_params.match(line)
                 if m:
                     run_id = int(m.group(1))
@@ -127,6 +186,7 @@ def parse_log(log_path: str):
                     params_by_pair[(run_id, name)] = m.group(3).strip()
                     continue
 
+                # ---- (E) 结果行：把结果与“该 pair 的全部已知 writer/reader”绑定 ----
                 m = re_result.match(line)
                 if m:
                     run_id = int(m.group(1))
@@ -134,23 +194,23 @@ def parse_log(log_path: str):
                     res = normalize_result(m.group(3))
                     pair = (run_id, name)
 
+                    # 记录同一 pair 出现的第 idx 次结果
                     occ_counter[pair] += 1
                     idx = occ_counter[pair]
                     inj_key = (run_id, name, idx)
 
+                    # 若当前正处于该 pair 的上下文，把“当前累积 + 历史缓存”一并合并
                     if cur_key == pair:
-                        recs = _merge_unique(cur_writers, cur_readers)
+                        current_pack = _merge_unique(cur_writers, cur_readers)
+                        existed = latest_effects_by_pair.get(pair, [])
+                        recs = _merge_records(existed, current_pack)
                         latest_effects_by_pair[pair] = deepcopy(recs)
                     else:
+                        # 否则退回到我们已缓存的该 pair 的最新合并结果
                         recs = latest_effects_by_pair.get(
                             pair,
                             [
-                                {
-                                    "kernel": "invalid_summary",
-                                    "inst_line": -1,
-                                    "inst_text": "",
-                                    "src": "invalid",
-                                }
+                                {"kernel": "invalid_summary", "inst_line": -1, "inst_text": "", "src": "invalid"}
                             ],
                         )
 
@@ -158,6 +218,7 @@ def parse_log(log_path: str):
                     results_occ[inj_key] = res
                     continue
 
+        # 文件结束：把最后一个上下文刷入缓存
         flush_current_effects()
 
     except FileNotFoundError:
@@ -165,6 +226,7 @@ def parse_log(log_path: str):
         sys.exit(1)
 
     return effects_occ, results_occ, params_by_pair
+
 
 
 def reduce_combo(combo: str) -> str:
@@ -207,7 +269,10 @@ def _ensure_unique_path(dest_dir: str, base_name: str) -> str:
 
 def _collect_invalid_sdc_outputs(effects_occ, results_occ, params_by_pair, app, test, components, bitflip):
     """
-    对“invalid 且结果为 SDC”的新注入：复制 tmp.out，并追加记录到 error_classification/error_list.txt
+    对“invalid 且结果为 SDC”的新注入：
+      - 复制 tmp.outN 到 error_classification/
+      - 同时复制 inst_exec.log 并重命名为 inst_exec_{app}_{test}_{components}_{bitflip}_r{run_id}_{name}.log
+      - 记录到 error_classification/error_list.txt
     """
     base_dir = os.path.dirname(os.path.abspath(__file__))
     err_dir = os.path.join(base_dir, "error_classification")
@@ -255,12 +320,24 @@ def _collect_invalid_sdc_outputs(effects_occ, results_occ, params_by_pair, app, 
         except Exception:
             dest_path = "COPY_FAILED"
 
+        # === 新增：复制 inst_exec.log 并重命名 ===
+        inst_log_src = os.path.join(base_dir, "inst_exec.log")
+        inst_log_dest_name = f"inst_exec_{app}_{test}_{components}_{bitflip}_r{run_id}_{name}.log"
+        inst_log_dest_path = os.path.join(err_dir, inst_log_dest_name)
+        try:
+            if os.path.exists(inst_log_src):
+                shutil.copyfile(inst_log_src, inst_log_dest_path)
+        except Exception as e:
+            print(f"WARN: failed to copy inst_exec.log for invalid-SDC: {e}")
+            inst_log_dest_path = "COPY_FAILED"
+
         combo_full = params_by_pair.get((run_id, name), "") or ""
         combo_reduced = reduce_combo(combo_full) if combo_full else ""
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         info_line = (
             f"time={ts}\tapp={app}\ttest={test}\tcomponent={components}\tbitflip={bitflip}\t"
             f"run={run_id}\ttmp={name}\tresult=SDC\tsrc_path={src_path}\tsaved_path={dest_path}\t"
+            f"inst_exec_saved={inst_log_dest_path}\t"
             f"params={combo_full}\treduced_params={combo_reduced}"
         )
         lines_to_append.append(info_line)
@@ -271,6 +348,7 @@ def _collect_invalid_sdc_outputs(effects_occ, results_occ, params_by_pair, app, 
                 f.write(line + "\n")
         print(f"Captured {appended} invalid-SDC outputs to {err_dir} and logged {len(lines_to_append)} entries.")
     return appended, len(lines_to_append)
+
 
 
 def write_csv(app: str, test: str, components: str, bitflip: str, effects_occ, results_occ, params_by_pair):

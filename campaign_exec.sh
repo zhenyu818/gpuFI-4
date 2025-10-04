@@ -9,7 +9,7 @@ CACHE_LOGS_DIR=./cache_logs
 TMP_FILE=tmp.out
 # persistent list of invalid parameter combinations to skip
 INVALID_COMBOS_FILE=./invalid_param_combos.txt
-RUNS=10
+RUNS=100
 COMPONENT_SET="0"
 BATCH=$(( $(grep -c ^processor /proc/cpuinfo) - 1 )) # -1 core for computer not to hang
 DELETE_LOGS=0 # if 1 then all logs will be deleted at the end of the script
@@ -33,9 +33,9 @@ L2_SIZE_BITS=24576057 # (nsets=64, line_size=128 bytes + 57 bits, assoc=16) x 24
 # ---------------------------------------------- END PER GPGPU CARD PARAMETERS ------------------------------------------------
 
 # ---------------------------------------------- START PER KERNEL/APPLICATION PARAMETERS (+profile=1) ----------------------------------------------
-CUDA_UUT="./Dijkstra 2 2"
+CUDA_UUT="./Dijkstra 112 56"
 # total cycles for all kernels
-CYCLES=2689
+CYCLES=34374
 # Get the exact cycles, max registers and SIMT cores used for each kernel with profile=1 
 # fix cycles.txt with kernel execution cycles
 # (e.g. seq 1 10 >> cycles.txt, or multiple seq commands if a kernel has multiple executions)
@@ -46,7 +46,7 @@ MAX_REGISTERS_USED=18
 SHADER_USED="0"
 SUCCESS_MSG='Fault Injection Test Success!'
 FAILED_MSG='Fault Injection Test Failed!'
-TIMEOUT_VAL=13s
+TIMEOUT_VAL=28s
 DATATYPE_SIZE=32
 # lmem and smem values are taken from gpgpu-sim ptx output per kernel
 # e.g. GPGPU-Sim PTX: Kernel '_Z9vectorAddPKdS0_Pdi' : regs=8, lmem=0, smem=0, cmem=380
@@ -212,9 +212,10 @@ gather_results() {
         grep -iq "${SUCCESS_MSG}" $file; success_msg_grep=$(echo $?)
 	grep -i "${CYCLES_MSG}" $file | tail -1 | grep -q "${CYCLES}"; cycles_grep=$(echo $?)
         grep -iq "${FAILED_MSG}" $file; failed_msg_grep=$(echo $?)
-        if grep -qE "FI_INJECT|FI_WRITER|FI_READER" "$file"; then
-            echo "[Run ${1}] Effects from ${file}:"
-            grep -hE "FI_INJECT|FI_WRITER|FI_READER" "$file"
+        if grep -qE "FI_WRITER|FI_READER" "$file"; then
+            grep -hE "FI_WRITER|FI_READER" "$file" | while IFS= read -r line; do
+            echo "[Run ${1}] Effects from ${file}: $line"
+            done
         fi
         result=${success_msg_grep}${cycles_grep}${failed_msg_grep}
         
