@@ -1,10 +1,10 @@
 #!/bin/bash
 
-TEST_APP_NAME="Dijkstra"
+TEST_APP_NAME="Attention"
 COMPONENT_SET="0"
 INJECT_BIT_FLIP_COUNT=1 # number of bits to flip per injection (e.g. 2 means flip 2 bits per injection)
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
-RUN_PER_EPOCH=100
+RUN_PER_EPOCH=5
 EPOCH=1
 
 
@@ -370,16 +370,16 @@ main() {
 
     # Ensure destination directory for classification artifacts exists
     error_classification_dir="error_classification"
-    if [[ -d "$error_classification_dir" ]]; then
-        rm -rf "$error_classification_dir"
-    fi
-    mkdir -p error_classification
+    # if [[ -d "$error_classification_dir" ]]; then
+    #     rm -rf "$error_classification_dir"
+    # fi
+    # mkdir -p error_classification
 
     inconsistent_dir="inconsistent_with_gpu"
-    if [[ -d "$inconsistent_dir" ]]; then
-        rm -rf "$inconsistent_dir"
-    fi
-    mkdir -p "$inconsistent_dir"
+    # if [[ -d "$inconsistent_dir" ]]; then
+    #     rm -rf "$inconsistent_dir"
+    # fi
+    # mkdir -p "$inconsistent_dir"
 
     if [[ $DO_BUILD -eq 1 ]]; then
         echo "=== Start compiling ==="
@@ -728,9 +728,21 @@ main() {
     rm -f result.txt
 
 }
-
-echo "=== Running main with COMPONENT_SET=${COMPONENT_SET} ==="
-echo "=== Component mapping: 0=RF, 1=local_mem, 2=shared_mem, 3=L1D_cache, 4=L1C_cache, 5=L1T_cache, 6=L2_cache ==="
-echo "=== Test application: ${TEST_APP_NAME} ==="
-echo "=== Injection bit flip count: ${INJECT_BIT_FLIP_COUNT} ==="
-main "$@"
+# echo "=== Running main with COMPONENT_SET=${COMPONENT_SET} ==="
+# echo "=== Component mapping: 0=RF, 1=local_mem, 2=shared_mem, 3=L1D_cache, 4=L1C_cache, 5=L1T_cache, 6=L2_cache ==="
+# echo "=== Test application: ${TEST_APP_NAME} ==="
+# echo "=== Injection bit flip count: ${INJECT_BIT_FLIP_COUNT} ==="
+# main "$@"
+# 遍历 test_apps 目录下所有文件夹，依次作为 TEST_APP_NAME 调用 main
+if [[ -d "test_apps" ]]; then
+    for app_dir in test_apps/*; do
+        if [[ -d "$app_dir" ]]; then
+            TEST_APP_NAME=$(basename "$app_dir")
+            echo "=== Running main for TEST_APP_NAME=${TEST_APP_NAME} ==="
+            main "$@"
+        fi
+    done
+else
+    echo "Error: test_apps directory not found."
+    exit 1
+fi

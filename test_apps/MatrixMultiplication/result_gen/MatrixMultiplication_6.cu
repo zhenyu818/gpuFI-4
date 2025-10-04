@@ -123,6 +123,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
             printf("%.15lf ", h_C[row * dimsC.x + col]);
         }
     }
+    printf("\n");
     checkCudaErrors(cudaFreeHost(h_A));
     checkCudaErrors(cudaFreeHost(h_B));
     checkCudaErrors(cudaFreeHost(h_C));

@@ -152,6 +152,7 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < d; i++)
         printf("%.3f ", __half2float(dout[i]));
+    printf("\n");
     free(key);
     free(value);
     free(query);

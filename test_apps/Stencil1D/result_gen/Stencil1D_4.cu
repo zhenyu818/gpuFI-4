@@ -122,6 +122,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < length; i++) {
         printf("%d ", b[i]);
     }
+    printf("\n");
     free(a);
     free(b);
     cudaFree(d_a);

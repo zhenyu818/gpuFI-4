@@ -125,6 +125,7 @@ int MatrixMultiply(const dim3 &dimsA, const dim3 &dimsB) {
             printf("%.15lf ", h_C[row * dimsC.x + col]);
         }
     }
+    printf("\n");
     checkCudaErrors(cudaFreeHost(h_A));
     checkCudaErrors(cudaFreeHost(h_B));
     checkCudaErrors(cudaFreeHost(h_C));

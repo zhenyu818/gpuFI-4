@@ -95,6 +95,7 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < src_size; i++) {
         printf("%.6f ", output[i]);
     }
+    printf("\n");
 
     cudaFree(d_output);
     cudaFree(d_bias);

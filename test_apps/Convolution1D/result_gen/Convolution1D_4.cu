@@ -52,6 +52,7 @@ void reference(const T *h_in, const T *d_out, const T *mask, const int input_wid
     for (int i = 0; i < input_width; i++) {
         printf("%d ", d_out[i]);
     }
+    printf("\n");
 }
 
 /**

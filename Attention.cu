@@ -1,4 +1,3 @@
-#include <cfloat> // for FLT_MIN
 #include <chrono>
 #include <cuda.h>
 #include <cuda_fp16.h>
@@ -6,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define M_SEED 5311
+#define M_SEED 1463
 #define BLOCK_SIZE 256
 
 // kernel1: dot product
@@ -109,14 +108,9 @@ __half *attention_device(const __half *key, const __half *value, const __half *q
     return output;
 }
 
-// ================= 输入生成函数（生成非正规数） ==================
-float generate_subnormal_float() {
-    // 生成比 FLT_MIN 更小的正数
-    float tiny = (float)(rand() % 100 + 1) * FLT_MIN / 1e5f;
-    // 随机正负号
-    if (rand() % 2 == 0)
-        tiny = -tiny;
-    return tiny;
+float random_float(float min, float max) {
+    float scale = rand() / (float)RAND_MAX; // [0, 1]
+    return min + scale * (max - min);       // [min, max]
 }
 
 int main(int argc, char *argv[]) {
@@ -135,19 +129,88 @@ int main(int argc, char *argv[]) {
 
     srand(M_SEED);
     for (int i = 0; i < n * d; i++) {
-        key[i] = __float2half(generate_subnormal_float());
-        value[i] = __float2half(generate_subnormal_float());
+        key[i] = __float2half(random_float(-1.0f, 1.0f));
+        value[i] = __float2half(random_float(-1.0f, 1.0f));
     }
 
     for (int i = 0; i < d; i++) {
-        query[i] = __float2half(generate_subnormal_float());
+        query[i] = __float2half(random_float(-2.0f, 2.0f));
     }
 
     __half *dout = attention_device(key, value, query, n, d, r);
 
-    for (int i = 0; i < d; i++)
-        printf("%.3f ", __half2float(dout[i]));
-    printf("\n");
+    // ===== 从 result.txt 读取期望结果 =====
+    FILE *file = fopen("result.txt", "r");
+    if (file == NULL) {
+        printf("Fault Injection Test Failed!\n");
+
+        free(key);
+        free(value);
+        free(query);
+        free(dout);
+        return 0;
+    }
+
+    float *expected = (float *)malloc(sizeof(float) * d);
+    int count = 0;
+    while (fscanf(file, "%f", &expected[count]) == 1 && count < d) {
+        count++;
+    }
+    fclose(file);
+
+    if (count != d) {
+        printf("Fault Injection Test Failed!\n");
+        free(expected);
+
+        free(key);
+        free(value);
+        free(query);
+        free(dout);
+        return 0;
+    }
+
+    // ===== 逐项比较结果，显式支持 NaN 和 Inf =====
+    bool match = true;
+    const float eps = 1e-2f;
+    for (int i = 0; i < d; i++) {
+        float actual = __half2float(dout[i]);
+        float expected_val = expected[i];
+
+        if (isnan(actual) && isnan(expected_val)) {
+            continue; // 两个都是 NaN
+        }
+        if (isnan(actual) || isnan(expected_val)) {
+            match = false;
+            break;
+        }
+
+        if (isinf(actual) && isinf(expected_val)) {
+            if (signbit(actual) != signbit(expected_val)) {
+                match = false; // +Inf vs -Inf
+                break;
+            } else {
+                continue; // 同号 Inf
+            }
+        }
+        if (isinf(actual) || isinf(expected_val)) {
+            match = false; // 一个 Inf，一个不是
+            break;
+        }
+
+        if (fabs(actual - expected_val) > eps) {
+            match = false;
+            break;
+        }
+    }
+
+    if (match) {
+        printf("Fault Injection Test Success!\n");
+    } else {
+        printf("Fault Injection Test Failed!\n");
+    }
+
+    free(expected);
+
     free(key);
     free(value);
     free(query);
