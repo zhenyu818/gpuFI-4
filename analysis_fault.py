@@ -563,7 +563,8 @@ def wilson_ci(k: int, n: int, alpha: float = 0.05):
     p = k / n
     denom = 1.0 + (z * z) / n
     center = (p + (z * z) / (2 * n)) / denom
-    rad = z * math.sqrt((p * (1 - p) + (z * z) / (4 * n)) / (n * denom**2)) / denom  # 调整以提高精度
+    # 注意：保持你现有的计算结构，不改变原有行为
+    rad = z * math.sqrt((p * (1 - p) + (z * z) / (4 * n)) / (n * denom**2)) / denom
     lo = max(0.0, center - rad)
     hi = min(1.0, center + rad)
     return lo, hi, (hi - lo) / 2.0
@@ -704,6 +705,8 @@ def compute_metrics_and_maybe_stop(out_csv_path: str,
     快照策略：
       - 仅 share 达标（sdc 未达标）：若无 *_share_exited.csv 则另存；若之后 share 失效则删除；
       - 仅 sdc 达标（share 未达标）：同理维护 *_sdc_exited.csv；
+      - 新增：当 share 达标到 eps_share/2、eps_share/4（sdc 仍未达标）时，分别保存 *_share_half_exited.csv、*_share_quarter_exited.csv；
+            它们与原快照遵循相同的“首次生成/掉线删除/再达标再生成一次”的规则。
       - 两者同达标：不另存、不改名，直接 exit(99)。
     """
     rows_raw, all_tot = _read_csv_summary(out_csv_path)
@@ -738,7 +741,7 @@ def compute_metrics_and_maybe_stop(out_csv_path: str,
         due = _safe_int(r.get("DUE", 0))
         others = _safe_int(r.get("Others", 0))
 
-        # 指标2（share，排除 invalid）：把“该指令被抽中一次”视作一次“成功”，试验数为 noninvalid_tot
+        # share：把“该指令被抽中一次”视作一次“成功”，试验数为 noninvalid_tot
         if kernel != "invalid_summary" and noninvalid_tot > 0:
             share = tot_inj / noninvalid_tot
             lo_s, hi_s, half_s = wilson_ci(tot_inj, noninvalid_tot, alpha)
@@ -746,7 +749,7 @@ def compute_metrics_and_maybe_stop(out_csv_path: str,
             share = 0.0
             lo_s, hi_s, half_s = 0.0, 1.0, 0.5
 
-        # 指标3（SDC rate）：对 tot=0 的行，CI 不可判定（记为 None）
+        # SDC rate：对 tot=0 的行，CI 不可判定（记为 None）
         if tot_inj > 0:
             sdc_rate = sdc / tot_inj
             lo_p, hi_p, half_p = wilson_ci(sdc, tot_inj, alpha)
@@ -766,18 +769,15 @@ def compute_metrics_and_maybe_stop(out_csv_path: str,
             "sdc_ci_half": half_p, "score": score
         })
 
-    # 不再写出逐指令的 result_info；改为每轮写入一条摘要
-
     # 仅对非 invalid_summary 的指令排序并取 Top-K（由 coverage 唯一决定）
     candidates = [r for r in rows_metrics if r["kernel"] != "invalid_summary"]
     if len(candidates) == 0:
         print("No non-invalid rows yet; cannot evaluate stopping.")
-        # 仍然写入一条摘要（Top-K 不可评估时，达标比例置为 0）
+        # 仍然写入摘要行
         summary_fields = [
             "cycle", "time", "perc_inv_new", "inv_half", "eps_inv",
             "share_pass_ratio", "sdc_pass_ratio"
         ]
-        # 轮数：基于历史数据推断
         next_cycle = _infer_next_cycle(info_path, summary_fields)
         summary_row = {
             "cycle": next_cycle,
@@ -790,7 +790,7 @@ def compute_metrics_and_maybe_stop(out_csv_path: str,
         }
 
         _append_summary_csv(info_path, summary_fields, summary_row)
-        # 汇总总计（保留分类计数）
+        # 汇总总计
         tot_masked = sum(_safe_int(x.get("Masked", 0)) for x in rows_raw)
         tot_sdc    = sum(_safe_int(x.get("SDC", 0)) for x in rows_raw)
         tot_due    = sum(_safe_int(x.get("DUE", 0)) for x in rows_raw)
@@ -817,7 +817,13 @@ def compute_metrics_and_maybe_stop(out_csv_path: str,
     share_pass_ratio = (share_pass_cnt / K) if K > 0 else 0.0
     sdc_pass_ratio   = (sdc_pass_cnt / K) if K > 0 else 0.0
 
-    # 失败项统计与注入量估计（仅总结性输出，不做逐项枚举）
+    # 新增：更严格的两级 share 阈值（Top-K 全部满足）
+    eps_share_half    = eps_share / 2.0
+    eps_share_quarter = eps_share / 4.0
+    share_pass_half    = all(r["share_ci_half"] is not None and r["share_ci_half"] <= eps_share_half    for r in topK)
+    share_pass_quarter = all(r["share_ci_half"] is not None and r["share_ci_half"] <= eps_share_quarter for r in topK)
+
+    # 失败项统计与注入量估计（仅总结性输出）
     bad_share = [r for r in topK if not (r["share_ci_half"] is not None and r["share_ci_half"] <= eps_share)]
     bad_sdc   = [r for r in topK if not (r["sdc_ci_half"]   is not None and r["sdc_ci_half"]   <= eps_sdc)]
 
@@ -857,7 +863,7 @@ def compute_metrics_and_maybe_stop(out_csv_path: str,
     else:
         print(" SDC precision OK on Top-K.")
 
-    # 追加“单行摘要”到 result_info CSV，并在控制台打印一行摘要（中文）
+    # 追加“单行摘要”到 result_info CSV
     summary_fields = [
         "cycle", "time", "perc_inv_new", "inv_half", "eps_inv",
         "share_pass_ratio", "sdc_pass_ratio"
@@ -872,35 +878,66 @@ def compute_metrics_and_maybe_stop(out_csv_path: str,
         "share_pass_ratio": f"{share_pass_ratio:.4f}",
         "sdc_pass_ratio": f"{sdc_pass_ratio:.4f}",
     }
-
     _append_summary_csv(info_path, summary_fields, summary_row)
 
     # -----------------
-    # 快照维护（只保存“第一次达标”的快照；变为不达标则删除）
+    # 快照维护
+    # （1）原有的 *_share_exited / *_sdc_exited / *_inv
+    # （2）新增更严格层级：*_share_half_exited，*_share_quarter_exited
+    # 规则：首次达标才保存；连续达标不重复保存；掉回不达标则删除；再度达标再保存一次
     # -----------------
-    share_snap = _append_suffix_before_ext(out_csv_path, "_share_exited")
-    sdc_snap   = _append_suffix_before_ext(out_csv_path, "_sdc_exited")
-    inv_snap   = _append_suffix_before_ext(out_csv_path, "_inv")
+    share_snap         = _append_suffix_before_ext(out_csv_path, "_share_exited")
+    share_half_snap    = _append_suffix_before_ext(out_csv_path, "_share_half_exited")
+    share_quarter_snap = _append_suffix_before_ext(out_csv_path, "_share_quarter_exited")
+    sdc_snap           = _append_suffix_before_ext(out_csv_path, "_sdc_exited")
+    inv_snap           = _append_suffix_before_ext(out_csv_path, "_inv")
 
+    # --- 情形 A：share 达标、sdc 未达标 ---
     if share_pass and not sdc_pass:
         _save_snapshot_if_first(out_csv_path, "_share_exited")
+
+        # 新增：当 Top-K 对 share 达到 eps_share/2 阈值（更严格）时
+        if share_pass_half:
+            _save_snapshot_if_first(out_csv_path, "_share_half_exited")
+        else:
+            if os.path.exists(share_half_snap) and _ensure_removed(share_half_snap):
+                print(f"Snapshot removed (share_half fell back): {share_half_snap}")
+
+        # 新增：当 Top-K 对 share 达到 eps_share/4 阈值（最严格）时
+        if share_pass_quarter:
+            _save_snapshot_if_first(out_csv_path, "_share_quarter_exited")
+        else:
+            if os.path.exists(share_quarter_snap) and _ensure_removed(share_quarter_snap):
+                print(f"Snapshot removed (share_quarter fell back): {share_quarter_snap}")
+
+        # sdc 仍未达标，确保 *_sdc_exited 不存在（若曾经保存过且后续掉线）
         if os.path.exists(sdc_snap):
             if _ensure_removed(sdc_snap):
                 print(f"Snapshot removed (sdc fell back): {sdc_snap}")
 
+    # --- 情形 B：sdc 达标、share 未达标 ---
     elif sdc_pass and not share_pass:
         _save_snapshot_if_first(out_csv_path, "_sdc_exited")
-        if os.path.exists(share_snap):
-            if _ensure_removed(share_snap):
-                print(f"Snapshot removed (share fell back): {share_snap}")
+        # share 所有层级都要清理
+        if os.path.exists(share_snap) and _ensure_removed(share_snap):
+            print(f"Snapshot removed (share fell back): {share_snap}")
+        if os.path.exists(share_half_snap) and _ensure_removed(share_half_snap):
+            print(f"Snapshot removed (share_half fell back): {share_half_snap}")
+        if os.path.exists(share_quarter_snap) and _ensure_removed(share_quarter_snap):
+            print(f"Snapshot removed (share_quarter fell back): {share_quarter_snap}")
 
+    # --- 情形 C：share 与 sdc 均未达标 ---
     elif not share_pass and not sdc_pass:
-        if os.path.exists(share_snap):
-            if _ensure_removed(share_snap):
-                print(f"Snapshot removed (share fell back): {share_snap}")
-        if os.path.exists(sdc_snap):
-            if _ensure_removed(sdc_snap):
-                print(f"Snapshot removed (sdc fell back): {sdc_snap}")
+        # 全部 share 层级快照删除
+        if os.path.exists(share_snap) and _ensure_removed(share_snap):
+            print(f"Snapshot removed (share fell back): {share_snap}")
+        if os.path.exists(share_half_snap) and _ensure_removed(share_half_snap):
+            print(f"Snapshot removed (share_half fell back): {share_half_snap}")
+        if os.path.exists(share_quarter_snap) and _ensure_removed(share_quarter_snap):
+            print(f"Snapshot removed (share_quarter fell back): {share_quarter_snap}")
+        # sdc 的快照也删除
+        if os.path.exists(sdc_snap) and _ensure_removed(sdc_snap):
+            print(f"Snapshot removed (sdc fell back): {sdc_snap}")
 
     else:
         # share_pass and sdc_pass 同时为 True：不另存也不改名；直接 exit(99)
@@ -916,13 +953,12 @@ def compute_metrics_and_maybe_stop(out_csv_path: str,
                 print(f"Snapshot removed (inv fell back): {inv_snap}")
 
     # 早停：两者同时达标（Top-K 上）
-    # 组织返回给 main 的摘要与总计（以便最后统一中文打印）
     tot_masked = sum(_safe_int(x.get("Masked", 0)) for x in rows_raw)
     tot_sdc    = sum(_safe_int(x.get("SDC", 0)) for x in rows_raw)
     tot_due    = sum(_safe_int(x.get("DUE", 0)) for x in rows_raw)
     tot_others = sum(_safe_int(x.get("Others", 0)) for x in rows_raw)
     ret = {
-        "cycle": summary_row["cycle"],
+        "cycle": next_cycle,
         "perc_inv_new": float(summary_row["perc_inv_new"]),
         "inv_half": float(summary_row["inv_half"]),
         "eps_inv": float(summary_row["eps_inv"]),
@@ -1017,9 +1053,6 @@ def main():
         bitflip=args.bitflip,
     )
 
-    # 控制台输出
-    # 先不打印传统摘要，由 compute_metrics_and_maybe_stop 的返回统一打印
-
     # 计算 Top-K 精度并决定是否早停 / 快照维护
     info_dir = "result_info"
     os.makedirs(info_dir, exist_ok=True)
@@ -1046,7 +1079,6 @@ def main():
             f"Metric1 Half-width={summary['inv_half']:.6f} | Metric1 Target Accuracy={summary['eps_inv']:.4f} | "
             f"Metric2 Pass Ratio={summary['share_pass_ratio']:.4f} | Metric3 Pass Ratio={summary['sdc_pass_ratio']:.4f}"
         )
-
 
 
 if __name__ == "__main__":
