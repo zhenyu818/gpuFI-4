@@ -543,8 +543,27 @@ def _read_csv_summary(path):
 
 
 # -----------------------------
-# 统计学与结果落盘（Wilson CI + 快照）
+# 新判据（coverage×384）与快照（9604）
 # -----------------------------
+
+def _read_csv_summary(path):
+    """
+    读取 CSV，返回：
+      - rows_raw: 列表[dict]，按行原样（含 kernel/inst_text/tot_inj 等）
+      - all_tot: 全部行 tot_inj 之和（含 invalid）
+    """
+    rows_raw = []
+    all_tot = 0
+    with open(path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows_raw.append(row)
+            try:
+                all_tot += int(row.get("tot_inj", "0"))
+            except ValueError:
+                pass
+    return rows_raw, all_tot
+
 
 def _safe_int(x, default=0):
     try:
@@ -552,130 +571,13 @@ def _safe_int(x, default=0):
     except Exception:
         return default
 
-
-def wilson_ci(k: int, n: int, alpha: float = 0.05):
-    """
-    Wilson 得分区间（双侧），返回 (lower, upper, half_width)
-    """
-    if n <= 0 or k < 0 or k > n:
-        return 0.0, 1.0, 0.5
-    z = norm.ppf(1 - alpha / 2.0)
-    p = k / n
-    denom = 1.0 + (z * z) / n
-    center = (p + (z * z) / (2 * n)) / denom
-    # 注意：保持你现有的计算结构，不改变原有行为
-    rad = z * math.sqrt((p * (1 - p) + (z * z) / (4 * n)) / (n * denom**2)) / denom
-    lo = max(0.0, center - rad)
-    hi = min(1.0, center + rad)
-    return lo, hi, (hi - lo) / 2.0
-
-
-def _append_summary_csv(info_path: str, header_fields, row_dict: dict):
-    """
-    将“本轮摘要变量”以单行形式追加到 result_info 对应的 CSV 中：
-      - 若文件不存在：写入表头后再写入一行；
-      - 若已存在：直接追加一行；若旧文件是旧格式（逐指令详情），则直接在其后追加（必要时附加一次新的表头）。
-    """
-    os.makedirs(os.path.dirname(info_path), exist_ok=True)
-
-    write_header = False
-    need_section_header = False
-    if not os.path.exists(info_path) or os.path.getsize(info_path) == 0:
-        write_header = True
-    else:
-        # 粗略检查首行是否为本摘要格式表头；若不是，则在末尾先写入一次新的表头
-        try:
-            with open(info_path, "r", encoding="utf-8", errors="ignore") as f:
-                first_line = f.readline().strip()
-            expected_first = ",".join(header_fields)
-            if first_line != expected_first:
-                need_section_header = True
-        except Exception:
-            # 无法读取则退化为写表头
-            need_section_header = True
-
-    mode = "a" if os.path.exists(info_path) else "w"
-    with open(info_path, mode, newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=header_fields)
-        if write_header or need_section_header:
-            w.writeheader()
-        w.writerow(row_dict)
-
-
-def _infer_next_cycle(info_path: str, header_fields):
-    """
-    基于 result_info 历史内容推断下一轮轮数：
-      - 若文件不存在：返回 1；
-      - 若存在，找到最后一次与当前表头完全相同的表头行，统计其后的数据行数 n，返回 n+1；
-      - 若未找到匹配表头：返回 1。
-    """
-    try:
-        if not os.path.exists(info_path) or os.path.getsize(info_path) == 0:
-            return 1
-        header_line = ",".join(header_fields)
-        with open(info_path, "r", encoding="utf-8", errors="ignore") as f:
-            lines = [ln.rstrip("\n") for ln in f]
-        # 找到最后一个匹配的表头位置
-        last_idx = -1
-        for i, ln in enumerate(lines):
-            if ln.strip() == header_line:
-                last_idx = i
-        if last_idx >= 0:
-            # 统计其后非空且不等于表头的行数
-            count = 0
-            for ln in lines[last_idx + 1 : ]:
-                if not ln.strip():
-                    continue
-                if ln.strip() == header_line:
-                    # 不应出现，但防御
-                    count = 0
-                    continue
-                count += 1
-            return count + 1 if count >= 0 else 1
-        # 回退策略：统计所有疑似数据行（排除以 time 开头的表头与空行）
-        count_all = 0
-        for ln in lines:
-            s = ln.strip()
-            if not s:
-                continue
-            # 忽略可能的旧表头
-            if s.startswith("time,"):
-                continue
-            count_all += 1
-        return count_all + 1 if count_all >= 0 else 1
-    except Exception:
-        return 1
-
-
-def _estimate_required_n_for_halfwidth(p_tilde, z, eps):
-    """
-    近似所需样本量：n ≈ z^2 * p~ * (1-p~) / eps^2
-    p~ 用 Wilson/Agresti–Coull 的中心值以稳健化 0/1 边界。
-    """
-    p_tilde = min(max(p_tilde, 1e-12), 1 - 1e-12)
-    return math.ceil((z * z) * p_tilde * (1.0 - p_tilde) / (eps * eps))
-
-
-def _append_suffix_before_ext(path: str, suffix: str) -> str:
-    base, ext = os.path.splitext(path)
-    return f"{base}{suffix}{ext}"
-
-
-def _ensure_removed(path: str) -> bool:
-    try:
-        if os.path.exists(path):
-            os.remove(path)
-            return True
-    except Exception as e:
-        print(f"WARN: failed to remove {path}: {e}")
-    return False
-
-
-def _save_snapshot_if_first(out_csv_path: str, suffix: str):
+def _save_snapshot_if_first(out_csv_path: str, suffix: str = "_snapshot"):
     """
     仅当快照不存在时另存一次；存在时不覆盖。
+    返回快照路径。
     """
-    snap = _append_suffix_before_ext(out_csv_path, suffix)
+    base, ext = os.path.splitext(out_csv_path)
+    snap = f"{base}{suffix}{ext}"
     if not os.path.exists(snap):
         try:
             shutil.copyfile(out_csv_path, snap)
@@ -687,292 +589,119 @@ def _save_snapshot_if_first(out_csv_path: str, suffix: str):
     return snap
 
 
-def compute_metrics_and_maybe_stop(out_csv_path: str,
-                                   alpha: float,
-                                   eps_share: float,
-                                   eps_inv: float,
-                                   eps_sdc: float,
-                                   coverage: float,
-                                   info_path: str,
-                                   perc_inv_new: float,
-                                   batch_injections: int = 0):
+
+def _save_noninvalid_sum_snapshot(out_csv_path: str, noninv_sum: int, threshold: int = 9604):
     """
-    覆盖率驱动的 Top-K 判据：
-      - 排除 invalid_summary；
-      - score = share * sdc_rate；
-      - K = ceil(coverage * 非invalid数量)；
-      - 若 Top-K 中每条都满足：share_half <= eps_share 且 sdc_half <= eps_sdc，则 exit(99)。
-    快照策略：
-      - 仅 share 达标（sdc 未达标）：若无 *_share_exited.csv 则另存；若之后 share 失效则删除；
-      - 仅 sdc 达标（share 未达标）：同理维护 *_sdc_exited.csv；
-      - 新增：当 share 达标到 eps_share/2、eps_share/4（sdc 仍未达标）时，分别保存 *_share_half_exited.csv、*_share_quarter_exited.csv；
-            它们与原快照遵循相同的“首次生成/掉线删除/再达标再生成一次”的规则。
-      - 两者同达标：不另存、不改名，直接 exit(99)。
+    当“非 invalid 指令的 tot_inj 之和”达到阈值时，保存 test_result 的一次快照。
+    规则：沿用原逻辑（首次达标才保存，不覆盖，之后不重复保存）。
     """
-    rows_raw, all_tot = _read_csv_summary(out_csv_path)
-    z = norm.ppf(1 - alpha / 2.0)
+    if noninv_sum >= threshold:
+        _save_snapshot_if_first(out_csv_path, f"_noninvalid_sum{threshold}")
 
-    # 计算 invalid 与非 invalid 的总注入数
-    invalid_tot = 0
-    for r in rows_raw:
-        try:
-            if r.get("kernel", "") == "invalid_summary":
-                invalid_tot += _safe_int(r.get("tot_inj", 0))
-        except Exception:
-            pass
-    noninvalid_tot = max(0, all_tot - invalid_tot)
 
-    # 指标1（全局）：invalid 占比与半宽（采用 Wilson）
-    if all_tot > 0:
-        inv_share = invalid_tot / all_tot
-        _, _, inv_half = wilson_ci(invalid_tot, all_tot, alpha)
-    else:
-        inv_share, inv_half = 0.0, 0.5
+def compute_coverage_and_maybe_stop(out_csv_path: str,
+                                    coverage: float,
+                                    info_path: str,
+                                    snapshot_threshold: int = 9604,
+                                    per_inst_target: int = 384,
+                                    print_top: int = 10):
+    """
+    新判据：
+      - 指标1 = 每条（非 invalid）tot_inj / 全部（非 invalid）tot_inj 之和
+      - 指标2 = 每条（非 invalid）SDC / 该条（非 invalid）tot_inj
+      - score = 指标1 * 指标2，按 score 由大到小排序
+      - 令 K = ceil(coverage * 非invalid指令数)，取 Top-K
+      - 若 Top-K 中“达到 per_inst_target(默认384)”的占比 == 1.0（即全部达标），则 exit(99)
 
-    # 逐行指标（Top-K 排序/判定只考虑非 invalid_summary；分母改为 noninvalid_tot）
-    rows_metrics = []
-    for r in rows_raw:
-        kernel = r.get("kernel", "")
-        inst_line = r.get("inst_line", "")
-        inst_text = r.get("inst_text", "")
-        tot_inj = _safe_int(r.get("tot_inj", 0))
-        masked = _safe_int(r.get("Masked", 0))
+    result_info 每轮保存：
+      cycle, time, noninv_tot_inj, coverage_ge384_ratio
+
+    返回：
+      {"cycle": ..., "noninv_tot_inj": ..., "K": ..., "coverage_ge384_ratio": ..., "totals": {...}}
+    """
+    rows_raw, _ = _read_csv_summary(out_csv_path)
+
+    # ------ 非 invalid 过滤与总注入数 ------
+    noninv_rows = [r for r in rows_raw if r.get("kernel", "") != "invalid_summary"]
+    noninv_sum = sum(_safe_int(r.get("tot_inj", 0)) for r in noninv_rows)
+
+    # ------ 9604 阈值的 test_result 快照 ------
+    _save_noninvalid_sum_snapshot(out_csv_path, noninv_sum, snapshot_threshold)
+
+    # ------ 计算指标1*指标2 并排序 ------
+    denom = noninv_sum if noninv_sum > 0 else 1
+    items = []
+    for r in noninv_rows:
+        tot = _safe_int(r.get("tot_inj", 0))
         sdc = _safe_int(r.get("SDC", 0))
-        due = _safe_int(r.get("DUE", 0))
-        others = _safe_int(r.get("Others", 0))
-
-        # share：把“该指令被抽中一次”视作一次“成功”，试验数为 noninvalid_tot
-        if kernel != "invalid_summary" and noninvalid_tot > 0:
-            share = tot_inj / noninvalid_tot
-            lo_s, hi_s, half_s = wilson_ci(tot_inj, noninvalid_tot, alpha)
-        else:
-            share = 0.0
-            lo_s, hi_s, half_s = 0.0, 1.0, 0.5
-
-        # SDC rate：对 tot=0 的行，CI 不可判定（记为 None）
-        if tot_inj > 0:
-            sdc_rate = sdc / tot_inj
-            lo_p, hi_p, half_p = wilson_ci(sdc, tot_inj, alpha)
-        else:
-            sdc_rate = 0.0
-            lo_p, hi_p, half_p = None, None, None
-
-        score = share * (sdc_rate if sdc_rate is not None else 0.0)
-
-        rows_metrics.append({
-            "kernel": kernel,
-            "inst_line": inst_line,
-            "inst_text": inst_text,
-            "Masked": masked, "SDC": sdc, "DUE": due, "Others": others, "tot_inj": tot_inj,
-            "share": share, "share_ci": (lo_s, hi_s), "share_ci_half": half_s,
-            "sdc_rate": sdc_rate, "sdc_ci": (lo_p, hi_p) if lo_p is not None else None,
-            "sdc_ci_half": half_p, "score": score
+        m1 = (tot / denom) if denom > 0 else 0.0
+        m2 = (sdc / tot) if tot > 0 else 0.0
+        score = m1 * m2
+        items.append({
+            "kernel": r.get("kernel", ""),
+            "inst_line": r.get("inst_line", ""),
+            "inst_text": r.get("inst_text", ""),
+            "tot_inj": tot,
+            "SDC": sdc,
+            "m1": m1,
+            "m2": m2,
+            "score": score
         })
+    items.sort(key=lambda x: x["score"], reverse=True)
 
-    # 仅对非 invalid_summary 的指令排序并取 Top-K（由 coverage 唯一决定）
-    candidates = [r for r in rows_metrics if r["kernel"] != "invalid_summary"]
-    if len(candidates) == 0:
-        print("No non-invalid rows yet; cannot evaluate stopping.")
-        # 仍然写入摘要行
-        summary_fields = [
-            "cycle", "time", "perc_inv_new", "inv_half", "eps_inv",
-            "share_pass_ratio", "sdc_pass_ratio"
-        ]
-        next_cycle = _infer_next_cycle(info_path, summary_fields)
-        summary_row = {
-            "cycle": next_cycle,
-            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "perc_inv_new": f"{perc_inv_new:.6f}",
-            "inv_half": f"{inv_half:.6f}",
-            "eps_inv": f"{eps_inv:.4f}",
-            "share_pass_ratio": f"{0.0:.4f}",
-            "sdc_pass_ratio": f"{0.0:.4f}",
-        }
+    # ------ 取覆盖集 Top-K ------
+    n = len(items)
+    K = max(1, math.ceil(coverage * n)) if n > 0 else 0
+    topK = items[:K] if K > 0 else []
 
-        _append_summary_csv(info_path, summary_fields, summary_row)
-        # 汇总总计
-        tot_masked = sum(_safe_int(x.get("Masked", 0)) for x in rows_raw)
-        tot_sdc    = sum(_safe_int(x.get("SDC", 0)) for x in rows_raw)
-        tot_due    = sum(_safe_int(x.get("DUE", 0)) for x in rows_raw)
-        tot_others = sum(_safe_int(x.get("Others", 0)) for x in rows_raw)
-        return {
-            "cycle": summary_row["cycle"],
-            "perc_inv_new": float(summary_row["perc_inv_new"]),
-            "inv_half": float(summary_row["inv_half"]),
-            "eps_inv": float(summary_row["eps_inv"]),
-            "share_pass_ratio": float(summary_row["share_pass_ratio"]),
-            "sdc_pass_ratio": float(summary_row["sdc_pass_ratio"]),
-            "totals": {"Masked": tot_masked, "SDC": tot_sdc, "DUE": tot_due, "Others": tot_others},
-        }
+    # ------ 统计 Top-K 中 tot_inj ≥ 384 的占比 ------
+    ge_cnt = sum(1 for it in topK if it["tot_inj"] >= per_inst_target)
+    ratio = (ge_cnt / K) if K > 0 else 0.0
 
-    K = max(1, math.ceil(coverage * len(candidates)))
-    candidates.sort(key=lambda r: r["score"], reverse=True)
-    topK = candidates[:K]
-
-    # Top-K 上的判定
-    share_pass = all(r["share_ci_half"] is not None and r["share_ci_half"] <= eps_share for r in topK)
-    sdc_pass   = all(r["sdc_ci_half"]   is not None and r["sdc_ci_half"]   <= eps_sdc   for r in topK)
-    share_pass_cnt = sum(1 for r in topK if r["share_ci_half"] is not None and r["share_ci_half"] <= eps_share)
-    sdc_pass_cnt   = sum(1 for r in topK if r["sdc_ci_half"]   is not None and r["sdc_ci_half"]   <= eps_sdc)
-    share_pass_ratio = (share_pass_cnt / K) if K > 0 else 0.0
-    sdc_pass_ratio   = (sdc_pass_cnt / K) if K > 0 else 0.0
-
-    # 新增：更严格的两级 share 阈值（Top-K 全部满足）
-    eps_share_half    = eps_share / 2.0
-    eps_share_quarter = eps_share / 4.0
-    share_pass_half    = all(r["share_ci_half"] is not None and r["share_ci_half"] <= eps_share_half    for r in topK)
-    share_pass_quarter = all(r["share_ci_half"] is not None and r["share_ci_half"] <= eps_share_quarter for r in topK)
-
-    # 失败项统计与注入量估计（仅总结性输出）
-    bad_share = [r for r in topK if not (r["share_ci_half"] is not None and r["share_ci_half"] <= eps_share)]
-    bad_sdc   = [r for r in topK if not (r["sdc_ci_half"]   is not None and r["sdc_ci_half"]   <= eps_sdc)]
-
-    if bad_share:
-        if noninvalid_tot > 0:
-            req_totals = []
-            for r in bad_share:
-                p_tilde = (r["tot_inj"] + z * z / 2.0) / (noninvalid_tot + z * z)
-                n_req = _estimate_required_n_for_halfwidth(p_tilde, z, eps_share)
-                req_totals.append(n_req)
-            add_total_needed = max(req_totals) - noninvalid_tot if req_totals else 0
-            add_total_needed = max(0, add_total_needed)
-        else:
-            add_total_needed = 0
-        print(f" SHARE not met on Top-K: {len(bad_share)} items. "
-              f"Approx additional TOTAL injections needed: ~{add_total_needed}")
-        if batch_injections and batch_injections > 0:
-            batches = math.ceil(add_total_needed / batch_injections) if add_total_needed > 0 else 0
-            print(f"   (If each batch ~{batch_injections}, need ~{batches} more batches for share)")
-    else:
-        print(" SHARE precision OK on Top-K.")
-
-    if bad_sdc:
-        # 估算每条指令各自需要的样本量；这里只汇总最大缺口
-        max_add_i = 0
-        for r in bad_sdc:
-            if r["tot_inj"] > 0:
-                p_tilde_sdc = (r["SDC"] + z * z / 2.0) / (r["tot_inj"] + z * z)
-                n_req_i = _estimate_required_n_for_halfwidth(p_tilde_sdc, z, eps_sdc)
-                add_i = max(0, n_req_i - r["tot_inj"])
-                if add_i > max_add_i:
-                    max_add_i = add_i
-            else:
-                max_add_i = max(max_add_i, 1)  # tot=0 时至少需要>0的注入
-        print(f" SDC not met on Top-K: {len(bad_sdc)} items. "
-              f"Max per-instruction additional injections needed: +{max_add_i}")
-    else:
-        print(" SDC precision OK on Top-K.")
-
-    # 追加“单行摘要”到 result_info CSV
-    summary_fields = [
-        "cycle", "time", "perc_inv_new", "inv_half", "eps_inv",
-        "share_pass_ratio", "sdc_pass_ratio"
-    ]
+    # ------ 每轮汇总写入 result_info ------
+    summary_fields = ["cycle", "time", "noninv_tot_inj", "coverage_ge384_ratio"]
     next_cycle = _infer_next_cycle(info_path, summary_fields)
-    summary_row = {
+    _append_summary_csv(info_path, summary_fields, {
         "cycle": next_cycle,
         "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "perc_inv_new": f"{perc_inv_new:.6f}",
-        "inv_half": f"{inv_half:.6f}",
-        "eps_inv": f"{eps_inv:.4f}",
-        "share_pass_ratio": f"{share_pass_ratio:.4f}",
-        "sdc_pass_ratio": f"{sdc_pass_ratio:.4f}",
-    }
-    _append_summary_csv(info_path, summary_fields, summary_row)
+        "noninv_tot_inj": str(noninv_sum),
+        "coverage_ge384_ratio": f"{ratio:.4f}",
+    })
 
-    # -----------------
-    # 快照维护
-    # （1）原有的 *_share_exited / *_sdc_exited / *_inv
-    # （2）新增更严格层级：*_share_half_exited，*_share_quarter_exited
-    # 规则：首次达标才保存；连续达标不重复保存；掉回不达标则删除；再度达标再保存一次
-    # -----------------
-    share_snap         = _append_suffix_before_ext(out_csv_path, "_share_exited")
-    share_half_snap    = _append_suffix_before_ext(out_csv_path, "_share_half_exited")
-    share_quarter_snap = _append_suffix_before_ext(out_csv_path, "_share_quarter_exited")
-    sdc_snap           = _append_suffix_before_ext(out_csv_path, "_sdc_exited")
-    inv_snap           = _append_suffix_before_ext(out_csv_path, "_inv")
+    # ------ 打印关键进展与 Top-K 摘要 ------
+    print(f"[Coverage] 非 invalid 指令数 = {n}，coverage = {coverage:.2%} → K = {K}")
+    print(f"[Progress] 非 invalid tot_inj 之和 = {noninv_sum} "
+          f"{'(已保存快照)' if noninv_sum >= snapshot_threshold else f'(未达 {snapshot_threshold}，待触发快照)'}")
+    if K > 0:
+        print(f"[Top-K] 已达标(≥{per_inst_target})：{ge_cnt}/{K} → 占比 {ratio:.2%}")
+        header = f"{'rank':>4}  {'tot_inj':>7}  {'SDC':>5}  {'m1(tot/sum)':>13}  {'m2(SDC/tot)':>13}  {'score':>10}  kernel:line  inst_text"
+        print(header)
+        for i, it in enumerate(topK[:print_top], 1):
+            print(f"{i:>4}  {it['tot_inj']:>7}  {it['SDC']:>5}  {it['m1']:.6f}      {it['m2']:.6f}      {it['score']:.6f}  "
+                  f"{it['kernel']}:{it['inst_line']}  {it['inst_text']}")
 
-    # --- 情形 A：share 达标、sdc 未达标 ---
-    if share_pass and not sdc_pass:
-        _save_snapshot_if_first(out_csv_path, "_share_exited")
-
-        # 新增：当 Top-K 对 share 达到 eps_share/2 阈值（更严格）时
-        if share_pass_half:
-            _save_snapshot_if_first(out_csv_path, "_share_half_exited")
-        else:
-            if os.path.exists(share_half_snap) and _ensure_removed(share_half_snap):
-                print(f"Snapshot removed (share_half fell back): {share_half_snap}")
-
-        # 新增：当 Top-K 对 share 达到 eps_share/4 阈值（最严格）时
-        if share_pass_quarter:
-            _save_snapshot_if_first(out_csv_path, "_share_quarter_exited")
-        else:
-            if os.path.exists(share_quarter_snap) and _ensure_removed(share_quarter_snap):
-                print(f"Snapshot removed (share_quarter fell back): {share_quarter_snap}")
-
-        # sdc 仍未达标，确保 *_sdc_exited 不存在（若曾经保存过且后续掉线）
-        if os.path.exists(sdc_snap):
-            if _ensure_removed(sdc_snap):
-                print(f"Snapshot removed (sdc fell back): {sdc_snap}")
-
-    # --- 情形 B：sdc 达标、share 未达标 ---
-    elif sdc_pass and not share_pass:
-        _save_snapshot_if_first(out_csv_path, "_sdc_exited")
-        # share 所有层级都要清理
-        if os.path.exists(share_snap) and _ensure_removed(share_snap):
-            print(f"Snapshot removed (share fell back): {share_snap}")
-        if os.path.exists(share_half_snap) and _ensure_removed(share_half_snap):
-            print(f"Snapshot removed (share_half fell back): {share_half_snap}")
-        if os.path.exists(share_quarter_snap) and _ensure_removed(share_quarter_snap):
-            print(f"Snapshot removed (share_quarter fell back): {share_quarter_snap}")
-
-    # --- 情形 C：share 与 sdc 均未达标 ---
-    elif not share_pass and not sdc_pass:
-        # 全部 share 层级快照删除
-        if os.path.exists(share_snap) and _ensure_removed(share_snap):
-            print(f"Snapshot removed (share fell back): {share_snap}")
-        if os.path.exists(share_half_snap) and _ensure_removed(share_half_snap):
-            print(f"Snapshot removed (share_half fell back): {share_half_snap}")
-        if os.path.exists(share_quarter_snap) and _ensure_removed(share_quarter_snap):
-            print(f"Snapshot removed (share_quarter fell back): {share_quarter_snap}")
-        # sdc 的快照也删除
-        if os.path.exists(sdc_snap) and _ensure_removed(sdc_snap):
-            print(f"Snapshot removed (sdc fell back): {sdc_snap}")
-
-    else:
-        # share_pass and sdc_pass 同时为 True：不另存也不改名；直接 exit(99)
-        pass
-
-    # 指标1（invalid 占比）单独维护快照：符合精度则另存 *_inv.csv；不符合则移除
-    inv_pass = (inv_half <= eps_inv)
-    if inv_pass:
-        _save_snapshot_if_first(out_csv_path, "_inv")
-    else:
-        if os.path.exists(inv_snap):
-            if _ensure_removed(inv_snap):
-                print(f"Snapshot removed (inv fell back): {inv_snap}")
-
-    # 早停：两者同时达标（Top-K 上）
+    # ------ 汇总 totals 返回（与旧打印兼容）------
     tot_masked = sum(_safe_int(x.get("Masked", 0)) for x in rows_raw)
     tot_sdc    = sum(_safe_int(x.get("SDC", 0)) for x in rows_raw)
     tot_due    = sum(_safe_int(x.get("DUE", 0)) for x in rows_raw)
     tot_others = sum(_safe_int(x.get("Others", 0)) for x in rows_raw)
     ret = {
         "cycle": next_cycle,
-        "perc_inv_new": float(summary_row["perc_inv_new"]),
-        "inv_half": float(summary_row["inv_half"]),
-        "eps_inv": float(summary_row["eps_inv"]),
-        "share_pass_ratio": float(summary_row["share_pass_ratio"]),
-        "sdc_pass_ratio": float(summary_row["sdc_pass_ratio"]),
+        "noninv_tot_inj": noninv_sum,
+        "K": K,
+        "coverage_ge384_ratio": ratio,
         "totals": {"Masked": tot_masked, "SDC": tot_sdc, "DUE": tot_due, "Others": tot_others},
     }
 
-    if share_pass and sdc_pass:
-        print("\nEARLY_STOP: Both SHARE and SDC precision targets are met on Top-K.")
-        print("Returning exit99 (no renaming; snapshots unchanged).")
+    # ------ 早停（全部覆盖集均达到 384）------
+    if K > 0 and ge_cnt == K:
+        print("\nEARLY_STOP: 覆盖集(Top-K)内所有指令的 tot_inj 均 ≥ "
+              f"{per_inst_target}。发送 exit99。")
         sys.exit(99)
 
-    # 未达标：继续下一批
+    # 若你想改为“Top-K 中任意一条达 384 就停”，把上面的判断改为：
+    # if K > 0 and ge_cnt > 0: sys.exit(99)
+
     return ret
 
 
@@ -989,15 +718,8 @@ def main():
     parser.add_argument("--component", "-c", required=True, help="Component set")
     parser.add_argument("--bitflip", "-b", required=True, help="Number of bit flips to inject")
 
-    # 置信区间与阈值/覆盖率
-    parser.add_argument("--alpha", type=float, default=0.05, help="1 - confidence level (default: 0.05 => 95% CI)")
-    parser.add_argument("--eps_share", type=float, default=0.01, help="Max half-width for per-instruction share (default 0.01)")
-    parser.add_argument("--eps_inv", type=float, default=0.01, help="Max half-width for invalid share (default 0.01)")
-    parser.add_argument("--eps_sdc", type=float, default=0.02, help="Max half-width for per-instruction SDC rate (default 0.02)")
+    # 覆盖率
     parser.add_argument("--coverage", type=float, default=0.90, help="Top-K coverage fraction over non-invalid instructions (default 0.90)")
-
-    # 打印辅助（不影响判据；可为 0）
-    parser.add_argument("--batch_injections", type=int, default=0, help="(Optional) Approx injections per batch for planning printouts")
 
     args = parser.parse_args()
 
@@ -1058,27 +780,24 @@ def main():
     os.makedirs(info_dir, exist_ok=True)
     info_path = os.path.join(info_dir, f"result_info_{args.app}_{args.test}_{args.component}_{args.bitflip}.csv")
 
-    summary = compute_metrics_and_maybe_stop(
+    summary = compute_coverage_and_maybe_stop(
         out_csv_path=out_path,
-        alpha=args.alpha,
-        eps_share=args.eps_share,
-        eps_inv=args.eps_inv,
-        eps_sdc=args.eps_sdc,
         coverage=args.coverage,
         info_path=info_path,
-        perc_inv_new=perc_inv_new,
-        batch_injections=args.batch_injections
+        snapshot_threshold=9604,   # 需求：非 invalid tot_inj 之和达到 9604 触发快照
+        per_inst_target=384        # 需求：Top-K 内每条至少 384 次注入才算达标
     )
 
     if summary is not None:
         totals = summary.get("totals", {})
         print("========== Final Summary ==========")
-        print(f" Masked: {totals.get('Masked', total_masked)} | SDC: {totals.get('SDC', total_sdc)} | DUE: {totals.get('DUE', total_due)} | Others: {totals.get('Others', total_others)}")
+        print(f" Masked: {totals.get('Masked', 0)} | SDC: {totals.get('SDC', 0)} | "
+            f"DUE: {totals.get('DUE', 0)} | Others: {totals.get('Others', 0)}")
         print(
-            f"Cycle={summary['cycle']} | perc_inv_new={summary['perc_inv_new']:.6f} | "
-            f"Metric1 Half-width={summary['inv_half']:.6f} | Metric1 Target Accuracy={summary['eps_inv']:.4f} | "
-            f"Metric2 Pass Ratio={summary['share_pass_ratio']:.4f} | Metric3 Pass Ratio={summary['sdc_pass_ratio']:.4f}"
+            f"Cycle={summary['cycle']} | noninvalid_tot_inj={summary['noninv_tot_inj']} | "
+            f"coverage_K={summary['K']} | coverage_ge384_ratio={summary['coverage_ge384_ratio']:.4f}"
         )
+
 
 
 if __name__ == "__main__":
