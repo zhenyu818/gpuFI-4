@@ -11,7 +11,6 @@ import math
 from collections import defaultdict, Counter
 from datetime import datetime
 from copy import deepcopy
-from scipy.stats import norm
 
 # -----------------------------
 # 基础解析与工具
@@ -35,13 +34,11 @@ def parse_log(log_path: str):
     re_effects_start = re.compile(
         r"^\[Run\s+(\d+)\]\s+Effects from\s+(?:.+/)?(tmp\.out\d+):\s*$"
     )
-    # 2) 内联形式：同一行既有 Effects 前缀也有 Writer/Reader（新格式）
+    # 2) 内联形式（新格式）
     re_effects_inline = re.compile(
         r"^\[Run\s+(\d+)\]\s+Effects from\s+(?:.+/)?(tmp\.out\d+):\s*(.*\S.*)$"
     )
     # 3) Writer/Reader 本体
-    #    - 放宽 src 允许连字符；
-    #    - 仍要求形如 "-> <kernel> PC=...(file:line) ..." 的结构（与你现有打印一致）
     re_writer = re.compile(
         r"^\[(?P<src>[-A-Za-z0-9_]+)_FI_WRITER\].*?->\s*(\S+)\s+PC=.*\(([^:()]+):(\d+)\)\s*(.*)$"
     )
@@ -52,7 +49,7 @@ def parse_log(log_path: str):
     re_result = re.compile(r"^\[Run\s+(\d+)\]\s+(tmp\.out\d+):\s*(.*?)\s*$")
     re_params = re.compile(r"^\[INJ_PARAMS\]\s+\[Run\s+(\d+)\]\s+(tmp\.out\d+)\s+(.*)$")
 
-    latest_effects_by_pair = {}   # {(run_id,name): [records...]} 跨段缓存、去重后的最新汇总
+    latest_effects_by_pair = {}   # {(run_id,name): [records...]} 去重后的最新汇总
     params_by_pair = {}           # {(run_id,name): "k=v;..."}
     cur_key = None
     cur_writers, cur_readers = [], []
@@ -77,7 +74,6 @@ def parse_log(log_path: str):
         return merged
 
     def _merge_records(existing, add):
-        """把 existing 与 add 两份 record 列表合并去重"""
         if not existing:
             return _merge_unique(add, [])
         if not add:
@@ -85,7 +81,6 @@ def parse_log(log_path: str):
         return _merge_unique(existing + add, [])
 
     def flush_current_effects():
-        """把当前累积的 cur_writers/readers 合并到 latest_effects_by_pair[cur_key]（去重/追加）"""
         nonlocal cur_key, cur_writers, cur_readers
         if cur_key is not None:
             new_pack = _merge_unique(cur_writers, cur_readers)
@@ -99,7 +94,7 @@ def parse_log(log_path: str):
             for raw in f:
                 line = raw.rstrip("\n")
 
-                # ---- (A) 先匹配“内联 Effects + Writer/Reader”的新格式 ----
+                # (A) 内联 Effects + Writer/Reader
                 m = re_effects_inline.match(line)
                 if m:
                     run_id = int(m.group(1))
@@ -107,13 +102,11 @@ def parse_log(log_path: str):
                     rest = m.group(3).strip()
                     new_key = (run_id, name)
 
-                    # 如果切换到新 key，先把上一个 key 的累积刷进缓存
                     if cur_key != new_key:
                         flush_current_effects()
                         cur_key = new_key
                         cur_writers, cur_readers = [], []
 
-                    # 尝试把“余下部分”作为 WRITER / READER 解析
                     mw = re_writer.match(rest)
                     if mw:
                         cur_writers.append(
@@ -124,7 +117,6 @@ def parse_log(log_path: str):
                                 "src": mw.group("src"),
                             }
                         )
-                        # 不立即 flush，允许同一 (run_id,name) 的多条内联继续累积
                         continue
                     mr = re_reader.match(rest)
                     if mr:
@@ -137,15 +129,11 @@ def parse_log(log_path: str):
                             }
                         )
                         continue
-
-                    # 如果 rest 不是 WRITER/READER，本行只是“起始+附带说明”，当作普通起始
-                    # 此时不 flush，保持 cur_key，以便随后行继续累积
                     continue
 
-                # ---- (B) 其次匹配旧格式的“独立 Effects 起始行” ----
+                # (B) 旧格式的 Effects 起始
                 m = re_effects_start.match(line)
                 if m:
-                    # 每遇到新的 Effects 起始，先把上一个 key 的累积刷进缓存
                     flush_current_effects()
                     run_id = int(m.group(1))
                     name = m.group(2)
@@ -153,7 +141,7 @@ def parse_log(log_path: str):
                     cur_writers, cur_readers = [], []
                     continue
 
-                # ---- (C) 在已有 cur_key 的上下文中累积 WRITER/READER（旧格式）----
+                # (C) 在当前 key 下累积 WRITER/READER（旧格式）
                 if cur_key is not None:
                     m = re_writer.match(line)
                     if m:
@@ -178,7 +166,7 @@ def parse_log(log_path: str):
                         )
                         continue
 
-                # ---- (D) INJ_PARAMS ----
+                # (D) INJ_PARAMS
                 m = re_params.match(line)
                 if m:
                     run_id = int(m.group(1))
@@ -186,7 +174,7 @@ def parse_log(log_path: str):
                     params_by_pair[(run_id, name)] = m.group(3).strip()
                     continue
 
-                # ---- (E) 结果行：把结果与“该 pair 的全部已知 writer/reader”绑定 ----
+                # (E) 结果行：绑定结果
                 m = re_result.match(line)
                 if m:
                     run_id = int(m.group(1))
@@ -194,19 +182,16 @@ def parse_log(log_path: str):
                     res = normalize_result(m.group(3))
                     pair = (run_id, name)
 
-                    # 记录同一 pair 出现的第 idx 次结果
                     occ_counter[pair] += 1
                     idx = occ_counter[pair]
                     inj_key = (run_id, name, idx)
 
-                    # 若当前正处于该 pair 的上下文，把“当前累积 + 历史缓存”一并合并
                     if cur_key == pair:
                         current_pack = _merge_unique(cur_writers, cur_readers)
                         existed = latest_effects_by_pair.get(pair, [])
                         recs = _merge_records(existed, current_pack)
                         latest_effects_by_pair[pair] = deepcopy(recs)
                     else:
-                        # 否则退回到我们已缓存的该 pair 的最新合并结果
                         recs = latest_effects_by_pair.get(
                             pair,
                             [
@@ -218,7 +203,6 @@ def parse_log(log_path: str):
                     results_occ[inj_key] = res
                     continue
 
-        # 文件结束：把最后一个上下文刷入缓存
         flush_current_effects()
 
     except FileNotFoundError:
@@ -226,7 +210,6 @@ def parse_log(log_path: str):
         sys.exit(1)
 
     return effects_occ, results_occ, params_by_pair
-
 
 
 def reduce_combo(combo: str) -> str:
@@ -271,7 +254,7 @@ def _collect_invalid_sdc_outputs(effects_occ, results_occ, params_by_pair, app, 
     """
     对“invalid 且结果为 SDC”的新注入：
       - 复制 tmp.outN 到 error_classification/
-      - 同时复制 inst_exec.log 并重命名为 inst_exec_{app}_{test}_{components}_{bitflip}_r{run_id}_{name}.log
+      - 同时复制 inst_exec.log 并重命名为 inst_exec_{...}.log
       - 记录到 error_classification/error_list.txt
     """
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -284,7 +267,6 @@ def _collect_invalid_sdc_outputs(effects_occ, results_occ, params_by_pair, app, 
 
     for inj_key, recs in effects_occ.items():
         run_id, name, _ = inj_key
-        # invalid if sentinel only
         is_invalid = (len(recs) == 1 and (recs[0].get("src") == "invalid" or recs[0].get("kernel") == "invalid_summary"))
         if not is_invalid:
             continue
@@ -292,10 +274,8 @@ def _collect_invalid_sdc_outputs(effects_occ, results_occ, params_by_pair, app, 
         if res != "SDC":
             continue
 
-        # source tmp.out path (logs<run_id>/tmp.outN)
         src_path = os.path.join(base_dir, f"logs{run_id}", name)
         if not os.path.exists(src_path):
-            # conservative fallback
             alt = os.path.join(f"logs{run_id}", name)
             if os.path.exists(alt):
                 src_path = alt
@@ -311,7 +291,6 @@ def _collect_invalid_sdc_outputs(effects_occ, results_occ, params_by_pair, app, 
                 lines_to_append.append(info_line)
                 continue
 
-        # destination name: include context to avoid collisions
         dest_name = f"{app}_{test}_{components}_{bitflip}_r{run_id}_{name}"
         dest_path = _ensure_unique_path(err_dir, dest_name)
         try:
@@ -320,7 +299,6 @@ def _collect_invalid_sdc_outputs(effects_occ, results_occ, params_by_pair, app, 
         except Exception:
             dest_path = "COPY_FAILED"
 
-        # === 新增：复制 inst_exec.log 并重命名 ===
         inst_log_src = os.path.join(base_dir, "inst_exec.log")
         inst_log_dest_name = f"inst_exec_{app}_{test}_{components}_{bitflip}_r{run_id}_{name}.log"
         inst_log_dest_path = os.path.join(err_dir, inst_log_dest_name)
@@ -350,7 +328,6 @@ def _collect_invalid_sdc_outputs(effects_occ, results_occ, params_by_pair, app, 
     return appended, len(lines_to_append)
 
 
-
 def write_csv(app: str, test: str, components: str, bitflip: str, effects_occ, results_occ, params_by_pair):
     """
     生成/合并 CSV，并为每条指令新增 reg_names 列。
@@ -368,7 +345,7 @@ def write_csv(app: str, test: str, components: str, bitflip: str, effects_occ, r
     all_srcs = set()
     regname_counts = defaultdict(Counter)  # 仅非 invalid 行统计
 
-    # === 合并旧 CSV ===
+    # 合并旧 CSV
     if os.path.exists(out_path):
         with open(out_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -400,13 +377,13 @@ def write_csv(app: str, test: str, components: str, bitflip: str, effects_occ, r
                             except ValueError:
                                 pass
 
-    # === 本次注入结果 ===
+    # 本次注入结果
     for inj_key, recs in effects_occ.items():
         res_cat = results_occ.get(inj_key, "Others")
         run_id, name, _ = inj_key
         combo = params_by_pair.get((run_id, name), "") or ""
 
-        # 提取 reg_name（可能是 "%r1" 或 "%r1:%p5:%rd7"）
+        # 提取 reg_name
         reg_names_this = []
         for part in combo.split(";"):
             part = part.strip()
@@ -426,14 +403,13 @@ def write_csv(app: str, test: str, components: str, bitflip: str, effects_occ, r
             inst_counts[key][src][res_cat] += 1
             all_srcs.add(src)
 
-            # invalid 行或 src==invalid 不累计 reg_name
             if kernel == "invalid_summary" or src == "invalid":
                 continue
             if reg_names_this:
                 for rn in reg_names_this:
                     regname_counts[key][rn] += 1
 
-    # === 写回 CSV（原子替换） ===
+    # 写回 CSV（原子替换）
     src_columns = []
     for src in sorted(all_srcs):
         src_columns += [f"{src}_Masked", f"{src}_SDC", f"{src}_DUE", f"{src}_Others"]
@@ -505,13 +481,13 @@ def write_csv(app: str, test: str, components: str, bitflip: str, effects_occ, r
 
 
 # -----------------------------
-# 新指标与 CSV 读取
+# 新增：仅新数据的 invalid 比例（保留原先定义）
 # -----------------------------
 
 def _compute_perc_inv_from_new(effects_occ):
     """
     Perc_inv（仅新数据）：新数据中 invalid 的 tot_inj / 新数据中所有行的 tot_inj
-    注意：与 write_csv 一致，按“recs 粒度”计数（一次注入若产生多个 reader，会计多次）。
+    （按 rec 粒度：一次注入若产生多个 reader，会计多次）
     """
     new_all = 0
     new_inv = 0
@@ -523,61 +499,79 @@ def _compute_perc_inv_from_new(effects_occ):
     return (new_inv / new_all) if new_all > 0 else 0.0
 
 
-def _read_csv_summary(path):
-    """
-    读取 CSV，返回：
-      - rows_raw: 列表[dict]，按行原样（含 kernel/inst_text/tot_inj 等）
-      - all_tot: 全部行 tot_inj 之和
-    """
-    rows_raw = []
-    all_tot = 0
-    with open(path, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            rows_raw.append(row)
-            try:
-                all_tot += int(row.get("tot_inj", "0"))
-            except ValueError:
-                pass
-    return rows_raw, all_tot
-
-
 # -----------------------------
-# 新判据（coverage×384）与快照（9604）
+# 工具：result_info 维护 & 快照
 # -----------------------------
 
-def _read_csv_summary(path):
-    """
-    读取 CSV，返回：
-      - rows_raw: 列表[dict]，按行原样（含 kernel/inst_text/tot_inj 等）
-      - all_tot: 全部行 tot_inj 之和（含 invalid）
-    """
-    rows_raw = []
-    all_tot = 0
-    with open(path, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            rows_raw.append(row)
-            try:
-                all_tot += int(row.get("tot_inj", "0"))
-            except ValueError:
-                pass
-    return rows_raw, all_tot
+def _append_summary_csv(info_path: str, header_fields, row_dict: dict):
+    """把一行摘要追加到 result_info（若文件不存在或表头不匹配则写表头）"""
+    os.makedirs(os.path.dirname(info_path), exist_ok=True)
+
+    write_header = False
+    need_section_header = False
+    if not os.path.exists(info_path) or os.path.getsize(info_path) == 0:
+        write_header = True
+    else:
+        try:
+            with open(info_path, "r", encoding="utf-8", errors="ignore") as f:
+                first_line = f.readline().strip()
+            expected_first = ",".join(header_fields)
+            if first_line != expected_first:
+                need_section_header = True
+        except Exception:
+            need_section_header = True
+
+    mode = "a" if os.path.exists(info_path) else "w"
+    with open(info_path, mode, newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=header_fields)
+        if write_header or need_section_header:
+            w.writeheader()
+        w.writerow(row_dict)
 
 
-def _safe_int(x, default=0):
+def _infer_next_cycle(info_path: str, header_fields):
+    """读取 result_info，推断下一轮编号（同表头段内 +1）"""
     try:
-        return int(x)
+        if not os.path.exists(info_path) or os.path.getsize(info_path) == 0:
+            return 1
+        header_line = ",".join(header_fields)
+        with open(info_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = [ln.rstrip("\n") for ln in f]
+        last_idx = -1
+        for i, ln in enumerate(lines):
+            if ln.strip() == header_line:
+                last_idx = i
+        if last_idx >= 0:
+            count = 0
+            for ln in lines[last_idx + 1:]:
+                if not ln.strip():
+                    continue
+                if ln.strip() == header_line:
+                    count = 0
+                    continue
+                count += 1
+            return count + 1 if count >= 0 else 1
+        count_all = 0
+        for ln in lines:
+            s = ln.strip()
+            if not s:
+                continue
+            if s.startswith("time,"):
+                continue
+            count_all += 1
+        return count_all + 1 if count_all >= 0 else 1
     except Exception:
-        return default
+        return 1
 
-def _save_snapshot_if_first(out_csv_path: str, suffix: str = "_snapshot"):
-    """
-    仅当快照不存在时另存一次；存在时不覆盖。
-    返回快照路径。
-    """
-    base, ext = os.path.splitext(out_csv_path)
-    snap = f"{base}{suffix}{ext}"
+
+def _append_suffix_before_ext(path: str, suffix: str) -> str:
+    base, ext = os.path.splitext(path)
+    return f"{base}{suffix}{ext}"
+
+
+def _save_snapshot_if_first(out_csv_path: str, suffix: str):
+    """仅当快照不存在时另存一次；存在时不覆盖。"""
+    snap = _append_suffix_before_ext(out_csv_path, suffix)
     if not os.path.exists(snap):
         try:
             shutil.copyfile(out_csv_path, snap)
@@ -589,120 +583,127 @@ def _save_snapshot_if_first(out_csv_path: str, suffix: str = "_snapshot"):
     return snap
 
 
+# -----------------------------
+# 新指标 + 停机/快照逻辑（按你的新要求）
+# -----------------------------
 
-def _save_noninvalid_sum_snapshot(out_csv_path: str, noninv_sum: int, threshold: int = 9604):
+def compute_metrics_and_maybe_stop_new(out_csv_path: str,
+                                       coverage: float,
+                                       info_path: str,
+                                       perc_inv_new: float,
+                                       snapshot_threshold_total: int = 9604,
+                                       per_inst_threshold: int = 384):
     """
-    当“非 invalid 指令的 tot_inj 之和”达到阈值时，保存 test_result 的一次快照。
-    规则：沿用原逻辑（首次达标才保存，不覆盖，之后不重复保存）。
+    新逻辑：
+      - 读取 CSV，过滤 invalid_summary；
+      - 指标1 = tot_inj / sum_noninvalid_totinj
+      - 指标2 = SDC / tot_inj（tot_inj=0 时取 0）
+      - score = 指标1 * 指标2，从大到小排序；
+      - K = ceil(coverage * 非 invalid 指令数) 取 Top-K；
+      - ratio = Top-K 内 tot_inj >= per_inst_threshold 的比例；
+      - 每轮向 result_info 追加：cycle, perc_inv_new, noninvalid_tot_inj, coverage_ge384_ratio；
+      - 若 ratio == 1 则打印信息并 exit(99)；
+      - 若 sum_noninvalid_totinj >= 9604 且尚未留存，则另存 *_9604.csv。
     """
-    if noninv_sum >= threshold:
-        _save_snapshot_if_first(out_csv_path, f"_noninvalid_sum{threshold}")
+    # 读取 CSV
+    rows = []
+    if not os.path.exists(out_csv_path):
+        print(f"CSV not found: {out_csv_path}")
+        return None
 
+    with open(out_csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows.append(row)
 
-def compute_coverage_and_maybe_stop(out_csv_path: str,
-                                    coverage: float,
-                                    info_path: str,
-                                    snapshot_threshold: int = 9604,
-                                    per_inst_target: int = 384,
-                                    print_top: int = 10):
-    """
-    新判据：
-      - 指标1 = 每条（非 invalid）tot_inj / 全部（非 invalid）tot_inj 之和
-      - 指标2 = 每条（非 invalid）SDC / 该条（非 invalid）tot_inj
-      - score = 指标1 * 指标2，按 score 由大到小排序
-      - 令 K = ceil(coverage * 非invalid指令数)，取 Top-K
-      - 若 Top-K 中“达到 per_inst_target(默认384)”的占比 == 1.0（即全部达标），则 exit(99)
+    # 非 invalid 行
+    def _safe_int(s, d=0):
+        try:
+            return int(s)
+        except Exception:
+            return d
 
-    result_info 每轮保存：
-      cycle, time, noninv_tot_inj, coverage_ge384_ratio
+    noninv_rows = [r for r in rows if r.get("kernel", "") != "invalid_summary"]
+    n_noninv = len(noninv_rows)
 
-    返回：
-      {"cycle": ..., "noninv_tot_inj": ..., "K": ..., "coverage_ge384_ratio": ..., "totals": {...}}
-    """
-    rows_raw, _ = _read_csv_summary(out_csv_path)
+    sum_noninv_totinj = sum(_safe_int(r.get("tot_inj", 0)) for r in noninv_rows)
 
-    # ------ 非 invalid 过滤与总注入数 ------
-    noninv_rows = [r for r in rows_raw if r.get("kernel", "") != "invalid_summary"]
-    noninv_sum = sum(_safe_int(r.get("tot_inj", 0)) for r in noninv_rows)
+    # 9604 快照（首次）
+    if sum_noninv_totinj >= snapshot_threshold_total:
+        _save_snapshot_if_first(out_csv_path, f"_{snapshot_threshold_total}")
 
-    # ------ 9604 阈值的 test_result 快照 ------
-    _save_noninvalid_sum_snapshot(out_csv_path, noninv_sum, snapshot_threshold)
-
-    # ------ 计算指标1*指标2 并排序 ------
-    denom = noninv_sum if noninv_sum > 0 else 1
-    items = []
+    # 计算指标与排序
+    scores = []
+    denom_total = max(sum_noninv_totinj, 0)
     for r in noninv_rows:
         tot = _safe_int(r.get("tot_inj", 0))
         sdc = _safe_int(r.get("SDC", 0))
-        m1 = (tot / denom) if denom > 0 else 0.0
-        m2 = (sdc / tot) if tot > 0 else 0.0
-        score = m1 * m2
-        items.append({
+        metric1 = (tot / denom_total) if denom_total > 0 else 0.0
+        metric2 = (sdc / tot) if tot > 0 else 0.0
+        score = metric1 * metric2
+        scores.append({
             "kernel": r.get("kernel", ""),
             "inst_line": r.get("inst_line", ""),
             "inst_text": r.get("inst_text", ""),
             "tot_inj": tot,
             "SDC": sdc,
-            "m1": m1,
-            "m2": m2,
-            "score": score
+            "metric1": metric1,
+            "metric2": metric2,
+            "score": score,
         })
-    items.sort(key=lambda x: x["score"], reverse=True)
 
-    # ------ 取覆盖集 Top-K ------
-    n = len(items)
-    K = max(1, math.ceil(coverage * n)) if n > 0 else 0
-    topK = items[:K] if K > 0 else []
+    scores.sort(key=lambda x: x["score"], reverse=True)
 
-    # ------ 统计 Top-K 中 tot_inj ≥ 384 的占比 ------
-    ge_cnt = sum(1 for it in topK if it["tot_inj"] >= per_inst_target)
-    ratio = (ge_cnt / K) if K > 0 else 0.0
+    # Top-K & 比例
+    if n_noninv > 0:
+        K = max(1, math.ceil(coverage * n_noninv))
+        topK = scores[:K]
+        cnt_ge = sum(1 for x in topK if x["tot_inj"] >= per_inst_threshold)
+        ratio = cnt_ge / K
+    else:
+        K, topK, cnt_ge, ratio = 0, [], 0, 0.0
 
-    # ------ 每轮汇总写入 result_info ------
-    summary_fields = ["cycle", "time", "noninv_tot_inj", "coverage_ge384_ratio"]
-    next_cycle = _infer_next_cycle(info_path, summary_fields)
-    _append_summary_csv(info_path, summary_fields, {
-        "cycle": next_cycle,
-        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "noninv_tot_inj": str(noninv_sum),
-        "coverage_ge384_ratio": f"{ratio:.4f}",
-    })
+    # result_info 追加（加入 perc_inv_new）
+    header_fields = ["cycle", "perc_inv_new", "noninvalid_tot_inj", "coverage_ge384_ratio"]
+    cycle = _infer_next_cycle(info_path, header_fields)
+    _append_summary_csv(
+        info_path,
+        header_fields,
+        {
+            "cycle": cycle,
+            "perc_inv_new": f"{perc_inv_new:.6f}",
+            "noninvalid_tot_inj": sum_noninv_totinj,
+            "coverage_ge384_ratio": f"{ratio:.6f}",
+        },
+    )
 
-    # ------ 打印关键进展与 Top-K 摘要 ------
-    print(f"[Coverage] 非 invalid 指令数 = {n}，coverage = {coverage:.2%} → K = {K}")
-    print(f"[Progress] 非 invalid tot_inj 之和 = {noninv_sum} "
-          f"{'(已保存快照)' if noninv_sum >= snapshot_threshold else f'(未达 {snapshot_threshold}，待触发快照)'}")
-    if K > 0:
-        print(f"[Top-K] 已达标(≥{per_inst_target})：{ge_cnt}/{K} → 占比 {ratio:.2%}")
-        header = f"{'rank':>4}  {'tot_inj':>7}  {'SDC':>5}  {'m1(tot/sum)':>13}  {'m2(SDC/tot)':>13}  {'score':>10}  kernel:line  inst_text"
-        print(header)
-        for i, it in enumerate(topK[:print_top], 1):
-            print(f"{i:>4}  {it['tot_inj']:>7}  {it['SDC']:>5}  {it['m1']:.6f}      {it['m2']:.6f}      {it['score']:.6f}  "
-                  f"{it['kernel']}:{it['inst_line']}  {it['inst_text']}")
+    # 打印摘要
+    print("===== Coverage Check (New Criterion) =====")
+    print(f" Non-invalid instructions: {n_noninv}")
+    print(f" Sum(non-invalid tot_inj): {sum_noninv_totinj}")
+    print(f" Coverage (Top-K) K = {K} (coverage={coverage:.3f})")
+    print(f" Ratio of Top-K with tot_inj >= {per_inst_threshold}: {ratio:.6f} ({cnt_ge}/{K})")
+    print(f" perc_inv_new (this batch): {perc_inv_new:.6f}")
 
-    # ------ 汇总 totals 返回（与旧打印兼容）------
-    tot_masked = sum(_safe_int(x.get("Masked", 0)) for x in rows_raw)
-    tot_sdc    = sum(_safe_int(x.get("SDC", 0)) for x in rows_raw)
-    tot_due    = sum(_safe_int(x.get("DUE", 0)) for x in rows_raw)
-    tot_others = sum(_safe_int(x.get("Others", 0)) for x in rows_raw)
-    ret = {
-        "cycle": next_cycle,
-        "noninv_tot_inj": noninv_sum,
-        "K": K,
-        "coverage_ge384_ratio": ratio,
-        "totals": {"Masked": tot_masked, "SDC": tot_sdc, "DUE": tot_due, "Others": tot_others},
-    }
-
-    # ------ 早停（全部覆盖集均达到 384）------
-    if K > 0 and ge_cnt == K:
-        print("\nEARLY_STOP: 覆盖集(Top-K)内所有指令的 tot_inj 均 ≥ "
-              f"{per_inst_target}。发送 exit99。")
+    # 若达到停机条件
+    if K > 0 and cnt_ge == K:
+        print("\nAll Top-K (by metric1*metric2) have tot_inj >= "
+              f"{per_inst_threshold}. Triggering early stop (exit99).")
+        print(" Top-K preview:")
+        for i, x in enumerate(topK[:min(10, len(topK))], 1):
+            print(f"  #{i} kernel={x['kernel']} line={x['inst_line']} tot_inj={x['tot_inj']} "
+                  f"SDC={x['SDC']} m1={x['metric1']:.6f} m2={x['metric2']:.6f} score={x['score']:.6e}")
         sys.exit(99)
 
-    # 若你想改为“Top-K 中任意一条达 384 就停”，把上面的判断改为：
-    # if K > 0 and ge_cnt > 0: sys.exit(99)
-
-    return ret
+    # 未达标则返回摘要
+    return {
+        "cycle": cycle,
+        "noninvalid_tot_inj": sum_noninv_totinj,
+        "coverage_ge384_ratio": ratio,
+        "K": K,
+        "cnt_ge": cnt_ge,
+        "perc_inv_new": perc_inv_new,
+    }
 
 
 # -----------------------------
@@ -711,15 +712,21 @@ def compute_coverage_and_maybe_stop(out_csv_path: str,
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Analyze inst_exec.log and merge results with previous CSV."
+        description="Analyze inst_exec.log and merge results with previous CSV (new stop & snapshot rules)."
     )
     parser.add_argument("--app", "-a", required=True, help="Application name")
     parser.add_argument("--test", "-t", required=True, help="Test identifier", type=str)
     parser.add_argument("--component", "-c", required=True, help="Component set")
     parser.add_argument("--bitflip", "-b", required=True, help="Number of bit flips to inject")
 
-    # 覆盖率
-    parser.add_argument("--coverage", type=float, default=0.90, help="Top-K coverage fraction over non-invalid instructions (default 0.90)")
+    # 旧参数保留（但不使用），保证外部调用兼容
+    parser.add_argument("--alpha", type=float, default=0.05, help="(ignored)")
+    parser.add_argument("--eps_share", type=float, default=0.01, help="(ignored)")
+    parser.add_argument("--eps_inv", type=float, default=0.01, help="(ignored)")
+    parser.add_argument("--eps_sdc", type=float, default=0.02, help="(ignored)")
+    parser.add_argument("--coverage", type=float, default=0.90, help="Top-K 覆盖率（用于新停机判据）")
+
+    parser.add_argument("--batch_injections", type=int, default=0, help="(ignored)")
 
     args = parser.parse_args()
 
@@ -728,7 +735,7 @@ def main():
     # 解析本次日志
     effects_occ, results_occ, params_by_pair = parse_log(log_path)
 
-    # Perc_inv（仅新数据）
+    # 计算并保留 perc_inv_new
     perc_inv_new = _compute_perc_inv_from_new(effects_occ)
 
     # 写入/合并结果 CSV
@@ -739,7 +746,7 @@ def main():
     out_path, total_masked, total_sdc, total_due, total_others, total_inj = write_csv(
         args.app, args.test, args.component, args.bitflip, effects_occ, results_occ, params_by_pair)
 
-    # 记录 invalid 参数组合
+    # 记录 invalid 参数组合（保持原功能）
     invalid_keys = set()
     for inj_key, recs in effects_occ.items():
         run_id, name, _ = inj_key
@@ -764,7 +771,7 @@ def main():
                     f.write(k + "\n")
             print(f"Appended {len(new_items)} invalid parameter combinations to {store_path}")
 
-    # 对“invalid 但结果为 SDC”的新注入，拷贝 tmp.out 并记录信息
+    # 对“invalid 但结果为 SDC”的新注入，拷贝 tmp.out 并记录信息（保持原功能）
     _collect_invalid_sdc_outputs(
         effects_occ,
         results_occ,
@@ -775,29 +782,26 @@ def main():
         bitflip=args.bitflip,
     )
 
-    # 计算 Top-K 精度并决定是否早停 / 快照维护
+    # 新的停机/快照逻辑（加入 perc_inv_new）
     info_dir = "result_info"
     os.makedirs(info_dir, exist_ok=True)
     info_path = os.path.join(info_dir, f"result_info_{args.app}_{args.test}_{args.component}_{args.bitflip}.csv")
 
-    summary = compute_coverage_and_maybe_stop(
+    summary = compute_metrics_and_maybe_stop_new(
         out_csv_path=out_path,
         coverage=args.coverage,
         info_path=info_path,
-        snapshot_threshold=9604,   # 需求：非 invalid tot_inj 之和达到 9604 触发快照
-        per_inst_target=384        # 需求：Top-K 内每条至少 384 次注入才算达标
+        perc_inv_new=perc_inv_new,
+        snapshot_threshold_total=9604,
+        per_inst_threshold=384,
     )
 
     if summary is not None:
-        totals = summary.get("totals", {})
         print("========== Final Summary ==========")
-        print(f" Masked: {totals.get('Masked', 0)} | SDC: {totals.get('SDC', 0)} | "
-            f"DUE: {totals.get('DUE', 0)} | Others: {totals.get('Others', 0)}")
-        print(
-            f"Cycle={summary['cycle']} | noninvalid_tot_inj={summary['noninv_tot_inj']} | "
-            f"coverage_K={summary['K']} | coverage_ge384_ratio={summary['coverage_ge384_ratio']:.4f}"
-        )
-
+        print(f" Masked: {total_masked} | SDC: {total_sdc} | DUE: {total_due} | Others: {total_others}")
+        print(f" Cycle={summary['cycle']} | NonInvalidTotInj={summary['noninvalid_tot_inj']} | "
+              f"TopK>=384 Ratio={summary['coverage_ge384_ratio']:.6f} ({summary['cnt_ge']}/{summary['K']}) | "
+              f"perc_inv_new={summary['perc_inv_new']:.6f}")
 
 
 if __name__ == "__main__":

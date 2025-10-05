@@ -1,11 +1,11 @@
 #!/bin/bash
 
-TEST_APP_NAME="RayTracing"
+TEST_APP_NAME="AdamW"
 COMPONENT_SET="0"
 INJECT_BIT_FLIP_COUNT=1 # number of bits to flip per injection (e.g. 2 means flip 2 bits per injection)
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
-RUN_PER_EPOCH=1000
-EPOCH=200
+RUN_PER_EPOCH=384
+EPOCH=521
 
 
 DO_BUILD=1 # 1: build before run, 0: skip build
@@ -364,6 +364,8 @@ main() {
     pip3 install numpy
     pip3 install pandas
     pip3 install scipy
+    pip3 install coscmd
+
 
     # load environment variables
     source setup_environment
@@ -729,6 +731,36 @@ main() {
                 break
             fi
         done
+
+        # 上传 test_result 目录下的所有文件到 COS
+        if [[ -d "test_result" && $(ls -A test_result) ]]; then
+            for tr_file in test_result/*; do
+            if [[ -f "$tr_file" ]]; then
+                coscmd upload "$tr_file" "fffggg-1309585620/${TEST_APP_NAME}/test_result/$(basename "$tr_file")"
+            fi
+            done
+            rm -rf test_result/*
+        fi
+
+        # 上传 result_info 目录下的所有文件到 COS
+        if [[ -d "result_info" && $(ls -A result_info) ]]; then
+            for ri_file in result_info/*; do
+            if [[ -f "$ri_file" ]]; then
+                coscmd upload "$ri_file" "fffggg-1309585620/${TEST_APP_NAME}/result_info/$(basename "$ri_file")"
+            fi
+            done
+            rm -rf result_info/*
+        fi
+        
+        if [[ -d "error_classification" && $(ls -A error_classification) ]]; then
+            for ec_file in error_classification/*; do
+            if [[ -f "$ec_file" ]]; then
+                coscmd upload "$ec_file" "fffggg-1309585620/error_classification/$(basename "$ec_file")"
+            fi
+            done
+            rm -rf error_classification/*
+        fi
+        
     done
     rm -f register_used.txt
     rm -f $TEST_APP_NAME.ptx
