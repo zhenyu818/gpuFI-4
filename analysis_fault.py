@@ -556,7 +556,7 @@ def _append_suffix_before_ext(path: str, suffix: str) -> str:
 
 
 # -----------------------------
-# 新增：分半计算 + Spearman 相关系数
+# 新增：分半计算 + Spearman 相关系数（保留，不再用于停机）
 # -----------------------------
 
 def _rankdata_avg_ties(values):
@@ -603,14 +603,7 @@ def _spearman_corr(x, y):
 
 def compute_A_B_with_random_split(effects_occ, results_occ):
     """
-    仅基于“本轮新数据（effects_occ/results_occ）”：
-      - 将所有“非 invalid 的 rec”随机打乱后均分为两半；
-      - 在每一半内，按“指令( kernel, inst_line, inst_text )”聚合 tot_inj 与 SDC；
-      - 指标1 = tot_inj / (该半内所有非 invalid 指令的 tot_inj 之和)；
-        指标2 = SDC / tot_inj( tot_inj=0 -> 0 )；
-      - 以 score = 指标1*指标2 排序，分别取各自 Top 50% 的指令集合；
-      - 在“两个 Top-50% 集合的交集”上，分别对指标1和指标2计算 Spearman 相关，得到 A、B。
-    备注：若交集大小 < 2，则相关系数置 0.0。
+    仅基于“本轮新数据（effects_occ/results_occ）”：随机分半并计算 A/B（保留原函数，未用于停机）
     """
     # 1) 展平“本轮新数据”的 rec 列表（过滤 invalid）
     records = []  # 每个元素： (key, is_sdc)
@@ -629,17 +622,14 @@ def compute_A_B_with_random_split(effects_occ, results_occ):
             key = (kernel, inst_line, inst_text)
             records.append((key, is_sdc))
 
-    # 若本轮没有非 invalid 数据，返回 0
     if not records:
         return 0.0, 0.0, set()
 
-    # 2) 随机打乱并均分为两半
     random.shuffle(records)
     mid = len(records) // 2
     half1 = records[:mid]
     half2 = records[mid:]
 
-    # 3) 两半内按指令聚合 tot_inj / SDC
     def agg_half(recs):
         tot = defaultdict(int)
         sdc = defaultdict(int)
@@ -652,12 +642,10 @@ def compute_A_B_with_random_split(effects_occ, results_occ):
     tot1, sdc1 = agg_half(half1)
     tot2, sdc2 = agg_half(half2)
 
-    # 指令全集（出现在任意半中的指令）
     keys = set(list(tot1.keys()) + list(tot2.keys()))
     if not keys:
         return 0.0, 0.0, set()
 
-    # 4) 计算每半的指标与分数
     sum_tot1 = sum(tot1.values())
     sum_tot2 = sum(tot2.values())
 
@@ -674,12 +662,10 @@ def compute_A_B_with_random_split(effects_occ, results_occ):
     met1 = calc_metrics_for_half(tot1, sdc1, sum_tot1)
     met2 = calc_metrics_for_half(tot2, sdc2, sum_tot2)
 
-    # 5) 各半 Top-50%（按 score 降序），取交集
     n = len(keys)
     top_n = max(1, math.ceil(0.5 * n))
 
     def top_set(metrics):
-        # metrics[k] = (m1, m2, score)
         ordered = sorted(metrics.items(), key=lambda kv: (-kv[1][2], kv[0][0], kv[0][1], kv[0][2]))
         return set(k for k, _ in ordered[:top_n])
 
@@ -690,7 +676,6 @@ def compute_A_B_with_random_split(effects_occ, results_occ):
     if len(inter) < 2:
         return 0.0, 0.0, inter
 
-    # 6) 在交集上计算 Spearman
     m1_half1 = [met1[k][0] for k in inter]
     m1_half2 = [met2[k][0] for k in inter]
     m2_half1 = [met1[k][1] for k in inter]
@@ -699,6 +684,85 @@ def compute_A_B_with_random_split(effects_occ, results_occ):
     A = _spearman_corr(m1_half1, m1_half2)
     B = _spearman_corr(m2_half1, m2_half2)
     return A, B, inter
+
+
+# -----------------------------
+# 新增：基于（旧数据）vs（旧+新）的 Spearman 相关（用于停机条件）
+# -----------------------------
+
+def _load_noninvalid_stats_from_csv(csv_path: str):
+    """
+    从累计 CSV 加载非 invalid 指令的 (tot_inj, SDC)。
+    返回 dict: { (kernel, inst_line:int, inst_text): (tot, sdc) }
+    """
+    stats = {}
+    if not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0:
+        return stats
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row.get("kernel", "") == "invalid_summary":
+                continue
+            try:
+                inst_line = -1 if row.get("inst_line", "") == "" else int(row.get("inst_line"))
+            except Exception:
+                inst_line = -1
+            key = (row.get("kernel", "unknown"), inst_line, row.get("inst_text", "unknown"))
+            try:
+                tot = int(row.get("tot_inj", 0))
+            except Exception:
+                tot = 0
+            try:
+                sdc = int(row.get("SDC", 0))
+            except Exception:
+                sdc = 0
+            stats[key] = (tot, sdc)
+    return stats
+
+
+def _calc_metrics_and_top(stats: dict, ratio: float = 0.6):
+    """
+    由 {key:(tot,sdc)} 计算：
+      指标1 m1 = tot / sum_tot_all
+      指标2 m2 = sdc / tot (tot=0 -> 0)
+      得分 score = m1*m2
+    返回 (metrics, top_keys)
+      metrics: {key: (m1, m2, score)}
+      top_keys: 依据 score 从大到小取前 ceil(ratio*n) 的 key 集合
+    """
+    n = len(stats)
+    if n == 0:
+        return {}, set()
+    sum_tot = sum(t for t, _ in stats.values())
+    metrics = {}
+    for k, (t, s) in stats.items():
+        m1 = (t / sum_tot) if sum_tot > 0 else 0.0
+        m2 = (s / t) if t > 0 else 0.0
+        metrics[k] = (m1, m2, m1 * m2)
+    top_n = max(1, math.ceil(ratio * n))
+    ordered = sorted(metrics.items(), key=lambda kv: (-kv[1][2], kv[0][0], kv[0][1], kv[0][2]))
+    top_keys = set(k for k, _ in ordered[:top_n])
+    return metrics, top_keys
+
+
+def compute_A_B_old_vs_merged(old_stats: dict, merged_stats: dict, top_ratio: float = 0.6):
+    """
+    计算（旧+新）与（旧）两者“各自按指标1*指标2排序后的前 top_ratio 部分”的
+    指标1/指标2在交集上的 Spearman 相关系数 A/B。
+    """
+    met_old, top_old = _calc_metrics_and_top(old_stats, ratio=top_ratio)
+    met_new, top_new = _calc_metrics_and_top(merged_stats, ratio=top_ratio)
+    inter = top_old & top_new
+    if len(inter) < 2:
+        return 0.0, 0.0
+    keys_sorted = sorted(inter, key=lambda k: (k[0], k[1], k[2]))
+    old_m1 = [met_old[k][0] for k in keys_sorted]
+    new_m1 = [met_new[k][0] for k in keys_sorted]
+    old_m2 = [met_old[k][1] for k in keys_sorted]
+    new_m2 = [met_new[k][1] for k in keys_sorted]
+    A = _spearman_corr(old_m1, new_m1)
+    B = _spearman_corr(old_m2, new_m2)
+    return A, B
 
 
 # -----------------------------
@@ -742,12 +806,12 @@ def _maybe_save_threshold_snapshots(out_csv_path: str, thresholds=(384, 600, 106
 
 
 # -----------------------------
-# 主流程（按你的新规则）
+# 主流程（停机条件按你的新规则）
 # -----------------------------
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Analyze inst_exec.log and merge results with previous CSV; compute split-half Spearman A/B & manage snapshots."
+        description="Analyze inst_exec.log and merge results with previous CSV; compute Spearman A/B & manage snapshots."
     )
     parser.add_argument("--app", "-a", required=True, help="Application name")
     parser.add_argument("--test", "-t", required=True, help="Test identifier", type=str)
@@ -765,14 +829,22 @@ def main():
     # 计算 Perc_inv（仅新数据）
     perc_inv_new = _compute_perc_inv_from_new(effects_occ)
 
-    # 写入/合并结果 CSV
+    # 结果 CSV 路径
     out_dir = os.path.join("test_result")
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"test_result_{args.app}_{args.test}_{args.component}_{args.bitflip}.csv")
 
+    # ==== 新增：在写入合并前，先读取“旧数据”的统计 ====
+    old_stats = _load_noninvalid_stats_from_csv(out_path)
+
+    # 写入/合并结果 CSV（得到“旧+新”）
     out_path, total_masked, total_sdc, total_due, total_others, total_inj = write_csv(
         args.app, args.test, args.component, args.bitflip, effects_occ, results_occ, params_by_pair
     )
+
+    # ==== 新增：读取“旧+新”的统计并计算 A/B（前 60% Top 集合）====
+    merged_stats = _load_noninvalid_stats_from_csv(out_path)
+    A, B = compute_A_B_old_vs_merged(old_stats, merged_stats, top_ratio=0.6)
 
     # 记录 invalid 参数组合（保持原功能）
     invalid_keys = set()
@@ -810,9 +882,6 @@ def main():
         bitflip=args.bitflip,
     )
 
-    # ===== 新增：分半排序 & 前 50% 指令的 Spearman 相关（A/B）=====
-    A, B, _ = compute_A_B_with_random_split(effects_occ, results_occ)
-
     # 写入 result_info（cycle, A, B, Perc_inv）
     info_dir = "result_info"
     os.makedirs(info_dir, exist_ok=True)
@@ -836,7 +905,7 @@ def main():
     print(f" Cycle={cycle} | A={A:.6f} | B={B:.6f} | Perc_inv (new only)={perc_inv_new:.6f}")
     print(f" Totals  Masked: {total_masked} | SDC: {total_sdc} | DUE: {total_due} | Others: {total_others} | All: {total_inj}")
 
-    # 读取最近历史，计算“连续 >=0.9”的计数
+    # 读取最近历史
     hist = _read_last_vals(info_path, k=10)  # 取最近最多 10 轮
     def streak_ge(vals, thr=0.9):
         cnt = 0
@@ -849,32 +918,38 @@ def main():
 
     As = [ab[0] for ab in hist]
     Bs = [ab[1] for ab in hist]
-    A_streak = streak_ge(As, 0.9)
-    B_streak = streak_ge(Bs, 0.9)
+
+    # 原有 0.9 阈值的连续计数（用于现有的快照逻辑，保持不变）
+    A_streak_09 = streak_ge(As, 0.9)
+    B_streak_09 = streak_ge(Bs, 0.9)
+
+    # ==== 新增：停机阈值改为 0.98（连续 3 轮）====
+    A_streak_098 = streak_ge(As, 0.98)
+    B_streak_098 = streak_ge(Bs, 0.98)
 
     # ---- 停机判断优先（若停机则不再执行分段里程碑快照）----
-    if A_streak >= 3 and B_streak >= 3:
-        print(f"[EXIT] A and B have both been >=0.9 for 3 consecutive rounds (A_streak={A_streak}, B_streak={B_streak}). exit99.")
+    if A_streak_098 >= 3 and B_streak_098 >= 3:
+        print(f"[EXIT] A and B have both been >=0.98 for 3 consecutive rounds (A_streak={A_streak_098}, B_streak={B_streak_098}). exit99.")
         sys.exit(99)
 
-    # A 连续>=3 且 B 尚未连续>=3：另存 test_result_*_A.csv
+    # A 连续>=3 且 B 尚未连续>=3：另存 test_result_*_A.csv（维持原有以 0.9 为阈值的行为）
     snap_A_path = _append_suffix_before_ext(out_path, "_A")
-    if A_streak >= 3 and B_streak < 3:
+    if A_streak_09 >= 3 and B_streak_09 < 3:
         try:
             shutil.copyfile(out_path, snap_A_path)
-            print(f"[Info] A has >=0.9 for {A_streak} consecutive rounds (B={B_streak}). Snapshot saved: {snap_A_path}")
+            print(f"[Info] A has >=0.9 for {A_streak_09} consecutive rounds (B={B_streak_09}). Snapshot saved: {snap_A_path}")
         except Exception as e:
             print(f"[WARN] Failed to save snapshot {snap_A_path}: {e}")
 
-    # 若 A 在曾经达到连续>=3 后又跌破（即当前连续计数 < 3），删除 _A 快照（若存在）
-    if A_streak < 3 and os.path.exists(snap_A_path):
+    # 若 A 在曾经达到连续>=3 后又跌破（即当前连续计数 < 3），删除 _A 快照（若存在）（仍按 0.9 阈值）
+    if A_streak_09 < 3 and os.path.exists(snap_A_path):
         try:
             os.remove(snap_A_path)
             print(f"[Info] A-streak dropped below 3. Snapshot removed: {snap_A_path}")
         except Exception as e:
             print(f"[WARN] Failed to remove {snap_A_path}: {e}")
 
-    # ---- 新增：分段里程碑快照（仅在“未停机”的情况下评估并保存；且仅首次保存）----
+    # ---- 分段里程碑快照（仅在“未停机”的情况下评估并保存；且仅首次保存）----
     total_noninv, saved_snaps = _maybe_save_threshold_snapshots(out_path, thresholds=(384, 600, 1067, 2401))
     if saved_snaps:
         print(f"[Info] Non-invalid tot_inj sum = {total_noninv}. Saved milestone snapshots: {', '.join(saved_snaps)}")

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-TEST_APP_NAME="AdamW"
-COMPONENT_SET="0"
+TEST_APP_NAME="Pathfinder"
+COMPONENT_SET="2"
 INJECT_BIT_FLIP_COUNT=1 # number of bits to flip per injection (e.g. 2 means flip 2 bits per injection)
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
 RUN_PER_EPOCH=1000

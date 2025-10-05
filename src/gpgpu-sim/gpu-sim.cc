@@ -2068,17 +2068,20 @@ void bitflip_n_local_mem(std::vector<ptx_thread_info*> &threads_vector, char *lo
     memory_space_impl<bsize> *local_mem = (memory_space_impl<bsize>*) (*threads_it)->m_local_mem;
     mem_map<mem_addr_t, mem_storage<bsize> > &memory_data = local_mem->get_m_data();
     for(std::vector<unsigned>::iterator bf_it = local_mem_bitflip_vector.begin(); bf_it != local_mem_bitflip_vector.end(); ++bf_it) {
-      unsigned bf = *bf_it;
-      unsigned block_idx = bf/(bsize*8); // this in fact is the mem_addr_t of memory_data
-      unsigned bit_in_block = bf - block_idx*bsize*8;
-      unsigned idx_64b = bit_in_block/64;
-      unsigned bit_in_64b = bit_in_block - idx_64b*64;
+      // Convert to 0-based bit index within the whole memory space page
+      unsigned bf1 = *bf_it;                 // 1-based from config
+      if (bf1 == 0) continue;                // ignore invalid 0
+      unsigned bf0 = bf1 - 1;                // 0-based bit index
+      unsigned block_idx = bf0/(bsize*8);    // mem_addr_t page index
+      unsigned bit_in_block0 = bf0 - block_idx*(bsize*8);
+      unsigned idx_64b = bit_in_block0/64;   // 0-based 64b word index
+      unsigned bit_in_64b0 = bit_in_block0 % 64; // 0..63
 
       if (memory_data.find(block_idx) != memory_data.end()) {
         unsigned long long *i_data = (unsigned long long *)memory_data[block_idx].get_m_data();
 //        printf("BEFORE BIT FLIP: address=%p\n", i_data);
 //        (*threads_it)->m_local_mem->print("%d", stdout);
-        i_data[idx_64b] ^= 1UL << (bit_in_64b-1);
+        i_data[idx_64b] ^= 1ULL << bit_in_64b0;
 //        printf("AFTER BIT FLIP: address=%p\n", i_data);
 //        g_print_memory_space((*threads_it)->m_local_mem, "%d");
       }
@@ -2086,11 +2089,11 @@ void bitflip_n_local_mem(std::vector<ptx_thread_info*> &threads_vector, char *lo
       gpgpu_sim *gpu = (gpgpu_sim *)((*threads_it)->get_gpu());
       unsigned long long cyc = gpu->gpu_sim_cycle + gpu->gpu_tot_sim_cycle;
       unsigned pc = (*threads_it)->get_pc();
-      mem_addr_t byte_addr = block_idx * bsize + (bit_in_block - 1) / 8;
-      unsigned bit_in_byte_1based = ((bit_in_block - 1) % 8) + 1;
+      mem_addr_t byte_addr = block_idx * bsize + (bit_in_block0) / 8;
+      unsigned bit_in_byte_1based = (bit_in_block0 % 8) + 1;
       ptx_thread_info::reg_write_info lastw = (*threads_it)->get_last_local_mem_writer(byte_addr);
       (*threads_it)->register_local_mem_injection(byte_addr, bit_in_byte_1based, cyc, pc, lastw);
-      printf("bf=%u, block_idx=%u, bit_in_block=%u, idx_64b=%u, bit_in_64b=%u\n", bf, block_idx, bit_in_block, idx_64b, bit_in_64b);
+      printf("bf=%u, block_idx=%u, bit_in_block0=%u, idx_64b=%u, bit_in_64b0=%u\n", bf1, block_idx, bit_in_block0, idx_64b, bit_in_64b0);
     }
   }
 }
@@ -2110,17 +2113,20 @@ void bitflip_n_shared_mem_nblocks(std::vector<memory_space*> shared_memories,
     mem_map<mem_addr_t, mem_storage<bsize> > &memory_data = shared_mem_to_bitflip->get_m_data();
 
     for(std::vector<unsigned>::iterator bf_it = shared_mem_bitflip_vector.begin(); bf_it != shared_mem_bitflip_vector.end(); ++bf_it) {
-      unsigned bf = *bf_it;
-      unsigned page_idx = bf/(bsize*8); // mem_addr_t (index) of memory_data page
-      unsigned bit_in_block = bf - page_idx*bsize*8;
-      unsigned idx_64b = bit_in_block/64;
-      unsigned bit_in_64b = bit_in_block - idx_64b*64;
+      // Convert to 0-based bit index within the whole shared memory page
+      unsigned bf1 = *bf_it;                 // 1-based from config
+      if (bf1 == 0) continue;                // ignore invalid 0
+      unsigned bf0 = bf1 - 1;                // 0-based bit index
+      unsigned page_idx = bf0/(bsize*8);     // mem_addr_t page index
+      unsigned bit_in_block0 = bf0 - page_idx*(bsize*8);
+      unsigned idx_64b = bit_in_block0/64;   // 0-based 64b word index
+      unsigned bit_in_64b0 = bit_in_block0 % 64; // 0..63
 
       if (memory_data.find(page_idx) != memory_data.end()) {
         unsigned long long *i_data = (unsigned long long *)memory_data[page_idx].get_m_data();
 //        printf("BEFORE BIT FLIP: address=%p\n", i_data);
 //        shared_mem_to_bitflip->print("%d", stdout);
-        i_data[idx_64b] ^= 1UL << (bit_in_64b-1);
+        i_data[idx_64b] ^= 1ULL << bit_in_64b0;
 //        printf("AFTER BIT FLIP: address=%p\n", i_data);
 //        shared_mem_to_bitflip->print("%08x", stdout);
       }
@@ -2137,12 +2143,12 @@ void bitflip_n_shared_mem_nblocks(std::vector<memory_space*> shared_memories,
         gpgpu_sim *gpu = (gpgpu_sim *)(t0->get_gpu());
         unsigned long long cyc = gpu->gpu_sim_cycle + gpu->gpu_tot_sim_cycle;
         unsigned pc = t0->get_pc();
-        mem_addr_t byte_addr = page_idx * bsize + (bit_in_block - 1) / 8;
-        unsigned bit_in_byte_1based = ((bit_in_block - 1) % 8) + 1;
+        mem_addr_t byte_addr = page_idx * bsize + (bit_in_block0) / 8;
+        unsigned bit_in_byte_1based = (bit_in_block0 % 8) + 1;
         ptx_cta_info::smem_write_info lastw = t0->m_cta_info->get_last_shared_mem_writer(byte_addr);
         t0->m_cta_info->register_shared_mem_injection(byte_addr, bit_in_byte_1based, cyc, pc, lastw, t0);
       }
-      printf("bf=%u, page_idx=%u, bit_in_block=%u, idx_64b=%u, bit_in_64b=%u\n", bf, page_idx, bit_in_block, idx_64b, bit_in_64b);
+      printf("bf=%u, page_idx=%u, bit_in_block0=%u, idx_64b=%u, bit_in_64b0=%u\n", bf1, page_idx, bit_in_block0, idx_64b, bit_in_64b0);
     }
 
     shared_memories.erase(shared_memories.begin() + block_idx);
