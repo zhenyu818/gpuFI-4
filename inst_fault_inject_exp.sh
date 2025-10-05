@@ -4,8 +4,8 @@ TEST_APP_NAME="AdamW"
 COMPONENT_SET="0"
 INJECT_BIT_FLIP_COUNT=1 # number of bits to flip per injection (e.g. 2 means flip 2 bits per injection)
 # 0:RF, 1:local_mem, 2:shared_mem, 3:L1D_cache, 4:L1C_cache, 5:L1T_cache, 6:L2_cache
-RUN_PER_EPOCH=384
-EPOCH=521
+RUN_PER_EPOCH=1000
+EPOCH=200
 
 
 DO_BUILD=1 # 1: build before run, 0: skip build
@@ -366,7 +366,6 @@ main() {
     pip3 install scipy
     pip3 install coscmd
 
-
     # load environment variables
     source setup_environment
 
@@ -724,7 +723,7 @@ main() {
             # 等待主进程结束
             wait $CMD_PID
             echo "=== Fault injection for ${filename} finished ==="
-            python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext  -c $COMPONENT_SET -b $INJECT_BIT_FLIP_COUNT --coverage 0.5
+            python3 analysis_fault.py -a $TEST_APP_NAME -t $filename_no_ext  -c $COMPONENT_SET -b $INJECT_BIT_FLIP_COUNT
             ret=$?
             if [ $ret -eq 99 ]; then
                 echo "=== Early stopping triggered. Exiting loop ==="
