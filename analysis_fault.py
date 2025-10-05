@@ -702,12 +702,52 @@ def compute_A_B_with_random_split(effects_occ, results_occ):
 
 
 # -----------------------------
+# 辅助：汇总非 invalid 指令 tot_inj，并按阈值做分段备份
+# -----------------------------
+
+def _sum_noninvalid_totinj_from_csv(out_csv_path: str) -> int:
+    """从累积 CSV 中计算所有非 invalid 行的 tot_inj 之和。"""
+    if not os.path.exists(out_csv_path):
+        return 0
+    s = 0
+    with open(out_csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row.get("kernel", "") == "invalid_summary":
+                continue
+            try:
+                s += int(row.get("tot_inj", 0))
+            except Exception:
+                pass
+    return s
+
+
+def _maybe_save_threshold_snapshots(out_csv_path: str, thresholds=(384, 600, 1067, 2401)):
+    """
+    当累积的非 invalid tot_inj 之和达到各阈值时，首次各自另存 CSV（_384/_600/_1067/_2401）。
+    若快照已存在则保持不变（不覆盖）。
+    """
+    total_noninv = _sum_noninvalid_totinj_from_csv(out_csv_path)
+    saved = []
+    for thr in thresholds:
+        snap = _append_suffix_before_ext(out_csv_path, f"_{thr}")
+        if total_noninv >= thr and not os.path.exists(snap):
+            try:
+                shutil.copyfile(out_csv_path, snap)
+                print(f"[Snapshot] non-invalid tot_inj={total_noninv} >= {thr}. Saved: {snap}")
+                saved.append(snap)
+            except Exception as e:
+                print(f"[WARN] Failed to save snapshot {snap}: {e}")
+    return total_noninv, saved
+
+
+# -----------------------------
 # 主流程（按你的新规则）
 # -----------------------------
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Analyze inst_exec.log and merge results with previous CSV; compute split-half Spearman A/B & manage _A snapshot."
+        description="Analyze inst_exec.log and merge results with previous CSV; compute split-half Spearman A/B & manage snapshots."
     )
     parser.add_argument("--app", "-a", required=True, help="Application name")
     parser.add_argument("--test", "-t", required=True, help="Test identifier", type=str)
@@ -771,7 +811,7 @@ def main():
     )
 
     # ===== 新增：分半排序 & 前 50% 指令的 Spearman 相关（A/B）=====
-    A, B, inter_keys = compute_A_B_with_random_split(effects_occ, results_occ)
+    A, B, _ = compute_A_B_with_random_split(effects_occ, results_occ)
 
     # 写入 result_info（cycle, A, B, Perc_inv）
     info_dir = "result_info"
@@ -798,7 +838,6 @@ def main():
 
     # 读取最近历史，计算“连续 >=0.9”的计数
     hist = _read_last_vals(info_path, k=10)  # 取最近最多 10 轮
-    # 把当前一轮的 (A,B) 也视作已写入（hist 已含当前行）
     def streak_ge(vals, thr=0.9):
         cnt = 0
         for v in reversed(vals):
@@ -813,6 +852,11 @@ def main():
     A_streak = streak_ge(As, 0.9)
     B_streak = streak_ge(Bs, 0.9)
 
+    # ---- 停机判断优先（若停机则不再执行分段里程碑快照）----
+    if A_streak >= 3 and B_streak >= 3:
+        print(f"[EXIT] A and B have both been >=0.9 for 3 consecutive rounds (A_streak={A_streak}, B_streak={B_streak}). exit99.")
+        sys.exit(99)
+
     # A 连续>=3 且 B 尚未连续>=3：另存 test_result_*_A.csv
     snap_A_path = _append_suffix_before_ext(out_path, "_A")
     if A_streak >= 3 and B_streak < 3:
@@ -823,18 +867,17 @@ def main():
             print(f"[WARN] Failed to save snapshot {snap_A_path}: {e}")
 
     # 若 A 在曾经达到连续>=3 后又跌破（即当前连续计数 < 3），删除 _A 快照（若存在）
-    if A_streak < 3:
-        if os.path.exists(snap_A_path):
-            try:
-                os.remove(snap_A_path)
-                print(f"[Info] A-streak dropped below 3. Snapshot removed: {snap_A_path}")
-            except Exception as e:
-                print(f"[WARN] Failed to remove {snap_A_path}: {e}")
+    if A_streak < 3 and os.path.exists(snap_A_path):
+        try:
+            os.remove(snap_A_path)
+            print(f"[Info] A-streak dropped below 3. Snapshot removed: {snap_A_path}")
+        except Exception as e:
+            print(f"[WARN] Failed to remove {snap_A_path}: {e}")
 
-    # 当 A 和 B 均连续 3 轮 >=0.9 时，上抛 exit99
-    if A_streak >= 3 and B_streak >= 3:
-        print(f"[EXIT] A and B have both been >=0.9 for 3 consecutive rounds (A_streak={A_streak}, B_streak={B_streak}). exit99.")
-        sys.exit(99)
+    # ---- 新增：分段里程碑快照（仅在“未停机”的情况下评估并保存；且仅首次保存）----
+    total_noninv, saved_snaps = _maybe_save_threshold_snapshots(out_path, thresholds=(384, 600, 1067, 2401))
+    if saved_snaps:
+        print(f"[Info] Non-invalid tot_inj sum = {total_noninv}. Saved milestone snapshots: {', '.join(saved_snaps)}")
 
     # 正常结束
     return
