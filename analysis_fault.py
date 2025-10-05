@@ -628,9 +628,10 @@ def compute_metrics_and_maybe_stop_new(out_csv_path: str,
 
     sum_noninv_totinj = sum(_safe_int(r.get("tot_inj", 0)) for r in noninv_rows)
 
-    # 9604 快照（首次）
-    if sum_noninv_totinj >= snapshot_threshold_total:
-        _save_snapshot_if_first(out_csv_path, f"_{snapshot_threshold_total}")
+    # 分段快照（首次）：当非 invalid tot_inj 之和达到 384 / 1067 / 9604 时各自留存一次
+    for thr in (384, 1067, snapshot_threshold_total):  # snapshot_threshold_total 默认就是 9604
+        if sum_noninv_totinj >= thr:
+            _save_snapshot_if_first(out_csv_path, f"_{thr}")
 
     # 计算指标与排序
     scores = []
