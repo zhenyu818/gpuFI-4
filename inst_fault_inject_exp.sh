@@ -14,7 +14,7 @@ DO_RESULT_GEN=0 # 1: generate result files, 0: skip result generation
 
 
 # set cuda installation path
-export CUDA_INSTALL_PATH=/usr/local/cuda
+export CUDA_INSTALL_PATH=/usr/local/cuda-11.0
 
 # -------- Global metrics storage (script-wide) --------
 GLOBAL_CYCLES=""
@@ -420,7 +420,7 @@ main() {
                     if [[ -n "$x_val" ]]; then
                         cp "$cu_file" "${cu_file}.bak"
                         nvcc "$cu_file" -o "./gen" -g -lcudart -arch=sm_75 
-                        /usr/local/cuda/bin/nvcc "$cu_file" -o "./gpu_gen" -arch=sm_75
+                        /usr/local/cuda-11.0/bin/nvcc "$cu_file" -o "./gpu_gen" -arch=sm_75
                         ./gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
                         ./gpu_gen $line >> "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}_gpu.txt"
                         # 仅保留最后一个GPGPU-Sim所在行到倒数第二个GPGPU-Sim所在行之间的内容（不包括GPGPU-Sim所在行）
@@ -473,7 +473,7 @@ main() {
                     fi
                     cp "$cu_file" "${cu_file}.bak"
                         nvcc "$cu_file" -o "./gen" -g -lcudart -arch=sm_75 
-                        /usr/local/cuda/bin/nvcc "$cu_file" -o "./gpu_gen" -arch=sm_75
+                        /usr/local/cuda-11.0/bin/nvcc "$cu_file" -o "./gpu_gen" -arch=sm_75
                         ./gen $line > "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}.txt"
                         ./gpu_gen $line >> "test_apps/${TEST_APP_NAME}/result/${idx}-${x_val}_gpu.txt"
                         # 仅保留最后一个GPGPU-Sim所在行到倒数第二个GPGPU-Sim所在行之间的内容（不包括GPGPU-Sim所在行）
