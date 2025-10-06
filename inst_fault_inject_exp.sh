@@ -746,6 +746,7 @@ main() {
         for f in result_info/*; do
             [[ -f "$f" ]] || continue
             coscmd upload "$f" "fffggg-1309585620/${TEST_APP_NAME}/result_info/$(basename "$f")" || failed_upload=1
+            coscmd upload "$f" "fffggg-1309585620/all_result_info/$(basename "$f")" || failed_upload=1
         done
         fi
 
