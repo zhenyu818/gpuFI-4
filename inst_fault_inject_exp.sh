@@ -359,9 +359,9 @@ main() {
     # pip3 install pathlib -i https://pypi.tuna.tsinghua.edu.cn/simple
     # pip3 install numpy -i https://pypi.tuna.tsinghua.edu.cn/simple
     # pip3 install pandas -i https://pypi.tuna.tsinghua.edu.cn/simple
+    apt-get update
     apt-cache search makedepend
     apt-get install xutils-dev
-    apt-get update
     apt-get install -y bison flex
     mkdir -p /usr/lib/x86_64-linux-gnu
     ln -sf /bin/true /usr/lib/x86_64-linux-gnu/libGL.so
