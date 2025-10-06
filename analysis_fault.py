@@ -767,6 +767,29 @@ def _sum_noninvalid_totinj_from_csv(out_csv_path: str) -> int:
                 pass
     return s
 
+def _count_noninvalid_rows_and_only_totinj(out_csv_path: str):
+    """
+    统计合并CSV中(新+旧)非 invalid_summary 行的数量；
+    若仅有一条有效指令，返回 (1, 该行的 tot_inj)，否则返回 (数量, 0)。
+    """
+    if not os.path.exists(out_csv_path):
+        return 0, 0
+    cnt = 0
+    only_totinj = 0
+    with open(out_csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row.get("kernel", "") == "invalid_summary":
+                continue
+            cnt += 1
+            if cnt == 1:
+                try:
+                    only_totinj = int(row.get("tot_inj", 0))
+                except Exception:
+                    only_totinj = 0
+    return cnt, only_totinj
+
+
 
 def _maybe_save_threshold_snapshots(out_csv_path: str, thresholds=(384, 600, 1067, 2401)):
     """
@@ -881,6 +904,13 @@ def main():
     print("========== Round Summary ==========")
     print(f" Cycle={cycle} | A={A:.6f} | B={B:.6f} | Perc_inv (new only)={perc_inv_new:.6f}")
     print(f" Totals  Masked: {total_masked} | SDC: {total_sdc} | DUE: {total_due} | Others: {total_others} | All: {total_inj}")
+    # ---- 新停机规则：到第三轮时，(新+旧) 仅存在 1 条有效指令，且其 tot_inj > 384 则停机 ----
+    if cycle == 3:
+        valid_cnt, only_totinj = _count_noninvalid_rows_and_only_totinj(out_path)
+        if valid_cnt == 1 and only_totinj > 384:
+            print(f"[EXIT] Round-3 rule hit: only 1 valid instruction with tot_inj={only_totinj} (>384). exit99.")
+            sys.exit(99)
+
 
     # 读取最近历史，计算“连续 >=0.98”的计数（新的停机阈值）
     hist = _read_last_vals(info_path, k=10)  # 取最近最多 10 轮
