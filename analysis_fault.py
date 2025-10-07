@@ -911,6 +911,13 @@ def main():
             print(f"[EXIT] Round-3 rule hit: only 1 valid instruction with tot_inj={only_totinj} (>384). exit99.")
             sys.exit(99)
 
+    # ---- 新停机规则：到第10轮时，所有指令的 SDC 之和仍为 0 则停机 ----
+    # 说明：total_sdc 来自 write_csv 的返回值，是“合并后 CSV（旧+新）”里所有行 SDC 的总和
+    if cycle == 10 and total_sdc == 0:
+        print("[EXIT] Round-10 rule hit: cumulative SDC sum across all instructions is 0 at cycle 10. exit99.")
+        sys.exit(99)
+
+
 
     # 读取最近历史，计算“连续 >=0.98”的计数（新的停机阈值）
     hist = _read_last_vals(info_path, k=10)  # 取最近最多 10 轮
